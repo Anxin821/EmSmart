@@ -14,20 +14,16 @@ __pycache__/
 # Virtual environments
 venv/
 .venv/
-*/venv/
-Smart/venv/
+env/
 
 # Node
 node_modules/
 **/node_modules/
-frontend/node_modules/
-Smart/frontend/node_modules/
 
 # Databases and local build artifacts
 **/emsmart.db
 *.sqlite3
-dist/
-frontend/dist/
+**/dist/
 
 # Logs and runtime files
 *.log
@@ -52,7 +48,7 @@ yarn-error.log*
 *.bak
 *.tmp
 
-# Local development files
-node_modules/
+# 后端备份/临时文件
+backend/main_legacy.py
 
 # End
