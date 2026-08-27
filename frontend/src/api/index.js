@@ -37,5 +37,6 @@ export { dashboardApi } from './dashboard'
 export { usersApi } from './users'
 export { projectsApi } from './projects'
 export { dutiesApi } from './duties'
+export { esopApi } from './esop'
 
 export default api

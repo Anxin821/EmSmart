@@ -14,6 +14,7 @@ from .production import WeeklyProduction, MonthlyProduction
 from .network import Server, AgingRack, WifiAp
 from .mes import WorkOrder, Bug, DevRequest
 from .system import Project, OperationLog, AntivirusRecord, JobResponsibility
+from .esop import EsopPart
 
 __all__ = [
     "Base",
@@ -32,4 +33,5 @@ __all__ = [
     "OperationLog",
     "AntivirusRecord",
     "JobResponsibility",
+    "EsopPart",
 ]

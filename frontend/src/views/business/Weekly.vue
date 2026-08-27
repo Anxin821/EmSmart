@@ -142,7 +142,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { productionApi, optionsApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
@@ -153,7 +153,7 @@ import CommonModal      from '@/components/common/CommonModal.vue'
 
 const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
-const allData = ref([])
+const tableData = ref([])
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线']
 const projects = ref([])
 const filters = ref({ year: '', week: '', line: '' })
@@ -172,11 +172,6 @@ const uploadRef = ref(null)
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
-const tableData = computed(() => {
-  const start = (page.value - 1) * pageSize.value
-  return allData.value.slice(start, start + pageSize.value)
-})
 
 const filterFields = [
   { type: 'input', key: 'year', label: '年', placeholder: '请输入年份（数字）', autoSearch: false, clearable: true },
@@ -202,15 +197,14 @@ const resetFilters = () => {
 
 const loadData = async () => {
   try {
-    const params = {}
+    const params = { page: page.value, page_size: pageSize.value }
     if (filters.value.year) params.year = filters.value.year
     if (filters.value.week) params.week = filters.value.week
     if (filters.value.line) params.production_line = filters.value.line
 
     const res = await productionApi.weekly(params)
-    allData.value = res.data?.items || []
-    total.value = allData.value.length
-    page.value = 1
+    tableData.value = res.data?.items || []
+    total.value = res.data?.total || 0
   } catch (e) {
     console.error(e)
   }
@@ -284,6 +278,10 @@ const handleImport = async () => {
     importing.value = false
   }
 }
+
+watch([page, pageSize], () => {
+  loadData()
+})
 
 onMounted(async () => {
   const projRes = await optionsApi.projects()

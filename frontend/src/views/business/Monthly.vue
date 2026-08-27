@@ -106,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { productionApi, optionsApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
@@ -118,7 +118,7 @@ import StatCard         from '@/components/common/StatCard.vue'
 
 const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
-const allData = ref([])
+const tableData = ref([])
 const projects = ref([])
 const filters = ref({ year: '', month: '', project: '' })
 const stats = ref({})
@@ -131,11 +131,6 @@ const saving = ref(false)
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
-const tableData = computed(() => {
-  const start = (page.value - 1) * pageSize.value
-  return allData.value.slice(start, start + pageSize.value)
-})
 
 const projectOptions = computed(() =>
   (projects.value || []).map(p => ({ label: p.project_name, value: p.project_code }))
@@ -164,16 +159,15 @@ const resetFilters = () => {
 
 const loadData = async () => {
   try {
-    const params = {}
+    const params = { page: page.value, page_size: pageSize.value }
     if (filters.value.year) params.year = filters.value.year
     if (filters.value.month) params.month = filters.value.month
     if (filters.value.project) params.project = filters.value.project
 
     const res = await productionApi.monthly(params)
-    allData.value = res.data?.items || []
+    tableData.value = res.data?.items || []
     stats.value = res.data?.extra || {}
-    total.value = allData.value.length
-    page.value = 1
+    total.value = res.data?.total || 0
   } catch (e) {
     console.error(e)
   }
@@ -234,6 +228,10 @@ const handleGenerate = async () => {
     toast.error('生成失败')
   }
 }
+
+watch([page, pageSize], () => {
+  loadData()
+})
 
 onMounted(async () => {
   const projRes = await optionsApi.projects()

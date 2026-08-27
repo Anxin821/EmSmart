@@ -112,6 +112,12 @@ const routes = [
         name: 'Users',
         component: () => import('../views/business/Users.vue'),
         meta: { requiresAuth: true }
+      },
+      {
+        path: '/esop-parts',
+        name: 'EsopParts',
+        component: () => import('../views/business/EsopParts.vue'),
+        meta: { requiresAuth: true }
       }
     ]
   }

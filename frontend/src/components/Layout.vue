@@ -55,6 +55,9 @@
       <button type="button" class="nav-link" :class="{ active: $route.name === 'Antivirus' }" @click="go('/antivirus')">
         <span class="bi bi-shield-shaded" aria-hidden="true"></span>设备杀毒记录
       </button>
+      <button type="button" class="nav-link" :class="{ active: $route.name === 'EsopParts' }" @click="go('/esop-parts')">
+        <span class="bi bi-file-earmark-text-fill" aria-hidden="true"></span>ESOP料号管理
+      </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'Users' }" @click="go('/users')">
         <span class="bi bi-people-fill" aria-hidden="true"></span>用户管理
       </button>
@@ -135,6 +138,7 @@ const NAME_MAP = {
   Bugs:         ['业务管理', 'MES BUG 管理'],
   DevReqs:      ['业务管理', 'MES 需求管理'],
   Antivirus:    ['业务管理', '设备杀毒记录'],
+  EsopParts:    ['业务管理', 'ESOP料号管理'],
   Users:        ['业务管理', '用户管理']
 }
 

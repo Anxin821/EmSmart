@@ -8,7 +8,7 @@ from sqlalchemy import func, and_, or_, text, desc, case, Date as DateType
 from sqlalchemy.orm import Session, joinedload
 from models import (
     User, AoiAiDevice, WeeklyProduction, MonthlyProduction,
-    Server, AgingRack, WifiAp, WorkOrder, Bug, DevRequest, OperationLog, Project
+    Server, AgingRack, WifiAp, WorkOrder, Bug, DevRequest, OperationLog, Project, EsopPart
 )
 from core.auth import hash_password
 
@@ -1024,5 +1024,59 @@ def delete_project(db: Session, project_id: int) -> bool:
     if not project:
         return False
     db.delete(project)
+    db.commit()
+    return True
+
+
+# ============================================================
+# ESOP 料号 CRUD
+# ============================================================
+def get_esop_parts_paginated(
+    db: Session, page: int = 1, page_size: int = 20,
+    keyword: Optional[str] = None, station_name: Optional[str] = None,
+    process_name: Optional[str] = None, file_name: Optional[str] = None,
+) -> Tuple[List[EsopPart], int]:
+    query = db.query(EsopPart)
+    if keyword:
+        kw = f"%{keyword}%"
+        query = query.filter(
+            or_(EsopPart.station_name.like(kw), EsopPart.process_name.like(kw), EsopPart.part_number.like(kw))
+        )
+    if station_name:
+        query = query.filter(EsopPart.station_name == station_name)
+    if process_name:
+        query = query.filter(EsopPart.process_name.like(f"%{process_name}%"))
+    if file_name:
+        query = query.filter(EsopPart.file_name.like(f"%{file_name}%"))
+    total = query.count()
+    items = query.order_by(EsopPart.id.asc()).offset((page - 1) * page_size).limit(page_size).all()
+    return items, total
+
+
+def create_esop_part(db: Session, data: dict) -> EsopPart:
+    part = EsopPart(**data)
+    db.add(part)
+    db.commit()
+    db.refresh(part)
+    return part
+
+
+def update_esop_part(db: Session, part_id: int, data: dict) -> Optional[EsopPart]:
+    part = db.query(EsopPart).filter(EsopPart.id == part_id).first()
+    if not part:
+        return None
+    for key, value in data.items():
+        if value is not None and hasattr(part, key):
+            setattr(part, key, value)
+    db.commit()
+    db.refresh(part)
+    return part
+
+
+def delete_esop_part(db: Session, part_id: int) -> bool:
+    part = db.query(EsopPart).filter(EsopPart.id == part_id).first()
+    if not part:
+        return False
+    db.delete(part)
     db.commit()
     return True

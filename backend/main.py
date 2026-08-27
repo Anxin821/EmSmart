@@ -34,6 +34,7 @@ from routers.projects import router as projects_router
 from routers.antivirus import router as antivirus_router
 from routers.users import router as users_router
 from routers.responsibilities import router as responsibilities_router
+from routers.esop import router as esop_router
 
 # ---------- 定时任务 ----------
 from tasks import check_server_health
@@ -163,6 +164,7 @@ app.include_router(projects_router, prefix=API_PREFIX)
 app.include_router(antivirus_router, prefix=API_PREFIX)
 app.include_router(users_router, prefix=API_PREFIX)
 app.include_router(responsibilities_router, prefix=API_PREFIX)
+app.include_router(esop_router, prefix=API_PREFIX)
 
 
 # ============================================================
