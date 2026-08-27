@@ -1,0 +1,58 @@
+# Root .gitignore for EmSmart repository
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.egg-info/
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+venv/
+.venv/
+*/venv/
+Smart/venv/
+
+# Node
+node_modules/
+**/node_modules/
+frontend/node_modules/
+Smart/frontend/node_modules/
+
+# Databases and local build artifacts
+**/emsmart.db
+*.sqlite3
+dist/
+frontend/dist/
+
+# Logs and runtime files
+*.log
+logs/
+backend/logs/
+!backend/logs/.gitkeep
+
+# IDEs / OS
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.DS_Store
+Thumbs.db
+
+# NPM
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Misc
+*.bak
+*.tmp
+
+# Local development files
+node_modules/
+
+# End

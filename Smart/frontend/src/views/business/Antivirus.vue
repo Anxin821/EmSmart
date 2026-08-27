@@ -1,0 +1,351 @@
+<template>
+  <div class="page">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title"><span class="emoji">🛡</span> 设备杀毒记录</h1>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-sm btn-outline-secondary" @click="resetFilters"><span class="bi bi-funnel"></span>重置筛选</button>
+        <template v-if="userStore.canEdit">
+          <button class="btn btn-sm btn-outline-primary" @click="openCreateModal"><span class="bi bi-plus-lg"></span>新增记录</button>
+        </template>
+      </div>
+    </div>
+    <section class="page-section" style="padding:0;overflow:hidden;">
+      <CommonFilterBar :fields="filterFields" v-model:model-value="filters" @search="loadData" @reset="onResetFromFilterBar">
+        <template #actions="scope">
+          <el-button type="primary" size="default" @click="scope.search"><el-icon style="margin-right:6px;"><Search /></el-icon>搜索</el-button>
+          <el-button size="default" @click="resetFilters"><el-icon style="margin-right:6px;"><RefreshRight /></el-icon>重置</el-button>
+        </template>
+      </CommonFilterBar>
+      <el-table
+        v-loading="loading"
+        :data="items"
+        stripe
+        border
+        style="width:100%;"
+        empty-text="暂无数据"
+        :header-cell-style="{fontWeight:600}"
+      >
+        <el-table-column label="设备ID" prop="device_id" min-width="160" align="center" show-overflow-tooltip>
+          <template #default="s">
+            <span class="fw-semibold" style="color:var(--c-text);">{{ s.row.device_id || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="产线" prop="production_line" min-width="90" align="center" />
+        <el-table-column label="杀毒时间" min-width="170" align="center" show-overflow-tooltip>
+          <template #default="s">{{ (s.row.antivirus_time || '').slice(0,16).replace('T',' ') || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="下次杀毒" min-width="170" align="center" show-overflow-tooltip>
+          <template #default="s">{{ (s.row.next_antivirus_time || '').slice(0,16).replace('T',' ') || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="周期" prop="cycle" min-width="80" align="center" />
+        <el-table-column label="状态" prop="status" min-width="120" align="center">
+          <template #default="s">
+            <span :class="'status-badge ' + statusClass(s.row)">{{ statusText(s.row) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作人" prop="operator" min-width="120" align="center" show-overflow-tooltip>
+          <template #default="s">{{ s.row.operator || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="180" align="center" fixed="right">
+          <template #default="s">
+            <template v-if="userStore.canEdit">
+              <el-button type="primary" link size="small" @click="openEditModal(s.row)">
+                <el-icon style="margin-right:2px;"><Edit /></el-icon>编辑
+              </el-button>
+              <el-button v-if="userStore.isAdmin" type="danger" link size="small" @click="openDeleteModal(s.row)">
+                <el-icon style="margin-right:2px;"><Delete /></el-icon>删除
+              </el-button>
+            </template>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <el-empty :image-size="80" description="暂无数据...">
+            <template #image><div style="font-size:44px;">🛡</div></template>
+          </el-empty>
+        </template>
+      </el-table>
+      <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact @change="onPagerChange" />
+    </section>
+
+    <!-- 新增/编辑 Modal -->
+    <CommonModal
+      v-model:visible="formModalVisible"
+      :title="formMode === 'create' ? '新增杀毒记录' : '编辑杀毒记录'"
+      width="680px"
+      :ok-loading="saving"
+      @ok="submitForm"
+    >
+      <el-form :model="form" label-width="96px" label-position="right">
+        <div class="row g-3">
+          <div class="col-6">
+            <el-form-item label="设备ID" required>
+              <el-input v-model="form.device_id" clearable placeholder="如：PC-8F7A" maxlength="50" />
+            </el-form-item>
+          </div>
+          <div class="col-6">
+            <el-form-item label="产线" required>
+              <el-select v-model="form.production_line" style="width:100%;">
+                <el-option v-for="l in lines" :key="l" :label="l" :value="l" />
+                <el-option label="品质线" value="品质线" />
+                <el-option label="维修线" value="维修线" />
+              </el-select>
+            </el-form-item>
+          </div>
+          <div class="col-6">
+            <el-form-item label="杀毒时间" required>
+              <el-date-picker
+                v-model="form.antivirus_time"
+                type="datetime"
+                value-format="YYYY-MM-DDTHH:mm:ss"
+                placeholder="选择日期时间"
+                style="width:100%;"
+              />
+            </el-form-item>
+          </div>
+          <div class="col-6">
+            <el-form-item label="杀毒周期">
+              <el-select v-model="form.cycle" style="width:100%;">
+                <el-option label="每天" value="每天" />
+                <el-option label="每周" value="每周" />
+              </el-select>
+            </el-form-item>
+          </div>
+          <div class="col-6">
+            <el-form-item label="操作人" required>
+              <el-input v-model="form.operator" clearable placeholder="请输入操作人姓名" maxlength="32" />
+            </el-form-item>
+          </div>
+          <div class="col-6">
+            <el-form-item label="备注">
+              <el-input v-model="form.remark" clearable placeholder="可选" maxlength="200" />
+            </el-form-item>
+          </div>
+        </div>
+      </el-form>
+      <template #footer="f">
+        <el-button @click="f.cancel">取消</el-button>
+        <el-button type="primary" :loading="f.okLoading" @click="f.ok">
+          {{ formMode === 'create' ? '创建' : '保存修改' }}
+        </el-button>
+      </template>
+    </CommonModal>
+
+    <!-- 删除确认 Modal -->
+    <CommonModal
+      v-model:visible="deleteModalVisible"
+      title="确认删除杀毒记录"
+      width="460px"
+      :ok-loading="deleting"
+      @ok="submitDelete"
+    >
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <div style="
+          width:44px;height:44px;flex-shrink:0;border-radius:50%;
+          background:#FEE2E2;color:#DC2626;font-size:22px;
+          display:inline-flex;align-items:center;justify-content:center;
+        ">
+          <span class="bi bi-trash3-fill"></span>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:600;color:#0f172a;margin-bottom:6px;">
+            确定删除该杀毒记录？
+          </div>
+          <div style="font-size:13px;color:var(--c-text-3);line-height:1.6;">
+            设备 <b style="color:var(--c-text-2);">{{ deleteRow?.device_id }}</b>
+            （{{ (deleteRow?.antivirus_time||'').slice(0,10) }}）将被永久删除，该操作无法撤销。
+          </div>
+        </div>
+      </div>
+      <template #footer="f">
+        <el-button @click="f.cancel">取消</el-button>
+        <el-button type="danger" :loading="f.okLoading" @click="f.ok">确认删除</el-button>
+      </template>
+    </CommonModal>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { antivirusApi } from '@/api'
+import { useUserStore } from '@/stores/user'
+import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
+import CommonPagination from '@/components/common/CommonPagination.vue'
+import CommonModal      from '@/components/common/CommonModal.vue'
+
+const userStore = useUserStore()
+const lines = ['1线','2线','3线','4线','5线','6线','7线','8线']
+const items = ref([])
+const page = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+const loading = ref(false)
+const filters = ref({ keyword:'', line:'' })
+
+// 表单弹窗
+const formModalVisible = ref(false)
+const formMode = ref('create')
+const saving = ref(false)
+const editRow = ref(null)
+const form = ref({
+  device_id: '', production_line: '1线', antivirus_time: '',
+  cycle: '每天', operator: '', remark: ''
+})
+
+// 删除弹窗
+const deleteModalVisible = ref(false)
+const deleting = ref(false)
+const deleteRow = ref(null)
+
+const filterFields = computed(() => [
+  {
+    type: 'input',
+    key: 'keyword',
+    label: '',
+    placeholder: '设备ID / 操作人',
+    minWidth: 260,
+    showSearchIcon: true,
+    autoSearch: false
+  },
+  { type: 'divider' },
+  {
+    type: 'select',
+    key: 'line',
+    label: '产线',
+    minWidth: 140,
+    options: [
+      { label: '全部产线', value: '' },
+      ...lines.map(l => ({ label: l, value: l })),
+      { label: '品质线', value: '品质线' },
+      { label: '维修线', value: '维修线' }
+    ],
+    autoSearch: true
+  }
+])
+
+/**
+ * 根据 next_antivirus_time 与当前时间对比，计算状态（与看板一致的口径）
+ * 已杀毒：next_antivirus_time > now
+ * 超时未杀毒：next_antivirus_time <= now
+ * 待处理：next_antivirus_time 为空
+ */
+const statusText = (row) => {
+  if (!row.next_antivirus_time) return '待处理'
+  const now = new Date()
+  const next = new Date(row.next_antivirus_time.replace('Z',''))
+  return next > now ? '已杀毒' : '超时未杀毒'
+}
+const statusClass = (row) => {
+  const t = statusText(row)
+  if (t === '已杀毒')     return 'normal'
+  if (t === '超时未杀毒') return 'fault'
+  return 'warn'
+}
+
+const defaultForm = () => ({
+  device_id: '', production_line: '1线', antivirus_time: '',
+  cycle: '每天', operator: '', remark: ''
+})
+
+const resetFilters = () => {
+  filters.value = { keyword:'', line:'' }
+  page.value = 1
+  loadData()
+}
+
+const onResetFromFilterBar = () => {
+  page.value = 1
+  loadData()
+}
+
+const loadData = async () => {
+  loading.value = true
+  try {
+    const params = { page: page.value, page_size: pageSize.value }
+    // 实际后端 API：device_id / production_line 作为查询参数
+    if (filters.value.keyword) params.device_id = filters.value.keyword
+    if (filters.value.line)    params.production_line = filters.value.line
+    const res = await antivirusApi.list(params)
+    items.value = res.data?.items || []
+    total.value = res.data?.total || 0
+  } catch(e) {
+    console.error(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+const openCreateModal = () => {
+  formMode.value = 'create'
+  editRow.value = null
+  form.value = defaultForm()
+  formModalVisible.value = true
+}
+
+const openEditModal = (row) => {
+  formMode.value = 'edit'
+  editRow.value = row
+  form.value = {
+    device_id: row.device_id ?? '',
+    production_line: row.production_line ?? '1线',
+    antivirus_time: row.antivirus_time ?? '',
+    cycle: row.cycle ?? '每天',
+    operator: row.operator ?? '',
+    remark: row.remark ?? '',
+  }
+  formModalVisible.value = true
+}
+
+const submitForm = async () => {
+  const d = form.value
+  if (!d.device_id       || !d.device_id.trim())       { ElMessage.warning('请输入设备ID'); return }
+  if (!d.production_line)                              { ElMessage.warning('请选择产线');    return }
+  if (!d.antivirus_time)                               { ElMessage.warning('请选择杀毒时间');return }
+  if (!d.operator      || !d.operator.trim())         { ElMessage.warning('请输入操作人');  return }
+  saving.value = true
+  try {
+    const payload = { ...d }
+    if (formMode.value === 'create') {
+      await antivirusApi.create(payload)
+      ElMessage.success('创建成功')
+    } else {
+      await antivirusApi.update(editRow.value.id, payload)
+      ElMessage.success('修改成功')
+    }
+    formModalVisible.value = false
+    loadData()
+  } catch(e) {
+    console.error(e)
+    ElMessage.error(e.response?.data?.message || (formMode.value === 'create' ? '创建失败' : '修改失败'))
+  } finally {
+    saving.value = false
+  }
+}
+
+const openDeleteModal = (row) => {
+  deleteRow.value = row
+  deleteModalVisible.value = true
+}
+
+const submitDelete = async () => {
+  deleting.value = true
+  try {
+    await antivirusApi.delete(deleteRow.value.id)
+    deleteModalVisible.value = false
+    ElMessage.success('删除成功')
+    loadData()
+  } catch(e) {
+    console.error(e)
+    ElMessage.error(e.response?.data?.message || '删除失败')
+  } finally {
+    deleting.value = false
+  }
+}
+
+const onPagerChange = () => loadData()
+
+onMounted(loadData)
+</script>
