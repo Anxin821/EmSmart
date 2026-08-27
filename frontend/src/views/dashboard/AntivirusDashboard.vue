@@ -28,7 +28,7 @@
         <div class="anti-stat-label">待杀毒</div>
       </div>
       <div class="anti-stat-card" style="color:#ef4444;">
-        <div class="anti-stat-num">{{ stats.overdue_count }}</div>
+        <div class="anti-stat-num" style="cursor:pointer;" @click="showOverdueModal(null)">{{ stats.overdue_count }}</div>
         <div class="anti-stat-label">超时未杀毒</div>
       </div>
     </div>
@@ -62,7 +62,8 @@
         </el-table-column>
         <el-table-column label="超时未杀毒" prop="overdue" min-width="120" align="center">
           <template #default="s">
-            <span style="color:#ef4444;font-weight:500;">{{ s.row.overdue }}</span>
+            <span v-if="s.row.overdue > 0" style="color:#ef4444;font-weight:500;cursor:pointer;text-decoration:underline;" @click="showOverdueModal(s.row.line)">{{ s.row.overdue }}</span>
+            <span v-else style="color:#ef4444;font-weight:500;">{{ s.row.overdue }}</span>
           </template>
         </el-table-column>
         <el-table-column label="进度" min-width="320" align="left">
@@ -80,16 +81,66 @@
         </template>
       </el-table>
     </section>
+
+    <!-- 超时未杀毒记录弹窗 -->
+    <el-dialog
+      v-model="overdueModalVisible"
+      :title="overdueLine ? overdueLine + ' - 超时未杀毒记录' : '全部超时未杀毒记录'"
+      width="900px"
+      align-center
+      destroy-on-close
+    >
+      <el-table :data="overdueRecords" stripe border style="width:100%;" max-height="420" empty-text="暂无超时记录">
+        <el-table-column prop="device_id" label="设备ID" min-width="140" align="center" show-overflow-tooltip />
+        <el-table-column prop="production_line" label="线体" width="90" align="center" />
+        <el-table-column prop="cycle" label="周期" width="80" align="center" />
+        <el-table-column label="上次杀毒时间" min-width="170" align="center">
+          <template #default="s">{{ (s.row.antivirus_time || '').slice(0, 19).replace('T', ' ') }}</template>
+        </el-table-column>
+        <el-table-column label="应杀毒时间" min-width="170" align="center">
+          <template #default="s">{{ (s.row.next_antivirus_time || '').slice(0, 19).replace('T', ' ') }}</template>
+        </el-table-column>
+        <el-table-column prop="operator" label="操作人" width="100" align="center">
+          <template #default="s">{{ s.row.operator || '-' }}</template>
+        </el-table-column>
+      </el-table>
+      <div style="margin-top:12px;display:flex;align-items:center;justify-content:center;position:relative;">
+        <el-button @click="overdueModalVisible = false">关闭</el-button>
+        <span style="position:absolute;right:0;color:var(--c-text-3);font-size:13px;">共 {{ overdueTotal }} 条记录</span>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { dashboardApi } from '@/api'
+import { dashboardApi, antivirusApi } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const stats = ref({ total_devices: 0, done_count: 0, pending_count: 0, overdue_count: 0 })
 const distribution = ref([])
+
+// 超时记录弹窗
+const overdueModalVisible = ref(false)
+const overdueLine = ref(null)
+const overdueRecords = ref([])
+const overdueTotal = ref(0)
+
+const showOverdueModal = async (line) => {
+  overdueLine.value = line
+  overdueModalVisible.value = true
+  overdueRecords.value = []
+  overdueTotal.value = 0
+  try {
+    const params = { page: 1, page_size: 200 }
+    if (line) params.production_line = line
+    const res = await antivirusApi.overdueRecords(params)
+    overdueRecords.value = res.data?.items || []
+    overdueTotal.value = res.data?.total || 0
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '加载超时记录失败')
+  }
+}
 
 const loadData = async () => {
   try {

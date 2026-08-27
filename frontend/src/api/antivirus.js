@@ -5,5 +5,6 @@ export const antivirusApi = {
   create: (data) => api.post('/antivirus/records', data),
   update: (id, data) => api.put(`/antivirus/records/${id}`, data),
   delete: (id) => api.delete(`/antivirus/records/${id}`),
-  dashboard: () => api.get('/antivirus/dashboard')
+  dashboard: () => api.get('/antivirus/dashboard'),
+  overdueRecords: (params) => api.get('/antivirus/overdue-records', { params }),
 }

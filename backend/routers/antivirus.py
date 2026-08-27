@@ -156,28 +156,30 @@ def import_records(
 
 # ==================== 看板 ====================
 
+@router.get("/overdue-records")
+def list_overdue_records(
+    production_line: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """查询超时未杀毒记录（按线体筛选）"""
+    now = datetime.utcnow()
+    q = db.query(AntivirusRecord).filter(AntivirusRecord.next_antivirus_time <= now)
+    if production_line:
+        q = q.filter(AntivirusRecord.production_line == production_line)
+    total = q.count()
+    records = q.order_by(AntivirusRecord.next_antivirus_time.asc()).offset((page - 1) * page_size).limit(page_size).all()
+    return {"code": 200, "data": PaginatedData(total=total, page=page, page_size=page_size, items=[_record_to_dict(r) for r in records])}
+
+
 @router.get("/dashboard")
 def antivirus_dashboard(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    """设备杀毒看板：全局统计 + 按线体分布（含进度百分比）"""
-    from sqlalchemy import func
-
+    """设备杀毒看板：全局统计 + 按线体分布（含进度百分比），基于全部记录"""
     now = datetime.utcnow()
 
-    # 取所有杀毒记录中每个设备最新的一条
-    latest = (
-        db.query(
-            AntivirusRecord.device_id,
-            func.max(AntivirusRecord.antivirus_time).label("last_time"),
-        )
-        .group_by(AntivirusRecord.device_id)
-        .subquery()
-    )
-    records = (
-        db.query(AntivirusRecord)
-        .join(latest, (AntivirusRecord.device_id == latest.c.device_id)
-                         & (AntivirusRecord.antivirus_time == latest.c.last_time))
-        .all()
-    )
+    records = db.query(AntivirusRecord).all()
 
     total_devices = len(records)
     done_count = 0
