@@ -64,7 +64,7 @@
               <el-button type="warning" link size="small" @click="showPermModal(row)">
                 <el-icon><Key /></el-icon>权限
               </el-button>
-              <el-button type="danger" link size="small" @click="handleDelete(row.user_id)">
+              <el-button type="danger" link size="small" @click="handleDelete(row.id)">
                 <el-icon><Delete /></el-icon>删除
               </el-button>
             </template>

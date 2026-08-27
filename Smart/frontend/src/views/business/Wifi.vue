@@ -54,7 +54,7 @@
               <el-button type="primary" link size="small" @click="openEditModal(s.row)">
                 <el-icon style="margin-right:2px;"><Edit /></el-icon>编辑
               </el-button>
-              <el-button v-if="userStore.isAdmin" type="danger" link size="small" @click="openDeleteModal(s.row)">
+              <el-button v-if="userStore.isAdmin" type="danger" link size="small" @click="handleDelete(s.row)">
                 <el-icon style="margin-right:2px;"><Delete /></el-icon>删除
               </el-button>
             </template>
@@ -139,37 +139,7 @@
       </template>
     </CommonModal>
 
-    <!-- 删除确认 Modal -->
-    <CommonModal
-      v-model:visible="deleteModalVisible"
-      title="确认删除 AP"
-      width="460px"
-      :ok-loading="deleting"
-      @ok="submitDelete"
-    >
-      <div style="display:flex;gap:14px;align-items:flex-start;">
-        <div style="
-          width:44px;height:44px;flex-shrink:0;border-radius:50%;
-          background:#FEE2E2;color:#DC2626;font-size:22px;
-          display:inline-flex;align-items:center;justify-content:center;
-        ">
-          <span class="bi bi-trash3-fill"></span>
-        </div>
-        <div>
-          <div style="font-size:15px;font-weight:600;color:#0f172a;margin-bottom:6px;">
-            确定删除该 AP？
-          </div>
-          <div style="font-size:13px;color:var(--c-text-3);line-height:1.6;">
-            AP <b style="color:var(--c-text-2);">{{ deleteRow?.ssid }}（{{ deleteRow?.ap_id }}）</b>
-            及相关数据将被永久删除，该操作无法撤销。
-          </div>
-        </div>
-      </div>
-      <template #footer="f">
-        <el-button @click="f.cancel">取消</el-button>
-        <el-button type="danger" :loading="f.okLoading" @click="f.ok">确认删除</el-button>
-      </template>
-    </CommonModal>
+
   </div>
 </template>
 
@@ -178,12 +148,13 @@ import { ref, computed, onMounted } from 'vue'
 import { networkApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { useNotify } from '@/composables/useNotify'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
 
 const userStore = useUserStore()
+const { toast, confirmDelete } = useNotify()
 const items = ref([])
 const page = ref(1)
 const pageSize = ref(20)
@@ -202,10 +173,7 @@ const form = ref({
   location: '', channel: 6, connected_devices: 0, status: '在线', responsible_person: ''
 })
 
-// 删除弹窗
-const deleteModalVisible = ref(false)
-const deleting = ref(false)
-const deleteRow = ref(null)
+
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 
@@ -304,45 +272,38 @@ const openEditModal = (row) => {
 
 const submitForm = async () => {
   const d = form.value
-  if (!d.ap_id || !d.ap_id.trim()) { ElMessage.warning('请输入 AP ID');  return }
-  if (!d.ssid  || !d.ssid.trim())  { ElMessage.warning('请输入 SSID');   return }
-  if (!d.production_line)          { ElMessage.warning('请选择产线');    return }
+  if (!d.ap_id || !d.ap_id.trim()) { toast.warn('请输入 AP ID');  return }
+  if (!d.ssid  || !d.ssid.trim())  { toast.warn('请输入 SSID');   return }
+  if (!d.production_line)          { toast.warn('请选择产线');    return }
   saving.value = true
   try {
     if (formMode.value === 'create') {
       await networkApi.create('wifi-aps', d)
-      ElMessage.success('创建成功')
+      toast.success('创建成功')
     } else {
       await networkApi.update('wifi-aps', String(editRow.value.id || editRow.value.ap_id), d)
-      ElMessage.success('修改成功')
+      toast.success('修改成功')
     }
     formModalVisible.value = false
     loadData()
   } catch(e) {
     console.error(e)
-    ElMessage.error(e.response?.data?.message || (formMode.value === 'create' ? '创建失败' : '修改失败'))
+    toast.error(e.response?.data?.message || (formMode.value === 'create' ? '创建失败' : '修改失败'))
   } finally {
     saving.value = false
   }
 }
 
-const openDeleteModal = (row) => {
-  deleteRow.value = row
-  deleteModalVisible.value = true
-}
-
-const submitDelete = async () => {
-  deleting.value = true
+const handleDelete = async (row) => {
+  const ok = await confirmDelete(`AP ${row.ap_id}`, '删除后数据不可恢复')
+  if (!ok) return
   try {
-    await networkApi.delete('wifi-aps', String(deleteRow.value.id || deleteRow.value.ap_id))
-    deleteModalVisible.value = false
-    ElMessage.success('删除成功')
+    await networkApi.delete('wifi-aps', String(row.id || row.ap_id))
+    toast.success('删除成功')
     loadData()
   } catch(e) {
     console.error(e)
-    ElMessage.error(e.response?.data?.message || '删除失败')
-  } finally {
-    deleting.value = false
+    toast.error(e.response?.data?.message || '删除失败')
   }
 }
 

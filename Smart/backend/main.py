@@ -5,7 +5,6 @@
 - 合并了之前 main.py（开发态 + 健康检查 + login/me）与 main_clean.py（前端生产静态 + SPA fallback），
   生产/开发都用 uvicorn main:app 启动。
 - 已移除对已删除文件 templates/index.html、index-cdn.html 的引用。
-- 服务器健康检查、权限构造逻辑分别迁入 tasks / auth 包，保持主入口精简。
 """
 from __future__ import annotations
 

@@ -48,7 +48,7 @@
               </el-button>
             </template>
             <template v-if="userStore.isAdmin">
-              <el-button type="danger" link size="small" @click="handleDelete(row.record_id)">
+              <el-button type="danger" link size="small" @click="handleDelete(row.id)">
                 <el-icon><Delete /></el-icon>删除
               </el-button>
             </template>
@@ -146,11 +146,13 @@ import { ref, computed, onMounted } from 'vue'
 import { productionApi, optionsApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
+import { useNotify } from '@/composables/useNotify'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
 
 const userStore = useUserStore()
+const { toast, confirmDelete } = useNotify()
 const allData = ref([])
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线']
 const projects = ref([])
@@ -216,7 +218,7 @@ const loadData = async () => {
 
 const showModal = (row = null) => {
   if (row) {
-    editingId.value = row.record_id
+    editingId.value = row.id
     form.value = { ...row }
   } else {
     editingId.value = null
@@ -230,26 +232,30 @@ const handleSave = async () => {
   try {
     if (editingId.value) {
       await productionApi.updateWeekly(editingId.value, form.value)
+      toast.success('修改成功')
     } else {
       form.value.recorder = userStore.user?.username
       await productionApi.createWeekly(form.value)
+      toast.success('创建成功')
     }
     modalVisible.value = false
     loadData()
   } catch (e) {
-    alert(e.response?.data?.message || '保存失败')
+    toast.error(e.response?.data?.message || '保存失败')
   } finally {
     saving.value = false
   }
 }
 
 const handleDelete = async (id) => {
-  if (!confirm('确定删除？')) return
+  const ok = await confirmDelete('周报记录', '删除后数据不可恢复')
+  if (!ok) return
   try {
     await productionApi.deleteWeekly(id)
+    toast.success('删除成功')
     loadData()
   } catch (e) {
-    alert(e.response?.data?.message || '删除失败')
+    toast.error(e.response?.data?.message || '删除失败')
   }
 }
 
@@ -271,9 +277,9 @@ const handleImport = async () => {
     importFile.value = null
     if (uploadRef.value) uploadRef.value.clearFiles()
     loadData()
-    alert(res.message || '导入成功')
+    toast.success(res.message || '导入成功')
   } catch (e) {
-    alert(e.response?.data?.detail || e.response?.data?.message || '导入失败')
+    toast.error(e.response?.data?.detail || e.response?.data?.message || '导入失败')
   } finally {
     importing.value = false
   }

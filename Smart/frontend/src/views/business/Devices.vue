@@ -217,7 +217,7 @@ const {
 })
 // 外层包装：点表格的删除按钮时，把设备名/ID传进去让确认弹窗更友好
 const handleDelete = (row) => del(row, {
-  idProp: 'item_id',
+  idProp: 'id',
   labelProp: 'name',
   extraMsg: `设备ID ${row.device_id || ''} 将一并删除其所有关联数据`,
   successMsg: '设备已删除',

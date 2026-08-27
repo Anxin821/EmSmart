@@ -147,34 +147,7 @@
       </template>
     </CommonModal>
 
-    <!-- 删除确认弹窗 -->
-    <CommonModal
-      v-model:visible="deleteModalVisible"
-      title="确认删除 BUG"
-      width="460px"
-      :ok-loading="deleting"
-      @ok="submitDelete"
-    >
-      <div style="display:flex;gap:14px;align-items:flex-start;">
-        <div style="
-          width:44px;height:44px;flex-shrink:0;border-radius:50%;
-          background:#FEE2E2;color:#DC2626;font-size:20px;
-          display:inline-flex;align-items:center;justify-content:center;">
-          <span class="bi bi-trash3-fill"></span>
-        </div>
-        <div>
-          <div style="font-size:15px;font-weight:600;color:#0f172a;margin-bottom:6px;">确定删除该 BUG？</div>
-          <div style="font-size:13px;color:var(--c-text-3);line-height:1.6;">
-            编号 <b>{{ deleteTarget?.bug_id }}</b> - {{ deleteTarget?.title }}<br/>
-            该操作无法撤销，相关历史记录也将被移除。
-          </div>
-        </div>
-      </div>
-      <template #footer="f">
-        <el-button @click="f.cancel">取消</el-button>
-        <el-button type="danger" :loading="f.okLoading" @click="f.ok">确认删除</el-button>
-      </template>
-    </CommonModal>
+
 
     <!-- 流转弹窗 -->
     <CommonModal
@@ -209,12 +182,13 @@ import { ref, computed, onMounted } from 'vue'
 import { mesApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, Refresh, RefreshRight } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { useNotify } from '@/composables/useNotify'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
 
 const userStore = useUserStore()
+const { toast, confirmDelete } = useNotify()
 const items = ref([])
 const page = ref(1)
 const pageSize = ref(20)
@@ -224,13 +198,10 @@ const filters = ref({ keyword: '', severity: '', status: '' })
 const modalVisible = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
-const deleting = ref(false)
 const flowSaving = ref(false)
 const form = ref({})
 
-// 删除确认弹窗
-const deleteModalVisible = ref(false)
-const deleteTarget = ref(null)
+
 
 // 流转弹窗
 const flowModalVisible = ref(false)
@@ -318,44 +289,37 @@ const closeModal = () => {
 
 const handleSave = async () => {
   if (!form.value.title || !String(form.value.title).trim()) {
-    ElMessage.warning('请输入 BUG 标题')
+    toast.warn('请输入 BUG 标题')
     return
   }
   saving.value = true
   try {
     if (editingId.value) {
       await mesApi.update('bugs', editingId.value, form.value)
-      ElMessage.success('修改成功')
+      toast.success('修改成功')
     } else {
       const r = await mesApi.create('bugs', form.value)
-      ElMessage.success(`创建成功 ${r.data?.bug_id ? '（'+r.data.bug_id+'）' : ''}`)
+      toast.success(`创建成功 ${r.data?.bug_id ? '（'+r.data.bug_id+'）' : ''}`)
     }
     closeModal()
     loadData()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '保存失败')
+    toast.error(e.response?.data?.message || '保存失败')
   } finally {
     saving.value = false
   }
 }
 
-// ---------- 删除 ----------
-const handleDelete = (row) => {
-  deleteTarget.value = row
-  deleteModalVisible.value = true
-}
-const submitDelete = async () => {
-  deleting.value = true
+const handleDelete = async (row) => {
+  const ok = await confirmDelete(`BUG ${row.bug_id}`, '删除后数据不可恢复')
+  if (!ok) return
   try {
-    await mesApi.delete('bugs', deleteTarget.value?.bug_id ?? deleteTarget.value)
-    ElMessage.success('BUG删除成功')
-    deleteModalVisible.value = false
-    deleteTarget.value = null
+    await mesApi.delete('bugs', row.bug_id)
+    toast.success('BUG删除成功')
     loadData()
-  } catch (e) {
-    ElMessage.error(e?.response?.data?.detail || e?.response?.data?.message || '删除失败')
-  } finally {
-    deleting.value = false
+  } catch(e) {
+    console.error(e)
+    toast.error(e.response?.data?.detail || e.response?.data?.message || '删除失败')
   }
 }
 
@@ -367,18 +331,18 @@ const handleFlow = (row) => {
 }
 const submitFlow = async () => {
   if (!flowStatus.value) {
-    ElMessage.warning('请选择新状态')
+    toast.warn('请选择新状态')
     return
   }
   flowSaving.value = true
   try {
     await mesApi.flow('bugs', flowRow.value.bug_id, flowStatus.value)
-    ElMessage.success(`状态已更新为 ${flowStatus.value}`)
+    toast.success(`状态已更新为 ${flowStatus.value}`)
     flowModalVisible.value = false
     flowRow.value = null
     loadData()
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '流转失败')
+    toast.error(e.response?.data?.message || '流转失败')
   } finally {
     flowSaving.value = false
   }

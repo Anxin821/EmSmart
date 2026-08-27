@@ -68,7 +68,7 @@
               </el-button>
             </template>
             <template v-if="userStore.isAdmin">
-              <el-button type="danger" link size="small" @click="handleDelete(row.server_id)">
+              <el-button type="danger" link size="small" @click="handleDelete(row.id)">
                 <el-icon><Delete /></el-icon>删除
               </el-button>
             </template>
