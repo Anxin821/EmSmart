@@ -102,8 +102,10 @@
         </el-upload>
       </div>
       <template #footer="f">
-        <el-button @click="f.cancel">取消</el-button>
-        <el-button type="primary" :loading="f.okLoading" :disabled="!importFile" @click="f.ok">开始导入</el-button>
+        <div class="cm-footer">
+          <el-button @click="f.cancel">取消</el-button>
+          <el-button type="primary" :loading="f.okLoading" :disabled="!importFile" @click="f.ok">开始导入</el-button>
+        </div>
       </template>
     </CommonModal>
     <CommonModal
@@ -144,8 +146,10 @@
         </div>
       </div>
       <template #footer="f">
-        <el-button @click="f.cancel">取消</el-button>
-        <el-button type="primary" :loading="f.okLoading" @click="f.ok">保存</el-button>
+        <div class="cm-footer">
+          <el-button @click="f.cancel">取消</el-button>
+          <el-button type="primary" :loading="f.okLoading" @click="f.ok">保存</el-button>
+        </div>
       </template>
     </CommonModal>
   </div>
@@ -283,4 +287,4 @@ onMounted(async () => {
   projects.value = projRes.data || []
   loadData()
 })
-</script>
+</script>

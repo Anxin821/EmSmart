@@ -140,10 +140,12 @@
         </div>
       </el-form>
       <template #footer="f">
-        <el-button @click="f.cancel">取消</el-button>
-        <el-button type="primary" :loading="f.okLoading" @click="f.ok">
-          {{ formMode === 'create' ? '创建' : '保存修改' }}
-        </el-button>
+        <div class="cm-footer">
+          <el-button @click="f.cancel">取消</el-button>
+          <el-button type="primary" :loading="f.okLoading" @click="f.ok">
+            {{ formMode === 'create' ? '创建' : '保存修改' }}
+          </el-button>
+        </div>
       </template>
     </CommonModal>
   </div>

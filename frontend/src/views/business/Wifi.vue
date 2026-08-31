@@ -21,9 +21,9 @@
 
     <el-table v-loading="loading" :data="items" stripe border style="width:100%" empty-text="暂无数据" :header-cell-style="{fontWeight:600}">
 
-        <el-table-column label="AP ID" prop="ap_id" min-width="120" align="center">
+        <el-table-column label="AP ID" min-width="120" align="center">
           <template #default="s">
-            <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">{{ s.row.ap_id }}</code>
+            <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">{{ s.row.ap_id || s.row.id || '-' }}</code>
           </template>
         </el-table-column>
 
@@ -142,10 +142,12 @@
         </div>
       </el-form>
       <template #footer="f">
-        <el-button @click="f.cancel">取消</el-button>
-        <el-button type="primary" :loading="f.okLoading" @click="f.ok">
-          {{ formMode === 'create' ? '创建' : '保存修改' }}
-        </el-button>
+        <div class="cm-footer">
+          <el-button @click="f.cancel">取消</el-button>
+          <el-button type="primary" :loading="f.okLoading" @click="f.ok">
+            {{ formMode === 'create' ? '创建' : '保存修改' }}
+          </el-button>
+        </div>
       </template>
     </CommonModal>
   </div>
@@ -278,7 +280,7 @@ const openEditModal = (row) => {
   formMode.value = 'edit'
   editRow.value = row
   form.value = {
-    ap_id: row.ap_id ?? '',
+    ap_id: (row.ap_id && row.ap_id.trim() !== '') ? row.ap_id : (row.id || ''),
     ssid: row.ssid ?? '',
     production_line: row.production_line ?? '1线',
     ip_address: row.ip_address ?? '',

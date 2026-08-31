@@ -158,7 +158,7 @@
         </el-form>
       </div>
       <template #footer="f">
-        <div style="display:flex;justify-content:center;gap:12px;">
+        <div class="cm-footer">
           <el-button size="default" style="min-width:110px;height:36px;border-radius:9px;" @click="f.cancel">
             <span class="bi bi-x" style="margin-right:4px;"></span>取消
           </el-button>
@@ -197,8 +197,10 @@
         </div>
       </div>
       <template #footer="f">
-        <el-button @click="f.cancel">取消</el-button>
-        <el-button type="danger" :loading="f.okLoading" @click="f.ok">确认删除</el-button>
+        <div class="cm-footer">
+          <el-button @click="f.cancel">取消</el-button>
+          <el-button type="danger" :loading="f.okLoading" @click="f.ok">确认删除</el-button>
+        </div>
       </template>
     </CommonModal>
 
@@ -299,7 +301,7 @@
         </el-form>
       </div>
       <template #footer="f">
-        <div style="display:flex;justify-content:center;gap:12px;">
+        <div class="cm-footer">
           <el-button size="default" style="min-width:108px;height:36px;border-radius:10px;" @click="f.cancel">取消</el-button>
           <el-button size="default" type="primary" :loading="f.okLoading" style="min-width:118px;height:36px;border-radius:10px;" @click="f.ok">
             {{ dutyMode === 'add' ? '创建岗位' : '保存修改' }}
@@ -336,8 +338,10 @@
         </div>
       </div>
       <template #footer="f">
-        <el-button @click="f.cancel">取消</el-button>
-        <el-button type="danger" :loading="f.okLoading" @click="f.ok">确认删除岗位</el-button>
+        <div class="cm-footer">
+          <el-button @click="f.cancel">取消</el-button>
+          <el-button type="danger" :loading="f.okLoading" @click="f.ok">确认删除岗位</el-button>
+        </div>
       </template>
     </CommonModal>
   </div>

@@ -91,8 +91,10 @@
         </div>
       </div>
       <template #footer="f">
-        <el-button @click="f.cancel">取消</el-button>
-        <el-button type="primary" :loading="f.okLoading" @click="f.ok">保存</el-button>
+        <div class="cm-footer">
+          <el-button @click="f.cancel">取消</el-button>
+          <el-button type="primary" :loading="f.okLoading" @click="f.ok">保存</el-button>
+        </div>
       </template>
     </CommonModal>
   </div>
@@ -194,4 +196,4 @@ watch([page, pageSize], () => {
 onMounted(() => {
   loadData()
 })
-</script>
+</script>
