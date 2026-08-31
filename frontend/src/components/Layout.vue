@@ -153,7 +153,7 @@ const go = (path) => router.push(path)
 
 const handleLogout = () => {
   userStore.logout()
-  router.push('/')
+  router.push('/login')
 }
 const reload = () => router.go(0)
 const toggleFullscreen = () => {

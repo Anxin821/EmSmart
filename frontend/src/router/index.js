@@ -5,7 +5,7 @@ import { authApi } from '../api'
 
 const routes = [
   {
-    path: '/',
+    path: '/login',
     name: 'Login',
     component: Login,
     meta: { requiresAuth: false }
@@ -13,7 +13,7 @@ const routes = [
   {
     // 父路由仅作为 Layout 包裹层；子路由均使用绝对路径，
     // 使浏览器地址与悬停提示不再出现无意义的 /index 前缀。
-    path: '/index',
+    path: '/',
     component: Layout,
     redirect: '/dashboard/aoi',
     children: [
@@ -136,12 +136,12 @@ router.beforeEach(async (to, from, next) => {
   
   if (to.meta.requiresAuth) {
     if (!token) {
-      next('/')
+      next('/login')
       return
     }
     next()
   } else {
-    if (to.path === '/' && token) {
+    if (to.path === '/login' && token) {
       next('/dashboard/aoi')
       return
     }
