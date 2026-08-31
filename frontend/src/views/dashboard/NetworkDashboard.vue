@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div id="page-container" class="page">
     <div class="page-header">
       <div>
         <h1 class="page-title"><span class="emoji">🌐</span>车间网络看板</h1>
@@ -8,10 +8,6 @@
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-sm btn-outline-secondary" @click="loadData">
           <span class="bi bi-arrow-clockwise"></span>刷新
-        </button>
-        <button class="btn btn-sm btn-outline-primary" @click="exportPPT" :disabled="exporting">
-          <span class="bi" :class="exporting ? 'bi-hourglass-split' : 'bi-file-earmark-ppt'"></span>
-          {{ exporting ? '导出中...' : '导出PPT' }}
         </button>
         <button class="btn btn-sm btn-outline-warning" @click="handleCheckAll">
           <span class="bi bi-lightning-charge"></span>一键检测
@@ -41,6 +37,7 @@
       <section class="topology-card">
         <header class="section-head">
           <h2 class="sec-title">按线体网络拓扑</h2>
+          <span class="card-subtitle">{{ data?.lines?.length || 0 }} 个线体 | {{ data?.lines?.reduce((sum, l) => (sum + (l.servers?.length || 0) + (l.aging_racks?.length || 0) + (l.wifi_aps?.length || 0)), 0) }} 个设备</span>
         </header>
         <div class="topology-grid">
           <div
@@ -48,53 +45,63 @@
             :key="line.line"
             class="line-col"
           >
-            <div class="line-header">{{ line.line }}</div>
+            <div class="line-header">
+              {{ line.line }}
+              <span class="line-count">
+                <span class="count" title="服务器">{{ line.servers?.length || 0 }}</span>
+                <span class="count" title="老化架">{{ line.aging_racks?.length || 0 }}</span>
+                <span class="count" title="WiFi AP">{{ line.wifi_aps?.length || 0 }}</span>
+              </span>
+            </div>
             <div class="line-body">
               <!-- 服务器 -->
-              <div class="device-block" v-if="line.servers?.length">
-                <div class="device-item server" v-for="s in line.servers" :key="s.id">
-                  <span class="device-icon bi bi-server"></span>
-                  <span class="device-name">{{ s.name }}</span>
-                  <span class="device-tag" :class="tagClass(s.name)">{{ s.name }}</span>
+              <div class="device-row" v-if="line.servers?.length">
+                <div class="device-label">服务器</div>
+                <div class="device-list">
+                  <div class="device-item server" v-for="s in line.servers" :key="s.id">
+                    <span class="device-icon bi bi-server"></span>
+                    <span class="device-name">{{ s.name }}</span>
+                    <span class="device-tag" :class="tagClass(s.name)">{{ s.name }}</span>
+                  </div>
                 </div>
               </div>
-              <div class="device-block" v-else>
-                <div class="device-item empty">
-                  <span class="device-icon bi bi-server"></span>
-                  <span class="device-name">-</span>
-                </div>
+              <div class="device-row empty-row" v-else>
+                <div class="device-label">服务器</div>
+                <div class="device-list"><span class="empty-text">-</span></div>
               </div>
 
               <!-- 老化架 -->
-              <div class="device-block" v-if="line.aging_racks?.length">
-                <div class="device-item aging" v-for="a in line.aging_racks" :key="a.id">
-                  <span class="device-icon bi bi-box-seam"></span>
-                  <span class="device-name">{{ a.name }}</span>
-                  <span class="device-tag" :class="{ 'tag-warn': a.status !== '正常', 'tag-ok': a.status === '正常' }">
-                    {{ a.status !== '正常' ? '⚠️' : '' }}{{ a.slots }}
-                  </span>
+              <div class="device-row" v-if="line.aging_racks?.length">
+                <div class="device-label">老化架</div>
+                <div class="device-list">
+                  <div class="device-item aging" v-for="a in line.aging_racks" :key="a.id">
+                    <span class="device-icon bi bi-box-seam"></span>
+                    <span class="device-name">{{ a.name }}</span>
+                    <span class="device-tag" :class="{ 'tag-warn': a.status !== '正常', 'tag-ok': a.status === '正常' }">
+                      {{ a.status !== '正常' ? '⚠️' : '' }}{{ a.slots }}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div class="device-block" v-else>
-                <div class="device-item empty">
-                  <span class="device-icon bi bi-box-seam"></span>
-                  <span class="device-name">-</span>
-                </div>
+              <div class="device-row empty-row" v-else>
+                <div class="device-label">老化架</div>
+                <div class="device-list"><span class="empty-text">-</span></div>
               </div>
 
               <!-- AP -->
-              <div class="device-block" v-if="line.wifi_aps?.length">
-                <div class="device-item ap" v-for="ap in line.wifi_aps" :key="ap.id">
-                  <span class="device-icon bi bi-router"></span>
-                  <span class="device-name">{{ ap.ssid || 'AP' }}</span>
-                  <span class="ap-bar" :class="{ offline: ap.status !== '在线' }"></span>
+              <div class="device-row" v-if="line.wifi_aps?.length">
+                <div class="device-label">WiFi AP</div>
+                <div class="device-list">
+                  <div class="device-item ap" v-for="ap in line.wifi_aps" :key="ap.id">
+                    <span class="device-icon bi bi-router"></span>
+                    <span class="device-name">{{ ap.ssid || 'AP' }}</span>
+                    <span class="ap-bar" :class="{ offline: ap.status !== '在线' }"></span>
+                  </div>
                 </div>
               </div>
-              <div class="device-block" v-else>
-                <div class="device-item empty">
-                  <span class="device-icon bi bi-router"></span>
-                  <span class="device-name">-</span>
-                </div>
+              <div class="device-row empty-row" v-else>
+                <div class="device-label">WiFi AP</div>
+                <div class="device-list"><span class="empty-text">-</span></div>
               </div>
             </div>
           </div>
@@ -104,6 +111,9 @@
       <section class="offline-card">
         <header class="section-head">
           <h2 class="sec-title">离线设备列表</h2>
+          <span class="badge" :class="data?.offline_list?.length ? 'badge-danger' : 'badge-success'">
+            {{ data?.offline_list?.length || 0 }}
+          </span>
         </header>
         <div class="offline-body">
           <div v-if="!data" class="empty-state">加载中…</div>
@@ -130,10 +140,8 @@
 import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
 import { dashboardApi, networkApi } from '@/api'
-import { createPresentation, addTitleSlide, addStatsSlide, addChartSlide, addTableSlide, savePresentation, captureElement, colorMap } from '@/utils/pptExport'
 
 const data = ref(null)
-const exporting = ref(false)
 let gaugeChart = null
 
 const tagClass = (name) => {
@@ -168,7 +176,7 @@ const renderGauge = () => {
   gaugeChart = echarts.init(document.getElementById('gauge'))
 
   gaugeChart.setOption({
-    series: [{
+    series: [ {
       type: 'gauge',
       startAngle: 210,
       endAngle: -30,
@@ -221,7 +229,7 @@ const renderGauge = () => {
         color: rate >= 90 ? '#10B981' : (rate >= 70 ? '#F59E0B' : '#EF4444'),
       },
       data: [{ value: rate, name: '在线率' }],
-    }],
+    } ],
   })
 }
 
@@ -247,64 +255,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', resize)
   gaugeChart && gaugeChart.dispose()
 })
-
-// 导出PPT
-const exportPPT = async () => {
-  exporting.value = true
-  try {
-    const pptx = createPresentation('车间网络看板')
-    
-    // 1. 标题页
-    addTitleSlide(pptx, '车间网络看板', '实时监测车间服务器 / WiFi / 老化架网络节点在线情况')
-    
-    // 2. 统计指标页
-    addStatsSlide(pptx, '网络状态', [
-      { label: '在线设备', value: data.value?.online_devices ?? 0, color: colorMap.green },
-      { label: '离线设备', value: data.value?.offline_devices ?? 0, color: colorMap.red },
-      { label: '在线率', value: `${data.value?.online_rate ?? 0}%`, color: data.value?.online_rate >= 90 ? colorMap.green : colorMap.yellow }
-    ])
-    
-    // 3. 仪表盘图表
-    const gaugeImg = await captureElement('gauge')
-    if (gaugeImg) {
-      addChartSlide(pptx, '在线率仪表盘', gaugeImg)
-    }
-    
-    // 4. 按线体分布
-    if (data.value?.lines?.length > 0) {
-      const headers = ['线体', '服务器', '老化架', 'WiFi AP']
-      const rows = data.value.lines.map(line => [
-        line.line || '-',
-        line.servers?.map(s => s.name).join(', ') || '-',
-        line.aging_racks?.map(a => `${a.name}(${a.slots}槽)`).join(', ') || '-',
-        line.wifi_aps?.map(ap => ap.ssid || 'AP').join(', ') || '-'
-      ])
-      addTableSlide(pptx, '按线体网络拓扑', headers, rows)
-    }
-    
-    // 5. 离线设备列表
-    if (data.value?.offline_list?.length > 0) {
-      const headers = ['类型', '名称', '线体', '状态', 'IP']
-      const rows = data.value.offline_list.map(item => [
-        item.type || '-',
-        item.name || '-',
-        item.line || '-',
-        item.status || '-',
-        item.ip || '-'
-      ])
-      addTableSlide(pptx, '离线设备列表', headers, rows)
-    }
-    
-    // 保存文件
-    const date = new Date().toISOString().slice(0, 10)
-    savePresentation(pptx, `车间网络看板_${date}.pptx`)
-  } catch (error) {
-    console.error('导出PPT失败:', error)
-    alert('导出PPT失败，请重试')
-  } finally {
-    exporting.value = false
-  }
-}
 </script>
 
 <style scoped>
@@ -315,14 +265,14 @@ const exportPPT = async () => {
 /* ---- 顶部统计区 ---- */
 .top-section {
   display: flex;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: 16px;
+  margin-bottom: 16px;
   align-items: stretch;
 }
 
 .stat-pair {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   flex: 1;
 }
 
@@ -330,14 +280,14 @@ const exportPPT = async () => {
   flex: 1;
   background: #fff;
   border-radius: 12px;
-  padding: 24px 28px;
+  padding: 20px 24px;
   text-align: center;
   border: 1px solid var(--c-divider);
   box-shadow: 0 2px 6px rgba(15, 23, 42, .03);
 }
 
 .stat-box .stat-num {
-  font-size: 48px;
+  font-size: 42px;
   font-weight: 700;
   line-height: 1.1;
 }
@@ -352,8 +302,8 @@ const exportPPT = async () => {
 }
 
 .gauge-wrapper {
-  width: 300px;
-  height: 240px;
+  width: 280px;
+  height: 220px;
   background: #fff;
   border-radius: 12px;
   border: 1px solid var(--c-divider);
@@ -365,13 +315,13 @@ const exportPPT = async () => {
 
 .gauge {
   width: 100%;
-  height: 240px;
+  height: 100%;
 }
 
 /* ---- 底部区 ---- */
 .bottom-section {
   display: flex;
-  gap: 20px;
+  gap: 12px;
 }
 
 .topology-card {
@@ -395,64 +345,122 @@ const exportPPT = async () => {
 }
 
 .section-head {
-  padding: 14px 20px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--c-divider);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .sec-title {
   font-size: 15px;
   font-weight: 600;
   color: var(--c-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-subtitle {
+  font-size: 12px;
+  color: var(--c-text-3);
+  font-weight: 400;
 }
 
 /* ---- 拓扑网格 ---- */
 .topology-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1px;
+  gap: 6px;
   background: var(--c-divider);
 }
 
 .line-col {
   background: #fff;
-  min-height: 280px;
   display: flex;
   flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .line-header {
-  padding: 10px 8px;
+  padding: 8px 6px;
   text-align: center;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--c-text);
   background: #F7FAFF;
   border-bottom: 1px solid var(--c-divider);
-}
-
-.line-body {
-  padding: 8px 6px;
-  flex: 1;
   display: flex;
-  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   gap: 6px;
 }
 
-.device-block {
+.line-count {
+  display: flex;
+  gap: 4px;
+}
+
+.count {
+  font-size: 10px;
+  color: var(--c-text-3);
+  background: #fff;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--c-divider);
+}
+
+.line-body {
+  padding: 6px 4px;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.device-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+}
+
+.device-label {
+  font-size: 10px;
+  color: var(--c-text-3);
+  font-weight: 600;
+  width: 48px;
+  white-space: nowrap;
+}
+
+.device-list {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
   gap: 3px;
+}
+
+.empty-row {
+  color: var(--c-text-mute);
+  background: #f9fafb;
+}
+
+.empty-text {
+  font-size: 10px;
+  color: var(--c-text-mute);
 }
 
 .device-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
+  gap: 3px;
+  padding: 3px 6px;
   border-radius: 5px;
   background: #F7FAFF;
-  font-size: 11px;
-  line-height: 1.3;
+  font-size: 10px;
+  line-height: 1.2;
 }
 
 .device-item.empty {
@@ -461,7 +469,7 @@ const exportPPT = async () => {
 }
 
 .device-icon {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--c-text-3);
   flex-shrink: 0;
 }
@@ -475,7 +483,7 @@ const exportPPT = async () => {
 }
 
 .device-tag {
-  font-size: 10px;
+  font-size: 9px;
   padding: 1px 5px;
   border-radius: 3px;
   font-weight: 600;
@@ -489,8 +497,8 @@ const exportPPT = async () => {
 .tag-warn    { background: var(--warn-bg); color: #B45309; }
 
 .ap-bar {
-  width: 24px;
-  height: 4px;
+  width: 20px;
+  height: 3px;
   border-radius: 2px;
   background: var(--ok);
   flex-shrink: 0;
@@ -581,8 +589,29 @@ const exportPPT = async () => {
   text-align: right;
 }
 
+.badge {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-success {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.badge-danger {
+  background: var(--err-bg);
+  color: var(--err);
+}
+
 /* 滚动条美化 */
 .offline-body::-webkit-scrollbar { width: 6px; }
 .offline-body::-webkit-scrollbar-thumb { background: #D8DEEA; border-radius: 4px; }
 .offline-body::-webkit-scrollbar-track { background: transparent; }
+
+.line-body::-webkit-scrollbar { width: 5px; }
+.line-body::-webkit-scrollbar-thumb { background: #D8DEEA; border-radius: 4px; }
+.line-body::-webkit-scrollbar-track { background: transparent; }
 </style>
