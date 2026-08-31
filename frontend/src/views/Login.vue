@@ -6,7 +6,6 @@
           <img src="/logo.png" alt="智能工厂管理平台" />
         </div>
         <h3>智能工厂管理平台</h3>
-        <p>工作任务管理系统</p>
       </div>
       
       <div v-if="errorMsg" class="alert alert-danger">{{ errorMsg }}</div>

@@ -108,6 +108,11 @@ button { font-family: inherit; }
   color: #F1F5F9;
   letter-spacing: .3px;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: background .15s;
+}
+.sidebar .brand:hover {
+  background: rgba(148,163,184,.12);
 }
 .sidebar .brand::before {
   /* 伪元素渐变色块已被真实 logo 替代 */
@@ -187,46 +192,16 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 16px;
-}
-.topbar .crumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--fn-sm);
-  color: var(--c-text-3);
-  flex-shrink: 0;
-}
-.topbar .crumb .sep { color: var(--c-text-mute); }
-.topbar .crumb .cur { color: var(--c-text); font-weight: 600; }
-.topbar .crumb .crumb-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--c-text-3);
-  text-decoration: none;
-  padding: 2px 6px;
-  border-radius: 6px;
-  transition: background .15s, color .15s;
-}
-.topbar .crumb .crumb-link:hover {
-  background: var(--primary-50, rgba(44,92,232,.08));
-  color: var(--primary, #2C5CE8);
-}
-
-/* actions（刷新/全屏）：紧贴 crumb 左侧，不占位撑满 */
-.topbar .actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-right: auto;   /* 把 user 区推到最右 */
-  flex-shrink: 0;
+  position: relative;
 }
 
 .topbar .user {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
 }
 .topbar .avatar {
   width: 32px; height: 32px;
@@ -238,14 +213,69 @@ button { font-family: inherit; }
   justify-content: center;
   font-size: 12px;
   font-weight: 600;
+  cursor: pointer;
 }
 .topbar .user .meta {
   display: flex;
   flex-direction: column;
   line-height: 1.25;
 }
-.topbar .user .meta .u-name { font-size: var(--fn-sm); font-weight: 600; color: var(--c-text); }
-.topbar .user .meta .u-role { font-size: 12px; color: var(--c-text-3); }
+.topbar .user .meta { display: none; }
+.topbar .username {
+  font-size: var(--fn-sm);
+  font-weight: 600;
+  color: var(--c-text);
+  white-space: nowrap;
+}
+
+/* 用户区右对齐容器 */
+.topbar .user-right {
+  margin-left: auto;
+}
+
+/* 用户下拉菜单 */
+.topbar .user-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 100%;
+  max-width: fit-content;
+  width: max-content;
+  background: #fff;
+  border-radius: var(--radius);
+  border: 1px solid var(--c-border);
+  box-shadow: var(--shadow-overlay);
+  padding: 6px 0;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: opacity .15s ease, transform .15s ease, visibility .15s;
+}
+.topbar .user-menu.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.topbar .user-menu .menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  font-size: var(--fn-sm);
+  color: var(--c-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.topbar .user-menu .menu-item:hover {
+  background: var(--primary-50);
+  color: var(--primary);
+}
 
 .topbar .icon-btn {
   width: 32px; height: 32px;

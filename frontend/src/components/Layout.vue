@@ -2,7 +2,7 @@
   <div class="app-layout">
     <!-- 侧边栏 -->
     <aside class="sidebar">
-      <div class="brand">
+      <div class="brand" @click="go(HOME_PATH)" style="cursor: pointer;">
         <img src="/logo.png" alt="产品Logo" class="brand-logo" />
         智能工厂管理平台
       </div>
@@ -66,36 +66,21 @@
     <!-- 主内容区 -->
     <main class="main">
       <div class="topbar">
-        <!-- 面包屑：简化为只保留「首页」可点击返回 -->
-        <div class="crumb">
-          <router-link class="crumb-link" :to="HOME_PATH" title="返回首页">
-            <span class="bi bi-house-door-fill" style="color: var(--primary);"></span>
-            <span>首页</span>
-          </router-link>
-        </div>
-
-        <!-- 快捷按钮 -->
-        <div class="actions">
-          <button class="icon-btn" title="刷新当前页" @click="reload">
-            <span class="bi bi-arrow-clockwise"></span>
-          </button>
-          <button class="icon-btn" title="全屏切换" @click="toggleFullscreen">
-            <span class="bi bi-arrows-fullscreen"></span>
-          </button>
-        </div>
-
         <!-- 用户区 -->
-        <div class="user">
-          <span class="avatar">{{ avatarText }}</span>
-          <div class="meta">
-            <span class="u-name">{{ userStore.user?.full_name || userStore.user?.username }}</span>
-            <span class="u-role">
-              {{ roleLabel }} · {{ userStore.user?.username }}
-            </span>
+        <div class="user-right">
+          <div class="user" @mouseenter="showMenu = true" @mouseleave="showMenu = false">
+            <span class="avatar">{{ avatarText }}</span>
+            <span class="username">{{ userStore.user?.full_name || userStore.user?.username }}</span>
+            <!-- 下拉菜单 -->
+            <div class="user-menu" :class="{ show: showMenu }">
+              <button class="menu-item" @click="handleProfile">
+                <span class="bi bi-person-circle"></span>个人中心
+              </button>
+              <button class="menu-item" @click="handleLogout">
+                <span class="bi bi-box-arrow-right"></span>安全退出
+              </button>
+            </div>
           </div>
-          <button class="btn btn-sm btn-outline-secondary" @click="handleLogout">
-            <span class="bi bi-box-arrow-right"></span>退出
-          </button>
         </div>
       </div>
 
@@ -107,13 +92,16 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+
+// 下拉菜单显示状态
+const showMenu = ref(false)
 
 // 路由 → 分组+标题 映射（保持 NAME_MAP 常量便于后续扩展）
 const NAME_MAP = {
@@ -154,11 +142,6 @@ const go = (path) => router.push(path)
 const handleLogout = () => {
   userStore.logout()
   router.push('/login')
-}
-const reload = () => router.go(0)
-const toggleFullscreen = () => {
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.()
-  else document.exitFullscreen?.()
 }
 
 </script>
