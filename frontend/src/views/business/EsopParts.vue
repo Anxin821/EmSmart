@@ -11,7 +11,7 @@
         </template>
       </div>
     </div>
-    <section class="page-section" style="padding:0;overflow:hidden;">
+
       <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
         <template #actions="{ search, reset }">
           <el-button type="primary" @click="search">
@@ -22,20 +22,27 @@
           </el-button>
         </template>
       </CommonFilterBar>
-      <el-table :data="tableData" stripe border style="width: 100%;" empty-text="暂无数据">
+
+    <el-table :data="tableData" stripe border style="width: 100%;" empty-text="暂无数据">
+
         <el-table-column label="序号" width="70" align="center">
           <template #default="{ $index }">
             {{ (page - 1) * pageSize + $index + 1 }}
           </template>
         </el-table-column>
+
         <el-table-column prop="station_name" label="工位名称" width="120" align="center" />
+
         <el-table-column prop="process_name" label="工序名称" min-width="200" align="center" show-overflow-tooltip />
+
         <el-table-column prop="part_number" label="料号" min-width="180" align="center" show-overflow-tooltip />
+
         <el-table-column prop="file_name" label="ESOP文件名称" min-width="180" align="center" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.file_name || '-' }}
           </template>
         </el-table-column>
+
         <el-table-column label="操作" width="160" align="center" fixed="right">
           <template #default="{ row }">
             <template v-if="userStore.canEdit">
@@ -51,13 +58,13 @@
           </template>
         </el-table-column>
       </el-table>
+
       <CommonPagination
         v-model:page="page"
         v-model:pageSize="pageSize"
         :total="total"
         compact
       />
-    </section>
     <CommonModal
       v-model:visible="modalVisible"
       :title="editingId ? '编辑料号' : '录入料号'"
@@ -90,20 +97,18 @@
     </CommonModal>
   </div>
 </template>
-
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { esopApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
-import CommonFilterBar from '@/components/common/CommonFilterBar.vue'
+import PageLayout       from '@/components/common/PageLayout.vue'
+import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal from '@/components/common/CommonModal.vue'
-
 const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
-
 const tableData = ref([])
 const page = ref(1)
 const pageSize = ref(20)
@@ -113,27 +118,23 @@ const modalVisible = ref(false)
 const editingId = ref(null)
 const form = ref({})
 const saving = ref(false)
-
 const filterFields = [
   { type: 'input', key: 'keyword', label: '关键字', placeholder: '工位/工序/料号', autoSearch: false, clearable: true },
   { type: 'input', key: 'station_name', label: '工位名称', placeholder: '请输入工位名称', autoSearch: false, clearable: true },
   { type: 'input', key: 'process_name', label: '工序名称', placeholder: '请输入工序名称', autoSearch: false, clearable: true },
   { type: 'input', key: 'file_name', label: 'ESOP文件名称', placeholder: '请输入文件名称', autoSearch: false, clearable: true },
 ]
-
 const defaultForm = () => ({
   station_name: '',
   process_name: '',
   part_number: '',
   file_name: '',
 })
-
 const resetFilters = () => {
   filters.value = { keyword: '', station_name: '', process_name: '', file_name: '' }
   page.value = 1
   loadData()
 }
-
 const loadData = async () => {
   try {
     const params = { page: page.value, page_size: pageSize.value }
@@ -141,7 +142,6 @@ const loadData = async () => {
     if (filters.value.station_name) params.station_name = filters.value.station_name
     if (filters.value.process_name) params.process_name = filters.value.process_name
     if (filters.value.file_name) params.file_name = filters.value.file_name
-
     const res = await esopApi.list(params)
     tableData.value = res.data?.items || []
     total.value = res.data?.total || 0
@@ -149,7 +149,6 @@ const loadData = async () => {
     console.error(e)
   }
 }
-
 const showModal = (row = null) => {
   if (row) {
     editingId.value = row.id
@@ -160,7 +159,6 @@ const showModal = (row = null) => {
   }
   modalVisible.value = true
 }
-
 const handleSave = async () => {
   saving.value = true
   try {
@@ -179,7 +177,6 @@ const handleSave = async () => {
     saving.value = false
   }
 }
-
 const handleDelete = async (id) => {
   const ok = await confirmDelete('ESOP料号', '删除后数据不可恢复')
   if (!ok) return
@@ -191,12 +188,10 @@ const handleDelete = async (id) => {
     toast.error(e.response?.data?.message || '删除失败')
   }
 }
-
 watch([page, pageSize], () => {
   loadData()
 })
-
 onMounted(() => {
   loadData()
 })
-</script>
+</script>

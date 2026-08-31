@@ -11,7 +11,7 @@
         </template>
       </div>
     </div>
-    <section class="page-section" style="padding: 0; overflow: hidden;">
+
       <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
         <template #actions="{ search, reset }">
           <el-button type="primary" @click="search">
@@ -22,37 +22,47 @@
           </el-button>
         </template>
       </CommonFilterBar>
-      <el-table v-loading="loading" :data="items" stripe border style="width: 100%;" empty-text="暂无数据">
+
+    <el-table v-loading="loading" :data="items" stripe border style="width: 100%;" empty-text="暂无数据">
+
         <el-table-column prop="bug_id" label="BUG ID" width="140" align="center" show-overflow-tooltip>
           <template #default="{ row }">
             <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">{{ row.bug_id }}</code>
           </template>
         </el-table-column>
+
         <el-table-column prop="title" label="标题" min-width="180" align="center" show-overflow-tooltip>
           <template #default="{ row }">{{ row.title || '-' }}</template>
         </el-table-column>
+
         <el-table-column prop="severity" label="严重等级" width="100" align="center">
           <template #default="{ row }">
             <span :class="'status-badge ' + getStatusClass(cleanStatus(row.severity))">{{ cleanStatus(row.severity) }}</span>
           </template>
         </el-table-column>
+
         <el-table-column prop="module" label="模块" min-width="110" align="center" show-overflow-tooltip>
           <template #default="{ row }">{{ row.module || '-' }}</template>
         </el-table-column>
+
         <el-table-column prop="status" label="状态" width="90" align="center">
           <template #default="{ row }">
             <span :class="'status-badge ' + getStatusClass(cleanStatus(row.status))">{{ cleanStatus(row.status) }}</span>
           </template>
         </el-table-column>
+
         <el-table-column prop="discoverer" label="发现人" min-width="90" align="center" show-overflow-tooltip>
           <template #default="{ row }">{{ row.discoverer || '-' }}</template>
         </el-table-column>
+
         <el-table-column prop="assignee" label="指派给" min-width="90" align="center" show-overflow-tooltip>
           <template #default="{ row }">{{ row.assignee || '-' }}</template>
         </el-table-column>
+
         <el-table-column prop="deadline" label="截止日期" width="110" align="center">
           <template #default="{ row }">{{ row.deadline ? row.deadline.slice(0, 10) : '-' }}</template>
         </el-table-column>
+
         <el-table-column label="操作" width="210" align="center" fixed="right">
           <template #default="{ row }">
             <template v-if="userStore.canEdit">
@@ -71,6 +81,7 @@
           </template>
         </el-table-column>
       </el-table>
+
       <CommonPagination
         v-model:page="page"
         v-model:pageSize="pageSize"
@@ -78,7 +89,6 @@
         compact
         @change="onPagerChange"
       />
-    </section>
     <CommonModal
       v-model:visible="modalVisible"
       :title="editingId ? '编辑BUG' : '新增BUG'"
@@ -146,9 +156,6 @@
         <el-button type="primary" :loading="f.okLoading" @click="f.ok">保存</el-button>
       </template>
     </CommonModal>
-
-
-
     <!-- 流转弹窗 -->
     <CommonModal
       v-model:visible="flowModalVisible"
@@ -176,13 +183,13 @@
     </CommonModal>
   </div>
 </template>
-
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { mesApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, Refresh, RefreshRight } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
+import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
@@ -201,14 +208,14 @@ const saving = ref(false)
 const flowSaving = ref(false)
 const form = ref({})
 
-
+// 用于取消请求的 AbortController
+let abortController = null
 
 // 流转弹窗
 const flowModalVisible = ref(false)
 const flowRow = ref(null)
 const flowStatus = ref('')
 const FLOW_STATUSES = ['新建', '确认', '修复中', '已解决', '关闭']
-
 const labelStyleNormal      = { color: 'var(--c-text-2)' }
 const labelStyleNoRequired  = { color: 'var(--c-text-2)', '--required': 'none' }
 
@@ -254,19 +261,31 @@ const resetFilters = () => {
 }
 
 const loadData = async () => {
+  // 取消之前的请求（如果有）
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  abortController = new AbortController()
   loading.value = true
+  
   try {
     const params = { page: page.value, page_size: pageSize.value }
     if (filters.value.keyword)  params.keyword  = filters.value.keyword
     if (filters.value.severity) params.severity = filters.value.severity
     if (filters.value.status)   params.status   = filters.value.status
+    
     const res = await mesApi.bugs(params)
     items.value = res.data?.items || []
     total.value = res.data?.total || 0
-  } catch (e) {
-    console.error(e)
+  } catch(e) {
+    // 忽略AbortError
+    if (e.name !== 'AbortError') {
+      console.error(e)
+    }
   } finally {
     loading.value = false
+    abortController = null
   }
 }
 
@@ -329,6 +348,7 @@ const handleFlow = (row) => {
   flowStatus.value = row.status || '新建'
   flowModalVisible.value = true
 }
+
 const submitFlow = async () => {
   if (!flowStatus.value) {
     toast.warn('请选择新状态')
@@ -350,5 +370,21 @@ const submitFlow = async () => {
 
 const onPagerChange = () => loadData()
 
-onMounted(() => { loadData() })
+onMounted(() => {
+  console.log('Bugs组件挂载')
+  loadData()
+})
+
+onUnmounted(() => {
+  console.log('Bugs组件卸载，清理资源')
+  // 取消正在进行的请求
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  // 清理引用
+  items.value = []
+  form.value = {}
+  filters.value = { keyword: '', severity: '', status: '' }
+})
 </script>

@@ -100,11 +100,7 @@
       </div>
 
       <div class="content">
-        <router-view v-slot="{ Component }">
-          <transition name="fade-slide" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
+        <router-view />
       </div>
     </main>
   </div>
@@ -164,17 +160,9 @@ const toggleFullscreen = () => {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.()
   else document.exitFullscreen?.()
 }
+
 </script>
 
 <style scoped>
-/* Layout.scoped 不再重复定义 layout 骨架。
-   全局骨架已在 styles.css（权威来源）。
-   这里只放本组件独有的路由过渡样式与专属差异化。 */
-
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition: opacity .2s ease, transform .2s ease;
-}
-.fade-slide-enter-from { opacity: 0; transform: translateY(6px); }
-.fade-slide-leave-to   { opacity: 0; transform: translateY(-4px); }
+/* Layout 样式由全局 styles.css 定义 */
 </style>

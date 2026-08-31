@@ -17,7 +17,7 @@
         </template>
       </div>
     </div>
-    <section class="page-section" style="padding: 0; overflow: hidden;">
+
       <CommonFilterBar
         :fields="filterFields"
         v-model:model-value="filters"
@@ -30,7 +30,8 @@
           </el-button>
         </template>
       </CommonFilterBar>
-      <el-table
+
+    <el-table
         v-loading="loading"
         :data="items"
         stripe
@@ -38,6 +39,7 @@
         :header-cell-style="{ fontWeight: 600 }"
         :row-style="{ fontSize: '13px' }"
       >
+
         <el-table-column label="需求ID" prop="request_id" min-width="120">
           <template #default="s">
             <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">
@@ -45,28 +47,35 @@
             </code>
           </template>
         </el-table-column>
+
         <el-table-column label="标题" prop="title" min-width="200">
           <template #default="s">{{ s.row.title || '-' }}</template>
         </el-table-column>
+
         <el-table-column label="优先级" prop="priority" min-width="100">
           <template #default="s">
             <span :class="'status-badge ' + getStatusClass(cleanField(s.row.priority))">{{ cleanField(s.row.priority) }}</span>
           </template>
         </el-table-column>
+
         <el-table-column label="状态" prop="status" min-width="100">
           <template #default="s">
             <span :class="'status-badge ' + getStatusClass(cleanField(s.row.status))">{{ cleanField(s.row.status) }}</span>
           </template>
         </el-table-column>
+
         <el-table-column label="提交人" prop="submitter" min-width="110">
           <template #default="s">{{ s.row.submitter || '-' }}</template>
         </el-table-column>
+
         <el-table-column label="指派给" prop="assignee" min-width="110">
           <template #default="s">{{ s.row.assignee || '-' }}</template>
         </el-table-column>
+
         <el-table-column label="期望日期" prop="expected_date" min-width="130">
           <template #default="s">{{ s.row.expected_date ? s.row.expected_date.slice(0, 10) : '-' }}</template>
         </el-table-column>
+
         <el-table-column label="操作" width="260" fixed="right">
           <template #default="s">
             <div class="row-actions">
@@ -105,13 +114,13 @@
           </el-empty>
         </template>
       </el-table>
+
       <CommonPagination
         v-model:page="page"
         v-model:page-size="pageSize"
         :total="total"
         @change="onPagerChange"
       />
-    </section>
     <CommonModal
       v-model:visible="modalVisible"
       :width="680"
@@ -180,13 +189,13 @@
     </CommonModal>
   </div>
 </template>
-
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { mesApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
@@ -198,11 +207,13 @@ const pageSize = ref(20)
 const total = ref(0)
 const loading = ref(false)
 const filters = ref({ keyword: '', priority: '', status: '' })
-
 const modalVisible = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
 const form = ref({})
+
+// 用于取消请求的 AbortController
+let abortController = null
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 
@@ -272,20 +283,31 @@ const onResetFromFilterBar = () => {
 }
 
 const loadData = async () => {
+  // 取消之前的请求（如果有）
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  abortController = new AbortController()
   loading.value = true
+  
   try {
     const params = { page: page.value, page_size: pageSize.value }
     if (filters.value.keyword)  params.keyword  = filters.value.keyword
     if (filters.value.priority) params.priority = filters.value.priority
     if (filters.value.status)   params.status   = filters.value.status
-
+    
     const res = await mesApi.devreqs(params)
     items.value = res.data?.items || []
     total.value = res.data?.total || 0
-  } catch (e) {
-    console.error(e)
+  } catch(e) {
+    // 忽略AbortError
+    if (e.name !== 'AbortError') {
+      console.error(e)
+    }
   } finally {
     loading.value = false
+    abortController = null
   }
 }
 
@@ -368,5 +390,21 @@ const handleFlow = async (s) => {
 
 const onPagerChange = () => loadData()
 
-onMounted(() => { loadData() })
+onMounted(() => {
+  console.log('DevReqs组件挂载')
+  loadData()
+})
+
+onUnmounted(() => {
+  console.log('DevReqs组件卸载，清理资源')
+  // 取消正在进行的请求
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  // 清理引用
+  items.value = []
+  form.value = {}
+  filters.value = { keyword: '', priority: '', status: '' }
+})
 </script>

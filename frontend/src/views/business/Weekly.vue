@@ -10,58 +10,68 @@
         <template v-if="userStore.canEdit"><button class="btn btn-sm btn-outline-primary" @click="showModal()"><span class="bi bi-plus-lg"></span>录入</button></template>
       </div>
     </div>
-    <section class="page-section" style="padding:0;overflow:hidden;">
-      <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
-        <template #actions="{ search, reset }">
-          <el-button type="primary" @click="search">
-            <el-icon><Search /></el-icon>搜索
-          </el-button>
-          <el-button @click="reset(); loadData()">
-            <el-icon><RefreshRight /></el-icon>重置
-          </el-button>
+
+    <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
+      <template #actions="{ search, reset }">
+        <el-button type="primary" @click="search">
+          <el-icon><Search /></el-icon>搜索
+        </el-button>
+        <el-button @click="reset(); loadData()">
+          <el-icon><RefreshRight /></el-icon>重置
+        </el-button>
+      </template>
+    </CommonFilterBar>
+
+    <el-table :data="tableData" stripe border style="width: 100%;" empty-text="暂无数据">
+
+      <el-table-column prop="year" label="年" width="80" align="center" />
+
+      <el-table-column prop="week_number" label="周" width="80" align="center" />
+
+      <el-table-column prop="production_line" label="产线" width="100" align="center" />
+
+      <el-table-column prop="project" label="项目" min-width="120" align="center" />
+
+      <el-table-column prop="total_output" label="总产量" min-width="110" align="center" />
+
+      <el-table-column prop="qualified_count" label="合格数" min-width="110" align="center" />
+
+      <el-table-column label="直通率" width="120" align="center">
+        <template #default="{ row }">
+          <span class="badge" style="background: var(--ok-bg); color: var(--ok); padding: 2px 10px; border-radius: 12px;">
+            {{ row.yield_rate }}%
+          </span>
         </template>
-      </CommonFilterBar>
-      <el-table :data="tableData" stripe border style="width: 100%;" empty-text="暂无数据">
-        <el-table-column prop="year" label="年" width="80" align="center" />
-        <el-table-column prop="week_number" label="周" width="80" align="center" />
-        <el-table-column prop="production_line" label="产线" width="100" align="center" />
-        <el-table-column prop="project" label="项目" min-width="120" align="center" />
-        <el-table-column prop="total_output" label="总产量" min-width="110" align="center" />
-        <el-table-column prop="qualified_count" label="合格数" min-width="110" align="center" />
-        <el-table-column label="直通率" width="120" align="center">
-          <template #default="{ row }">
-            <span class="badge" style="background: var(--ok-bg); color: var(--ok); padding: 2px 10px; border-radius: 12px;">
-              {{ row.yield_rate }}%
-            </span>
+      </el-table-column>
+
+      <el-table-column prop="recorder" label="录入人" min-width="110" align="center">
+        <template #default="{ row }">
+          {{ row.recorder || '-' }}
+        </template>
+      </el-table-column>
+
+      <el-table-column label="操作" width="160" align="center" fixed="right">
+        <template #default="{ row }">
+          <template v-if="userStore.canEdit">
+            <el-button type="primary" link size="small" @click="showModal(row)">
+              <el-icon><Edit /></el-icon>编辑
+            </el-button>
           </template>
-        </el-table-column>
-        <el-table-column prop="recorder" label="录入人" min-width="110" align="center">
-          <template #default="{ row }">
-            {{ row.recorder || '-' }}
+          <template v-if="userStore.isAdmin">
+            <el-button type="danger" link size="small" @click="handleDelete(row.id)">
+              <el-icon><Delete /></el-icon>删除
+            </el-button>
           </template>
-        </el-table-column>
-        <el-table-column label="操作" width="160" align="center" fixed="right">
-          <template #default="{ row }">
-            <template v-if="userStore.canEdit">
-              <el-button type="primary" link size="small" @click="showModal(row)">
-                <el-icon><Edit /></el-icon>编辑
-              </el-button>
-            </template>
-            <template v-if="userStore.isAdmin">
-              <el-button type="danger" link size="small" @click="handleDelete(row.id)">
-                <el-icon><Delete /></el-icon>删除
-              </el-button>
-            </template>
-          </template>
-        </el-table-column>
-      </el-table>
-      <CommonPagination
-        v-model:page="page"
-        v-model:pageSize="pageSize"
-        :total="total"
-        compact
-      />
-    </section>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <CommonPagination
+      v-model:page="page"
+      v-model:pageSize="pageSize"
+      :total="total"
+      compact
+    />
     <!-- 批量导入弹窗 -->
     <CommonModal
       v-model:visible="importModalVisible"
@@ -140,17 +150,16 @@
     </CommonModal>
   </div>
 </template>
-
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { productionApi, optionsApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
+import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
-
 const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
 const tableData = ref([])
@@ -161,25 +170,21 @@ const modalVisible = ref(false)
 const editingId = ref(null)
 const form = ref({})
 const saving = ref(false)
-
 // 批量导入
 const importModalVisible = ref(false)
 const importFile = ref(null)
 const importing = ref(false)
 const uploadRef = ref(null)
-
 // 分页
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
-
 const filterFields = [
   { type: 'input', key: 'year', label: '年', placeholder: '请输入年份（数字）', autoSearch: false, clearable: true },
   { type: 'input', key: 'week', label: '周', placeholder: '请输入周数（数字）', autoSearch: false, clearable: true },
   { type: 'select', key: 'line', label: '产线', placeholder: '全部产线', autoSearch: false, clearable: true,
     options: lines.map(l => ({ label: l, value: l })) }
 ]
-
 const defaultForm = () => ({
   year: new Date().getFullYear(),
   week_number: Math.ceil((new Date().getMonth() + 1) / 4),
@@ -188,20 +193,17 @@ const defaultForm = () => ({
   total_output: 0,
   qualified_count: 0
 })
-
 const resetFilters = () => {
   filters.value = { year: '', week: '', line: '' }
   page.value = 1
   loadData()
 }
-
 const loadData = async () => {
   try {
     const params = { page: page.value, page_size: pageSize.value }
     if (filters.value.year) params.year = filters.value.year
     if (filters.value.week) params.week = filters.value.week
     if (filters.value.line) params.production_line = filters.value.line
-
     const res = await productionApi.weekly(params)
     tableData.value = res.data?.items || []
     total.value = res.data?.total || 0
@@ -209,7 +211,6 @@ const loadData = async () => {
     console.error(e)
   }
 }
-
 const showModal = (row = null) => {
   if (row) {
     editingId.value = row.id
@@ -220,7 +221,6 @@ const showModal = (row = null) => {
   }
   modalVisible.value = true
 }
-
 const handleSave = async () => {
   saving.value = true
   try {
@@ -240,7 +240,6 @@ const handleSave = async () => {
     saving.value = false
   }
 }
-
 const handleDelete = async (id) => {
   const ok = await confirmDelete('周报记录', '删除后数据不可恢复')
   if (!ok) return
@@ -252,14 +251,12 @@ const handleDelete = async (id) => {
     toast.error(e.response?.data?.message || '删除失败')
   }
 }
-
 const onImportFileChange = (file) => {
   importFile.value = file.raw
 }
 const onImportFileRemove = () => {
   importFile.value = null
 }
-
 const handleImport = async () => {
   if (!importFile.value) return
   importing.value = true
@@ -278,14 +275,12 @@ const handleImport = async () => {
     importing.value = false
   }
 }
-
 watch([page, pageSize], () => {
   loadData()
 })
-
 onMounted(async () => {
   const projRes = await optionsApi.projects()
   projects.value = projRes.data || []
   loadData()
 })
-</script>
+</script>

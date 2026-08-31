@@ -11,43 +11,54 @@
         </template>
       </div>
     </div>
-    <section class="page-section" style="padding:0;overflow:hidden;">
+
       <CommonFilterBar :fields="filterFields" v-model:model-value="filters" @search="loadData" @reset="onResetFromFilterBar">
         <template #actions="scope">
           <el-button type="primary" size="default" @click="scope.search"><el-icon style="margin-right:6px;"><Search /></el-icon>搜索</el-button>
           <el-button size="default" @click="resetFilters"><el-icon style="margin-right:6px;"><RefreshRight /></el-icon>重置</el-button>
         </template>
       </CommonFilterBar>
-      <el-table v-loading="loading" :data="items" stripe border style="width:100%" empty-text="暂无数据" :header-cell-style="{fontWeight:600}">
+
+    <el-table v-loading="loading" :data="items" stripe border style="width:100%" empty-text="暂无数据" :header-cell-style="{fontWeight:600}">
+
         <el-table-column label="AP ID" prop="ap_id" min-width="120" align="center">
           <template #default="s">
             <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">{{ s.row.ap_id }}</code>
           </template>
         </el-table-column>
+
         <el-table-column label="SSID" prop="ssid" min-width="140" align="center" show-overflow-tooltip>
           <template #default="s"><span class="fw-semibold" style="color: var(--c-text);">{{ s.row.ssid }}</span></template>
         </el-table-column>
+
         <el-table-column label="产线" prop="production_line" min-width="90" align="center" />
+
         <el-table-column label="IP" prop="ip_address" min-width="130" align="center" show-overflow-tooltip>
           <template #default="s">
             <span style="font-family: Consolas, 'Courier New', monospace; font-size: var(--fn-sm);">{{ s.row.ip_address }}</span>
           </template>
         </el-table-column>
+
         <el-table-column label="位置" prop="location" min-width="140" align="center" show-overflow-tooltip>
           <template #default="s">{{ s.row.location || '-' }}</template>
         </el-table-column>
+
         <el-table-column label="信道" prop="channel" min-width="90" align="center" />
+
         <el-table-column label="已连接" prop="connected_devices" min-width="100" align="center">
           <template #default="s">{{ s.row.connected_devices || 0 }}</template>
         </el-table-column>
+
         <el-table-column label="状态" prop="status" min-width="100" align="center">
           <template #default="s">
             <span :class="'status-badge ' + statusClass(s.row.status)">{{ s.row.status }}</span>
           </template>
         </el-table-column>
+
         <el-table-column label="负责人" prop="responsible_person" min-width="110" align="center" show-overflow-tooltip>
           <template #default="s">{{ s.row.responsible_person || '-' }}</template>
         </el-table-column>
+
         <el-table-column label="操作" width="180" align="center" fixed="right">
           <template #default="s">
             <template v-if="userStore.canEdit">
@@ -66,9 +77,8 @@
           </el-empty>
         </template>
       </el-table>
-      <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact @change="onPagerChange" />
-    </section>
 
+      <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact @change="onPagerChange" />
     <!-- 新增/编辑 Modal -->
     <CommonModal
       v-model:visible="formModalVisible"
@@ -138,17 +148,15 @@
         </el-button>
       </template>
     </CommonModal>
-
-
   </div>
 </template>
-
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { networkApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
+import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
@@ -163,6 +171,9 @@ const loading = ref(false)
 const filters = ref({ keyword:'', line:'', status:'' })
 const lines = ['1线','2线','3线','4线','5线','6线','7线','8线']
 
+// 用于取消请求的 AbortController
+let abortController = null
+
 // 表单弹窗
 const formModalVisible = ref(false)
 const formMode = ref('create')
@@ -172,8 +183,6 @@ const form = ref({
   ap_id: '', ssid: '', production_line: '1线', ip_address: '',
   location: '', channel: 6, connected_devices: 0, status: '在线', responsible_person: ''
 })
-
-
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 
@@ -227,19 +236,31 @@ const onResetFromFilterBar = () => {
 }
 
 const loadData = async () => {
+  // 取消之前的请求（如果有）
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  abortController = new AbortController()
   loading.value = true
+  
   try {
     const params = { page: page.value, page_size: pageSize.value }
     if (filters.value.keyword) params.keyword = filters.value.keyword
     if (filters.value.line) params.production_line = filters.value.line
     if (filters.value.status) params.status = filters.value.status
+    
     const res = await networkApi.wifi(params)
     items.value = res.data?.items || []
     total.value = res.data?.total || 0
   } catch(e) {
-    console.error(e)
+    // 忽略AbortError
+    if (e.name !== 'AbortError') {
+      console.error(e)
+    }
   } finally {
     loading.value = false
+    abortController = null
   }
 }
 
@@ -309,5 +330,24 @@ const handleDelete = async (row) => {
 
 const onPagerChange = () => loadData()
 
-onMounted(loadData)
+onMounted(() => {
+  console.log('Wifi组件挂载')
+  loadData()
+})
+
+onUnmounted(() => {
+  console.log('Wifi组件卸载，清理资源')
+  // 取消正在进行的请求
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  // 清理引用
+  items.value = []
+  form.value = {
+    ap_id: '', ssid: '', production_line: '1线', ip_address: '',
+    location: '', channel: 6, connected_devices: 0, status: '在线', responsible_person: ''
+  }
+  filters.value = { keyword:'', line:'', status:'' }
+})
 </script>

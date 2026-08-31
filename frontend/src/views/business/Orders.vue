@@ -17,108 +17,118 @@
         </template>
       </div>
     </div>
-    <section class="page-section" style="padding: 0; overflow: hidden;">
-      <CommonFilterBar
-        :fields="filterFields"
-        v-model:model-value="filters"
-        @search="loadData"
-        @reset="onResetFromFilterBar"
-      >
-        <template #actions="scope">
-          <el-button type="primary" size="default" @click="scope.search">
-            <el-icon style="margin-right: 6px;"><Search /></el-icon>搜索
-          </el-button>
+
+    <CommonFilterBar
+      :fields="filterFields"
+      v-model:model-value="filters"
+      @search="loadData"
+      @reset="onResetFromFilterBar"
+    >
+      <template #actions="scope">
+        <el-button type="primary" size="default" @click="scope.search">
+          <el-icon style="margin-right: 6px;"><Search /></el-icon>搜索
+        </el-button>
+      </template>
+    </CommonFilterBar>
+
+    <el-table
+      v-loading="loading"
+      :data="items"
+      stripe
+      style="width: 100%"
+      :header-cell-style="{ fontWeight: 600 }"
+      :row-style="{ fontSize: '13px' }"
+    >
+
+      <el-table-column label="工单号" prop="order_number" min-width="140">
+        <template #default="s">
+          <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px; font-weight: 600;">
+            {{ s.row.order_number }}
+          </code>
         </template>
-      </CommonFilterBar>
-      <el-table
-        v-loading="loading"
-        :data="items"
-        stripe
-        style="width: 100%"
-        :header-cell-style="{ fontWeight: 600 }"
-        :row-style="{ fontSize: '13px' }"
-      >
-        <el-table-column label="工单号" prop="order_number" min-width="140">
-          <template #default="s">
-            <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px; font-weight: 600;">
-              {{ s.row.order_number }}
-            </code>
-          </template>
-        </el-table-column>
-        <el-table-column label="类型" prop="order_type" min-width="100">
-          <template #default="s">
-            <span class="badge" style="padding: 2px 10px; border-radius: 12px; background: var(--info-bg); color: var(--info);">
-              {{ s.row.order_type }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="产品" prop="product_name" min-width="140">
-          <template #default="s">{{ s.row.product_name || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="优先级" prop="priority" min-width="100">
-          <template #default="s">
-            <span :class="'status-badge ' + getStatusClass(s.row.priority)">{{ s.row.priority }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="计划开始" prop="planned_start" min-width="130">
-          <template #default="s">{{ s.row.planned_start ? s.row.planned_start.slice(0, 10) : '-' }}</template>
-        </el-table-column>
-        <el-table-column label="计划结束" prop="planned_end" min-width="130">
-          <template #default="s">{{ s.row.planned_end ? s.row.planned_end.slice(0, 10) : '-' }}</template>
-        </el-table-column>
-        <el-table-column label="状态" prop="status" min-width="110">
-          <template #default="s">
-            <span :class="'status-badge ' + getStatusClass(s.row.status)">{{ s.row.status }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="负责人" prop="responsible_person" min-width="110">
-          <template #default="s">{{ s.row.responsible_person || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right">
-          <template #default="s">
-            <div class="row-actions">
-              <el-button
-                v-if="userStore.canEdit"
-                type="primary"
-                link
-                @click="showModal(s.row)"
-              >
-                <el-icon><Edit /></el-icon> 编辑
-              </el-button>
-              <el-button
-                v-if="userStore.canEdit"
-                type="warning"
-                link
-                @click="handleFlow(s.row)"
-              >
-                <el-icon><Refresh /></el-icon> 流转
-              </el-button>
-              <el-button
-                v-if="userStore.isAdmin"
-                type="danger"
-                link
-                @click="handleDelete(s.row)"
-              >
-                <el-icon><Delete /></el-icon> 删除
-              </el-button>
-            </div>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <el-empty :image-size="80" description="暂无数据">
-            <template #image>
-              <div style="font-size: 44px;">📝</div>
-            </template>
-          </el-empty>
+      </el-table-column>
+
+      <el-table-column label="类型" prop="order_type" min-width="100">
+        <template #default="s">
+          <span class="badge" style="padding: 2px 10px; border-radius: 12px; background: var(--info-bg); color: var(--info);">
+            {{ s.row.order_type }}
+          </span>
         </template>
-      </el-table>
-      <CommonPagination
-        v-model:page="page"
-        v-model:page-size="pageSize"
-        :total="total"
-        @change="onPagerChange"
-      />
-    </section>
+      </el-table-column>
+
+      <el-table-column label="产品" prop="product_name" min-width="140">
+        <template #default="s">{{ s.row.product_name || '-' }}</template>
+      </el-table-column>
+
+      <el-table-column label="优先级" prop="priority" min-width="100">
+        <template #default="s">
+          <span :class="'status-badge ' + getStatusClass(s.row.priority)">{{ s.row.priority }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="计划开始" prop="planned_start" min-width="130">
+        <template #default="s">{{ s.row.planned_start ? s.row.planned_start.slice(0, 10) : '-' }}</template>
+      </el-table-column>
+
+      <el-table-column label="计划结束" prop="planned_end" min-width="130">
+        <template #default="s">{{ s.row.planned_end ? s.row.planned_end.slice(0, 10) : '-' }}</template>
+      </el-table-column>
+
+      <el-table-column label="状态" prop="status" min-width="110">
+        <template #default="s">
+          <span :class="'status-badge ' + getStatusClass(s.row.status)">{{ s.row.status }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="负责人" prop="responsible_person" min-width="110">
+        <template #default="s">{{ s.row.responsible_person || '-' }}</template>
+      </el-table-column>
+
+      <el-table-column label="操作" width="260" fixed="right">
+        <template #default="s">
+          <div class="row-actions">
+            <el-button
+              v-if="userStore.canEdit"
+              type="primary"
+              link
+              @click="showModal(s.row)"
+            >
+              <el-icon><Edit /></el-icon> 编辑
+            </el-button>
+            <el-button
+              v-if="userStore.canEdit"
+              type="warning"
+              link
+              @click="handleFlow(s.row)"
+            >
+              <el-icon><Refresh /></el-icon> 流转
+            </el-button>
+            <el-button
+              v-if="userStore.isAdmin"
+              type="danger"
+              link
+              @click="handleDelete(s.row)"
+            >
+              <el-icon><Delete /></el-icon> 删除
+            </el-button>
+          </div>
+        </template>
+      </el-table-column>
+      <template #empty>
+        <el-empty :image-size="80" description="暂无数据">
+          <template #image>
+            <div style="font-size: 44px;">📝</div>
+          </template>
+        </el-empty>
+      </template>
+    </el-table>
+
+    <CommonPagination
+      v-model:page="page"
+      v-model:page-size="pageSize"
+      :total="total"
+      @change="onPagerChange"
+    />
     <CommonModal
       v-model:visible="modalVisible"
       :width="680"
@@ -200,13 +210,13 @@
     </CommonModal>
   </div>
 </template>
-
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { mesApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
@@ -218,11 +228,13 @@ const pageSize = ref(20)
 const total = ref(0)
 const loading = ref(false)
 const filters = ref({ keyword: '', status: '', priority: '' })
-
 const modalVisible = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
 const form = ref({})
+
+// 用于取消请求的 AbortController
+let abortController = null
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 
@@ -289,20 +301,31 @@ const onResetFromFilterBar = () => {
 }
 
 const loadData = async () => {
+  // 取消之前的请求（如果有）
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  abortController = new AbortController()
   loading.value = true
+  
   try {
     const params = { page: page.value, page_size: pageSize.value }
     if (filters.value.keyword)  params.keyword  = filters.value.keyword
     if (filters.value.status)   params.status   = filters.value.status
     if (filters.value.priority) params.priority = filters.value.priority
-
+    
     const res = await mesApi.orders(params)
     items.value = res.data?.items || []
     total.value = res.data?.total || 0
-  } catch (e) {
-    console.error(e)
+  } catch(e) {
+    // 忽略AbortError
+    if (e.name !== 'AbortError') {
+      console.error(e)
+    }
   } finally {
     loading.value = false
+    abortController = null
   }
 }
 
@@ -385,5 +408,21 @@ const handleFlow = async (s) => {
 
 const onPagerChange = () => loadData()
 
-onMounted(() => { loadData() })
+onMounted(() => {
+  console.log('Orders组件挂载')
+  loadData()
+})
+
+onUnmounted(() => {
+  console.log('Orders组件卸载，清理资源')
+  // 取消正在进行的请求
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  // 清理引用
+  items.value = []
+  form.value = {}
+  filters.value = { keyword: '', status: '', priority: '' }
+})
 </script>

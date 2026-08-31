@@ -11,14 +11,15 @@
         </template>
       </div>
     </div>
-    <section class="page-section" style="padding:0;overflow:hidden;">
+
       <CommonFilterBar :fields="filterFields" v-model:model-value="filters" @search="loadData" @reset="onResetFromFilterBar">
         <template #actions="scope">
           <el-button type="primary" size="default" @click="scope.search"><el-icon style="margin-right:6px;"><Search /></el-icon>搜索</el-button>
           <el-button size="default" @click="resetFilters"><el-icon style="margin-right:6px;"><RefreshRight /></el-icon>重置</el-button>
         </template>
       </CommonFilterBar>
-      <el-table
+
+    <el-table
         v-loading="loading"
         :data="items"
         stripe
@@ -27,27 +28,35 @@
         empty-text="暂无数据"
         :header-cell-style="{fontWeight:600}"
       >
+
         <el-table-column label="设备ID" prop="device_id" min-width="160" align="center" show-overflow-tooltip>
           <template #default="s">
             <span class="fw-semibold" style="color:var(--c-text);">{{ s.row.device_id || '-' }}</span>
           </template>
         </el-table-column>
+
         <el-table-column label="产线" prop="production_line" min-width="90" align="center" />
+
         <el-table-column label="杀毒时间" min-width="170" align="center" show-overflow-tooltip>
           <template #default="s">{{ (s.row.antivirus_time || '').slice(0,16).replace('T',' ') || '-' }}</template>
         </el-table-column>
+
         <el-table-column label="下次杀毒" min-width="170" align="center" show-overflow-tooltip>
           <template #default="s">{{ (s.row.next_antivirus_time || '').slice(0,16).replace('T',' ') || '-' }}</template>
         </el-table-column>
+
         <el-table-column label="周期" prop="cycle" min-width="80" align="center" />
+
         <el-table-column label="状态" prop="status" min-width="120" align="center">
           <template #default="s">
             <span :class="'status-badge ' + statusClass(s.row)">{{ statusText(s.row) }}</span>
           </template>
         </el-table-column>
+
         <el-table-column label="操作人" prop="operator" min-width="120" align="center" show-overflow-tooltip>
           <template #default="s">{{ s.row.operator || '-' }}</template>
         </el-table-column>
+
         <el-table-column label="操作" width="180" align="center" fixed="right">
           <template #default="s">
             <template v-if="userStore.canEdit">
@@ -66,9 +75,8 @@
           </el-empty>
         </template>
       </el-table>
-      <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact @change="onPagerChange" />
-    </section>
 
+      <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact @change="onPagerChange" />
     <!-- 新增/编辑 Modal -->
     <CommonModal
       v-model:visible="formModalVisible"
@@ -131,17 +139,16 @@
         </el-button>
       </template>
     </CommonModal>
-
-
   </div>
 </template>
-
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { antivirusApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useNotify } from '@/composables/useNotify'
+import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
@@ -156,6 +163,9 @@ const total = ref(0)
 const loading = ref(false)
 const filters = ref({ keyword:'', line:'' })
 
+// 用于取消请求的 AbortController
+let abortController = null
+
 // 表单弹窗
 const formModalVisible = ref(false)
 const formMode = ref('create')
@@ -165,8 +175,6 @@ const form = ref({
   device_id: '', production_line: '1线', antivirus_time: '',
   cycle: '每天', operator: '', remark: ''
 })
-
-
 
 const filterFields = computed(() => [
   {
@@ -206,6 +214,7 @@ const statusText = (row) => {
   const next = new Date(row.next_antivirus_time.replace('Z',''))
   return next > now ? '已杀毒' : '超时未杀毒'
 }
+
 const statusClass = (row) => {
   const t = statusText(row)
   if (t === '已杀毒')     return 'normal'
@@ -230,19 +239,31 @@ const onResetFromFilterBar = () => {
 }
 
 const loadData = async () => {
+  // 取消之前的请求（如果有）
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  abortController = new AbortController()
   loading.value = true
+  
   try {
     const params = { page: page.value, page_size: pageSize.value }
     // 实际后端 API：device_id / production_line 作为查询参数
     if (filters.value.keyword) params.device_id = filters.value.keyword
     if (filters.value.line)    params.production_line = filters.value.line
+    
     const res = await antivirusApi.list(params)
     items.value = res.data?.items || []
     total.value = res.data?.total || 0
   } catch(e) {
-    console.error(e)
+    // 忽略AbortError
+    if (e.name !== 'AbortError') {
+      console.error(e)
+    }
   } finally {
     loading.value = false
+    abortController = null
   }
 }
 
@@ -308,5 +329,21 @@ const handleDelete = async (row) => {
 
 const onPagerChange = () => loadData()
 
-onMounted(loadData)
+onMounted(() => {
+  console.log('Antivirus组件挂载')
+  loadData()
+})
+
+onUnmounted(() => {
+  console.log('Antivirus组件卸载，清理资源')
+  // 取消正在进行的请求
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  // 清理引用
+  items.value = []
+  form.value = defaultForm()
+  filters.value = { keyword:'', line:'' }
+})
 </script>

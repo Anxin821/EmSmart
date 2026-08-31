@@ -125,7 +125,9 @@ const routes = [
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
+  // 禁用路由滚动行为，避免某些浏览器兼容性问题
+  scrollBehavior: () => ({ left: 0, top: 0 })
 })
 
 // 路由守卫
@@ -146,5 +148,26 @@ router.beforeEach(async (to, from, next) => {
     next()
   }
 })
+
+// 添加路由变化后的日志，便于调试
+router.afterEach((to, from) => {
+  console.log(`路由切换: ${from.path} -> ${to.path}`)
+})
+
+// 添加全局错误处理
+router.onError((error) => {
+  console.error('路由错误:', error)
+  // 可以在这里添加错误恢复逻辑
+})
+
+// 捕获导航错误
+const originalPush = router.push
+router.push = function(location) {
+  return originalPush.call(this, location).catch(err => {
+    if (err.name !== 'NavigationDuplicated') {
+      console.error('路由导航错误:', err)
+    }
+  })
+}
 
 export default router

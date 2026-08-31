@@ -1,161 +1,166 @@
 <template>
-  <div class="page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title"><span class="emoji">🔍</span>AOI&AI 设备管理</h1>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="resetFilters"><span class="bi bi-funnel"></span>重置筛选</button>
-        <template v-if="userStore.canEdit">
-          <button class="btn btn-sm btn-outline-primary" @click="showModal()"><span class="bi bi-plus-lg"></span>新增设备</button>
+  <PageLayout 
+    title="AOI&AI 设备管理" 
+    icon="🔍"
+  >
+    <template #header-actions>
+      <button class="btn btn-sm btn-outline-secondary" @click="resetFilters"><span class="bi bi-funnel"></span>重置筛选</button>
+      <template v-if="userStore.canEdit">
+        <button class="btn btn-sm btn-outline-primary" @click="showModal()"><span class="bi bi-plus-lg"></span>新增设备</button>
+      </template>
+    </template>
+    <!-- 页面内容区域 -->
+
+    <CommonFilterBar :model-value="filters" :fields="filterFields" @update:model-value="val => Object.assign(filters, val)" @search="loadData">
+      <template #actions="{ search, reset }">
+        <el-button type="primary" @click="search">
+          <el-icon><Search /></el-icon>搜索
+        </el-button>
+        <el-button @click="reset">
+          <el-icon><RefreshRight /></el-icon>重置
+        </el-button>
+        <el-button @click="handleExport">
+          <i class="bi bi-file-earmark-excel" style="margin-right: 4px;"></i>导出
+        </el-button>
+        <el-button v-if="userStore.canEdit" type="success" plain @click="handleImport">
+          <i class="bi bi-upload" style="margin-right: 4px;"></i>导入
+        </el-button>
+      </template>
+    </CommonFilterBar>
+
+    <el-table v-loading="loading" :data="devices" stripe border style="width: 100%;" empty-text="暂无数据">
+
+      <el-table-column prop="device_id" label="设备ID" width="130" align="center" show-overflow-tooltip>
+        <template #default="{ row }">
+          <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">{{ row.device_id }}</code>
         </template>
+      </el-table-column>
+
+      <el-table-column prop="name" label="名称" min-width="120" align="center" show-overflow-tooltip>
+        <template #default="{ row }"><span class="fw-semibold" style="color: var(--c-text);">{{ row.name }}</span></template>
+      </el-table-column>
+
+      <el-table-column prop="device_type" label="类型" width="90" align="center">
+        <template #default="{ row }">
+          <span class="badge" :style="{ background: row.device_type === 'AOI' ? 'var(--info-bg)' : 'var(--purple-bg)', color: row.device_type === 'AOI' ? 'var(--info)' : 'var(--purple)', padding: '2px 10px', borderRadius: '12px' }">{{ row.device_type }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column prop="production_line" label="产线" width="80" align="center" />
+
+      <el-table-column prop="location" label="位置" min-width="120" align="center" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.location || '-' }}</template>
+      </el-table-column>
+
+      <el-table-column prop="ip_address" label="IP" width="130" align="center">
+        <template #default="{ row }">
+          <span style="font-family: Consolas, 'Courier New', monospace; font-size: var(--fn-sm);">{{ row.ip_address || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column prop="status" label="状态" width="90" align="center">
+        <template #default="{ row }">
+          <span :class="'status-badge ' + getStatusClass(cleanStatus(row.status))">{{ cleanStatus(row.status) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column prop="responsible_person" label="负责人" min-width="90" align="center" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.responsible_person || '-' }}</template>
+      </el-table-column>
+
+      <el-table-column prop="install_date" label="安装日期" width="110" align="center">
+        <template #default="{ row }">{{ row.install_date || '-' }}</template>
+      </el-table-column>
+
+      <el-table-column label="操作" width="150" align="center" fixed="right">
+        <template #default="{ row }">
+          <template v-if="userStore.canEdit">
+            <el-button type="primary" link size="small" @click="showModal(row)">
+              <el-icon><Edit /></el-icon>编辑
+            </el-button>
+          </template>
+          <template v-if="userStore.isAdmin">
+            <el-button type="danger" link size="small" @click="handleDelete(row)">
+              <el-icon><Delete /></el-icon>删除
+            </el-button>
+          </template>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <CommonPagination
+      :page="page"
+      :page-size="pageSize"
+      :total="total"
+      compact
+      @change="onPagerChange"
+    />
+  </PageLayout>
+  <!-- 模态框保持在PageLayout外部 -->
+  <CommonModal
+    :visible="crud.modalVisible"
+    @update:visible="v => crud.modalVisible = v"
+    :title="crud.isEdit() ? '编辑设备' : '新增设备'"
+    width="640px"
+    :ok-loading="crud.modalSaving"
+    @ok="handleSave"
+  >
+    <div class="row g-3">
+      <div class="col-6">
+        <label class="small form-label">设备ID <span style="color: var(--err);">*</span></label>
+        <el-input v-model="crud.form.device_id" placeholder="如 AOI-001" clearable />
+      </div>
+      <div class="col-6">
+        <label class="small form-label">名称 <span style="color: var(--err);">*</span></label>
+        <el-input v-model="crud.form.name" clearable />
+      </div>
+      <div class="col-6">
+        <label class="small form-label">类型</label>
+        <el-select v-model="crud.form.device_type" style="width: 100%;">
+          <el-option label="AOI" value="AOI" />
+          <el-option label="AI"  value="AI"  />
+        </el-select>
+      </div>
+      <div class="col-6">
+        <label class="small form-label">产线</label>
+        <el-select v-model="crud.form.production_line" style="width: 100%;">
+          <el-option v-for="l in lines" :key="l" :label="l" :value="l" />
+        </el-select>
+      </div>
+      <div class="col-6">
+        <label class="small form-label">状态</label>
+        <el-select v-model="crud.form.status" style="width: 100%;">
+          <el-option label="正常"   value="正常" />
+          <el-option label="故障"   value="故障" />
+          <el-option label="保养中" value="保养中" />
+        </el-select>
+      </div>
+      <div class="col-6">
+        <label class="small form-label">负责人</label>
+        <el-input v-model="crud.form.responsible_person" clearable placeholder="请输入负责人姓名" />
+      </div>
+      <div class="col-6">
+        <label class="small form-label">IP地址</label>
+        <el-input v-model="crud.form.ip_address" clearable placeholder="192.168.x.x" />
+      </div>
+      <div class="col-6">
+        <label class="small form-label">安装日期</label>
+        <el-date-picker v-model="crud.form.install_date" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%;" />
+      </div>
+      <div class="col-12">
+        <label class="small form-label">位置</label>
+        <el-input v-model="crud.form.location" clearable placeholder="车间位置描述" />
       </div>
     </div>
-
-    <section class="page-section" style="padding: 0; overflow: hidden;">
-      <CommonFilterBar :model-value="filters" :fields="filterFields" @update:model-value="val => Object.assign(filters, val)" @search="loadData">
-        <template #actions="{ search, reset }">
-          <el-button type="primary" @click="search">
-            <el-icon><Search /></el-icon>搜索
-          </el-button>
-          <el-button @click="reset">
-            <el-icon><RefreshRight /></el-icon>重置
-          </el-button>
-          <el-button @click="handleExport">
-            <i class="bi bi-file-earmark-excel" style="margin-right: 4px;"></i>导出
-          </el-button>
-          <el-button v-if="userStore.canEdit" type="success" plain @click="handleImport">
-            <i class="bi bi-upload" style="margin-right: 4px;"></i>导入
-          </el-button>
-        </template>
-      </CommonFilterBar>
-
-      <el-table v-loading="loading" :data="devices" stripe border style="width: 100%;" empty-text="暂无数据">
-        <el-table-column prop="device_id" label="设备ID" width="130" align="center" show-overflow-tooltip>
-          <template #default="{ row }">
-            <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">{{ row.device_id }}</code>
-          </template>
-        </el-table-column>
-        <el-table-column prop="name" label="名称" min-width="120" align="center" show-overflow-tooltip>
-          <template #default="{ row }"><span class="fw-semibold" style="color: var(--c-text);">{{ row.name }}</span></template>
-        </el-table-column>
-        <el-table-column prop="device_type" label="类型" width="90" align="center">
-          <template #default="{ row }">
-            <span class="badge" :style="{ background: row.device_type === 'AOI' ? 'var(--info-bg)' : 'var(--purple-bg)', color: row.device_type === 'AOI' ? 'var(--info)' : 'var(--purple)', padding: '2px 10px', borderRadius: '12px' }">{{ row.device_type }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="production_line" label="产线" width="80" align="center" />
-        <el-table-column prop="location" label="位置" min-width="120" align="center" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.location || '-' }}</template>
-        </el-table-column>
-        <el-table-column prop="ip_address" label="IP" width="130" align="center">
-          <template #default="{ row }">
-            <span style="font-family: Consolas, 'Courier New', monospace; font-size: var(--fn-sm);">{{ row.ip_address || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="90" align="center">
-          <template #default="{ row }">
-            <span :class="'status-badge ' + getStatusClass(cleanStatus(row.status))">{{ cleanStatus(row.status) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="responsible_person" label="负责人" min-width="90" align="center" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.responsible_person || '-' }}</template>
-        </el-table-column>
-        <el-table-column prop="install_date" label="安装日期" width="110" align="center">
-          <template #default="{ row }">{{ row.install_date || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="150" align="center" fixed="right">
-          <template #default="{ row }">
-            <template v-if="userStore.canEdit">
-              <el-button type="primary" link size="small" @click="showModal(row)">
-                <el-icon><Edit /></el-icon>编辑
-              </el-button>
-            </template>
-            <template v-if="userStore.isAdmin">
-              <el-button type="danger" link size="small" @click="handleDelete(row)">
-                <el-icon><Delete /></el-icon>删除
-              </el-button>
-            </template>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <CommonPagination
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        compact
-        @change="onPagerChange"
-      />
-    </section>
-
-    <CommonModal
-      :visible="crud.modalVisible"
-      @update:visible="v => crud.modalVisible = v"
-      :title="crud.isEdit() ? '编辑设备' : '新增设备'"
-      width="640px"
-      :ok-loading="crud.modalSaving"
-      @ok="handleSave"
-    >
-      <div class="row g-3">
-        <div class="col-6">
-          <label class="small form-label">设备ID <span style="color: var(--err);">*</span></label>
-          <el-input v-model="crud.form.device_id" placeholder="如 AOI-001" clearable />
-        </div>
-        <div class="col-6">
-          <label class="small form-label">名称 <span style="color: var(--err);">*</span></label>
-          <el-input v-model="crud.form.name" clearable />
-        </div>
-        <div class="col-6">
-          <label class="small form-label">类型</label>
-          <el-select v-model="crud.form.device_type" style="width: 100%;">
-            <el-option label="AOI" value="AOI" />
-            <el-option label="AI"  value="AI"  />
-          </el-select>
-        </div>
-        <div class="col-6">
-          <label class="small form-label">产线</label>
-          <el-select v-model="crud.form.production_line" style="width: 100%;">
-            <el-option v-for="l in lines" :key="l" :label="l" :value="l" />
-          </el-select>
-        </div>
-        <div class="col-6">
-          <label class="small form-label">状态</label>
-          <el-select v-model="crud.form.status" style="width: 100%;">
-            <el-option label="正常"   value="正常" />
-            <el-option label="故障"   value="故障" />
-            <el-option label="保养中" value="保养中" />
-          </el-select>
-        </div>
-        <div class="col-6">
-          <label class="small form-label">负责人</label>
-          <el-input v-model="crud.form.responsible_person" clearable placeholder="请输入负责人姓名" />
-        </div>
-        <div class="col-6">
-          <label class="small form-label">IP地址</label>
-          <el-input v-model="crud.form.ip_address" clearable placeholder="192.168.x.x" />
-        </div>
-        <div class="col-6">
-          <label class="small form-label">安装日期</label>
-          <el-date-picker v-model="crud.form.install_date" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%;" />
-        </div>
-        <div class="col-12">
-          <label class="small form-label">位置</label>
-          <el-input v-model="crud.form.location" clearable placeholder="车间位置描述" />
-        </div>
-      </div>
-      <template #footer="f">
-        <el-button @click="f.cancel">取消</el-button>
-        <el-button type="primary" :loading="f.okLoading" @click="f.ok">保存</el-button>
-      </template>
-    </CommonModal>
-
-    <input type="file" ref="fileInput" accept=".xlsx,.xls" style="display:none" @change="handleFileChange">
-  </div>
+    <template #footer="f">
+      <el-button @click="f.cancel">取消</el-button>
+      <el-button type="primary" :loading="f.okLoading" @click="f.ok">保存</el-button>
+    </template>
+  </CommonModal>
+  <input type="file" ref="fileInput" accept=".xlsx,.xls" style="display:none" @change="handleFileChange">
 </template>
-
 <script setup>
-import { computed } from 'vue'
+import { computed, onUnmounted } from 'vue'
 import { devicesApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
@@ -163,15 +168,13 @@ import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
 import { useNotify }    from '@/composables/useNotify'
 import { useCrudModal } from '@/composables/useCrudModal'
 import { useCrudList }  from '@/composables/useCrudList'
+import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
-
 const userStore = useUserStore()
 const { toast } = useNotify()
-
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线']
-
 const filterFields = [
   { type: 'input',  key: 'keyword', label: '',          placeholder: '设备ID / 名称 / IP / 负责人', autoSearch: false, clearable: true },
   { type: 'select', key: 'line',    label: '产线',      placeholder: '全部产线', autoSearch: true, clearable: true,
@@ -181,7 +184,6 @@ const filterFields = [
   { type: 'select', key: 'type',    label: '类型',      placeholder: '全部类型', autoSearch: true, clearable: true,
     options: [{ label: '全部类型', value: '' }, { label: 'AOI', value: 'AOI' }, { label: 'AI', value: 'AI' }] },
 ]
-
 /* ====================== 业务纯函数（小而集中，方便 UT/复用） ====================== */
 const cleanStatus = (s) => (s == null ? '正常' : String(s).replace(/^\s*\|*\s*/, '').replace(/\s*\|*\s*$/, '').trim() || '正常')
 const getStatusClass = (s) => ({ '正常': 'normal', '故障': 'fault', '保养中': 'warn' }[s] || 'muted')
@@ -189,7 +191,6 @@ const defaultForm = () => ({
   device_id: '', name: '', device_type: 'AOI', production_line: '1线',
   location: '', ip_address: '', status: '正常', responsible_person: '', install_date: '',
 })
-
 /* ================ 列表 CRUD（useCrudList 统一封装了 filters/loading/list/total/loadData/delete/import/export） ================ */
 const listAdapter = {
   list:   async ({ page, size, keyword, line, status, type }) => {
@@ -223,12 +224,10 @@ const handleDelete = (row) => del(row, {
   successMsg: '设备已删除',
 })
 const handleExport = () => doExport()
-
 /* ================ 新增 / 编辑弹窗（useCrudModal 统一封装 visible/editing/form/saving/showCreate/showEdit/close/submit） ================ */
 const crud = useCrudModal(defaultForm)
 const showModal = (dev = null) => (dev ? crud.showEdit(dev) : crud.showCreate())
 const closeModal = () => crud.close()
-
 const handleSave = () => crud.submit(
   async ({ form, editing, isEdit }) => {
     const payload = { ...form }
@@ -243,7 +242,6 @@ const handleSave = () => crud.submit(
     onSaved:    () => loadData(),
   }
 )
-
 const page      = computed(() => filters.page)
 const pageSize  = computed(() => filters.size)
 const totalPages = computed(() => Math.ceil((total.value || 0) / (pageSize.value || 1)))

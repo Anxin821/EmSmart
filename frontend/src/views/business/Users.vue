@@ -19,7 +19,6 @@
       </div>
     </div>
 
-    <section class="page-section" style="padding: 0; overflow: hidden;">
       <CommonFilterBar v-model="filters" :fields="filterFields" @search="onSearch">
         <template #actions="{ search, reset }">
           <el-button type="primary" @click="search">
@@ -31,30 +30,37 @@
         </template>
       </CommonFilterBar>
 
-      <el-table :data="listFiltered" stripe border style="width: 100%;" empty-text="暂无数据">
+    <el-table :data="listFiltered" stripe border style="width: 100%;" empty-text="暂无数据">
+
         <el-table-column prop="username" label="用户名" width="130" align="center" show-overflow-tooltip>
           <template #default="{ row }"><b>{{ row.username }}</b></template>
         </el-table-column>
+
         <el-table-column prop="full_name" label="姓名" min-width="110" align="center" show-overflow-tooltip>
           <template #default="{ row }">{{ row.full_name || '-' }}</template>
         </el-table-column>
+
         <el-table-column prop="role" label="角色" width="110" align="center">
           <template #default="{ row }">
             <span :class="'status-badge ' + getRoleClass(row.role)">{{ row.role }}</span>
           </template>
         </el-table-column>
+
         <el-table-column prop="email" label="邮箱" min-width="180" align="center" show-overflow-tooltip>
           <template #default="{ row }">{{ row.email || '-' }}</template>
         </el-table-column>
+
         <el-table-column prop="is_active" label="状态" width="90" align="center">
           <template #default="{ row }">
             <span v-if="row.is_active" class="status-badge normal">正常</span>
             <span v-else class="status-badge muted">禁用</span>
           </template>
         </el-table-column>
+
         <el-table-column prop="created_at" label="创建时间" width="120" align="center">
           <template #default="{ row }">{{ (row.created_at || '').slice(0, 10) }}</template>
         </el-table-column>
+
         <el-table-column label="操作" width="210" align="center" fixed="right">
           <template #default="{ row }">
             <template v-if="userStore.isAdmin">
@@ -78,8 +84,6 @@
         :total="filteredCount"
         compact
       />
-    </section>
-
     <!-- 用户新增/编辑弹框 -->
     <CommonModal
       v-model:visible="modalVisible"
@@ -127,7 +131,6 @@
         <el-button type="primary" :loading="f.okLoading" @click="f.ok">保存</el-button>
       </template>
     </CommonModal>
-
     <!-- 权限设置弹框 -->
     <CommonModal
       v-model:visible="permModalVisible"
@@ -157,13 +160,13 @@
     </CommonModal>
   </div>
 </template>
-
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { usersApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, Key, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
@@ -173,6 +176,9 @@ const data = ref([])
 const page = ref(1)
 const pageSize = ref(20)
 const filters = ref({ keyword: '', role: '' })
+
+// 用于取消请求的 AbortController
+let abortController = null
 
 const filterFields = [
   { type: 'input', key: 'keyword', label: '', placeholder: '用户名 / 姓名 / 邮箱', autoSearch: false, clearable: true },
@@ -206,7 +212,9 @@ const filteredData = computed(() => {
   if (filters.value.role) arr = arr.filter(u => u.role === filters.value.role)
   return arr
 })
+
 const filteredCount = computed(() => filteredData.value.length)
+
 const listFiltered = computed(() => {
   const start = (page.value - 1) * pageSize.value
   return filteredData.value.slice(start, start + pageSize.value)
@@ -229,11 +237,23 @@ const getRoleClass = (role) => ({ admin: 'severe', engineer: 'info', viewer: 'mu
 const onSearch = () => { page.value = 1 }
 
 const loadData = async () => {
+  // 取消之前的请求（如果有）
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  abortController = new AbortController()
+  
   try {
     const res = await usersApi.list()
     data.value = res.data || []
-  } catch (e) {
-    console.error(e)
+  } catch(e) {
+    // 忽略AbortError
+    if (e.name !== 'AbortError') {
+      console.error(e)
+    }
+  } finally {
+    abortController = null
   }
 }
 
@@ -306,9 +326,24 @@ const handlePermSave = async () => {
   }
 }
 
-onMounted(() => { loadData() })
-</script>
+onMounted(() => {
+  console.log('Users组件挂载')
+  loadData()
+})
 
+onUnmounted(() => {
+  console.log('Users组件卸载，清理资源')
+  // 取消正在进行的请求
+  if (abortController) {
+    abortController.abort()
+  }
+  
+  // 清理引用
+  data.value = []
+  form.value = {}
+  filters.value = { keyword: '', role: '' }
+})
+</script>
 <style scoped>
 .mod-perm-card {
   border: 1px solid var(--border);

@@ -26,6 +26,9 @@ api.interceptors.response.use(
   }
 )
 
+// 导出API工厂函数
+export * from './factory'
+
 // 按业务域导出
 export { authApi } from './auth'
 export { optionsApi, devicesApi } from './devices'
