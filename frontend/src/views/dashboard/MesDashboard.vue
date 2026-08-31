@@ -8,8 +8,9 @@
         <button class="btn btn-sm btn-outline-secondary" @click="loadData">
           <span class="bi bi-arrow-clockwise"></span>刷新
         </button>
-        <button class="btn btn-sm btn-outline-primary" @click="handleExportPPT">
-          <span class="bi bi-filetype-ppt"></span>导出 PPT
+        <button class="btn btn-sm btn-outline-primary" @click="exportPPT" :disabled="exporting">
+          <span class="bi" :class="exporting ? 'bi-hourglass-split' : 'bi-file-earmark-ppt'"></span>
+          {{ exporting ? '导出中...' : '导出PPT' }}
         </button>
       </div>
     </div>
@@ -107,8 +108,10 @@
 import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
 import { mesApi } from '@/api'
+import { createPresentation, addTitleSlide, addStatsSlide, addChartSlide, addTableSlide, savePresentation, captureElement, colorMap } from '@/utils/pptExport'
 
 const data = ref(null)
+const exporting = ref(false)
 let cBugs = null, cReqs = null
 
 const resize = () => {
@@ -222,6 +225,67 @@ const renderCharts = () => {
 
 const handleExportPPT = () => {
   alert('PPT 导出：请在浏览器打印对话框中选择「另存为 PDF」再转 PPT，或等待后端实现（后续迭代）。')
+}
+
+// 导出PPT
+const exportPPT = async () => {
+  exporting.value = true
+  try {
+    const pptx = createPresentation('MES 管理看板')
+    
+    // 1. 标题页
+    addTitleSlide(pptx, 'MES 管理看板', 'BUG修复率与需求完成率统计')
+    
+    // 2. 统计指标页
+    addStatsSlide(pptx, '核心指标', [
+      { label: 'BUG修复率', value: `${data.value?.fix_rate ?? 0}%`, color: colorMap.green },
+      { label: '需求完成率', value: `${data.value?.delivery_rate ?? 0}%`, color: colorMap.red }
+    ])
+    
+    // 3. BUG月度图表
+    const bugsChart = await captureElement('chart-bugs')
+    if (bugsChart) {
+      addChartSlide(pptx, 'BUG 月度状态分布', bugsChart)
+    }
+    
+    // 4. 需求月度图表
+    const reqsChart = await captureElement('chart-reqs')
+    if (reqsChart) {
+      addChartSlide(pptx, '需求月度状态分布', reqsChart)
+    }
+    
+    // 5. 风险列表
+    if (data.value?.risks?.length > 0) {
+      const headers = ['类型', '描述', '数量']
+      const rows = data.value.risks.map(r => [
+        r.label || '-',
+        r.items?.join('、') || '-',
+        `${r.value} ${r.unit || ''}`
+      ])
+      addTableSlide(pptx, '阻塞与风险归因', headers, rows)
+    }
+    
+    // 6. 里程碑
+    if (data.value?.milestones) {
+      const ms = data.value.milestones
+      const headers = ['里程碑', '需求数量', '需求列表']
+      const rows = [[
+        ms.label || '本月里程碑',
+        `${ms.count || 0} 个`,
+        ms.items?.join('、') || '-'
+      ]]
+      addTableSlide(pptx, '本月里程碑 & 下月承诺', headers, rows)
+    }
+    
+    // 保存文件
+    const date = new Date().toISOString().slice(0, 10)
+    savePresentation(pptx, `MES管理看板_${date}.pptx`)
+  } catch (error) {
+    console.error('导出PPT失败:', error)
+    alert('导出PPT失败，请重试')
+  } finally {
+    exporting.value = false
+  }
 }
 
 onMounted(() => {

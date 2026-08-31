@@ -11,6 +11,10 @@
         <button class="btn btn-sm btn-outline-secondary" @click="loadData">
           <span class="bi bi-arrow-clockwise"></span>刷新
         </button>
+        <button class="btn btn-sm btn-outline-primary" @click="exportPPT" :disabled="exporting">
+          <span class="bi" :class="exporting ? 'bi-hourglass-split' : 'bi-file-earmark-ppt'"></span>
+          {{ exporting ? '导出中...' : '导出PPT' }}
+        </button>
         <router-link class="btn btn-sm btn-primary" to="/devices">
           <span class="bi bi-arrow-right"></span>进入管理
         </router-link>
@@ -142,11 +146,13 @@
 import { ref, reactive, computed, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
 import { devicesApi, productionApi } from '@/api'
+import { createPresentation, addTitleSlide, addStatsSlide, addChartSlide, addTableSlide, savePresentation, captureElement, colorMap } from '@/utils/pptExport'
 
 const devices = ref([])
 const summary = ref({ total_output: 0, total_qualified: 0, yield_rate: 0, months: 0 })
 const trend   = ref([])
 const recentWeeks = ref([])
+const exporting = ref(false)
 
 const stats = reactive({ total: 0, normal: 0, fault: 0, maintenance: 0 })
 
@@ -327,6 +333,70 @@ onBeforeUnmount(() => {
   chartYield && chartYield.dispose()
   chartOutput && chartOutput.dispose()
 })
+
+// 导出PPT
+const exportPPT = async () => {
+  exporting.value = true
+  try {
+    const pptx = createPresentation('AOI&AI 设备监控看板')
+    
+    // 1. 标题页
+    addTitleSlide(pptx, 'AOI&AI 设备监控看板', '设备运行状态、产线分布与产量直通率总览')
+    
+    // 2. 统计指标页
+    addStatsSlide(pptx, '设备统计', [
+      { label: '设备总数', value: stats.total, color: colorMap.blue },
+      { label: '正常运行', value: stats.normal, color: colorMap.green },
+      { label: '故障设备', value: stats.fault, color: colorMap.red },
+      { label: '保养中', value: stats.maintenance, color: colorMap.yellow }
+    ])
+    
+    // 3. 直通率图表
+    const yieldChart = await captureElement('chart-yield')
+    if (yieldChart) {
+      addChartSlide(pptx, '直通率趋势', yieldChart)
+    }
+    
+    // 4. 产量图表
+    const outputChart = await captureElement('chart-output')
+    if (outputChart) {
+      addChartSlide(pptx, '月度产量', outputChart)
+    }
+    
+    // 5. 近四周数据表格
+    if (recentWeeks.value.length > 0) {
+      const headers = ['产线', '项目', '产量', '合格数', '直通率']
+      const rows = recentWeeks.value.slice(0, 10).map(row => [
+        row.production_line || '-',
+        row.project || '-',
+        row.total_output?.toLocaleString() || '0',
+        row.qualified_count?.toLocaleString() || '0',
+        row.yield_rate ? `${row.yield_rate}%` : '-'
+      ])
+      addTableSlide(pptx, '近四周数据快照', headers, rows)
+    }
+    
+    // 6. 产线设备分布
+    if (lineGroups.value.length > 0) {
+      const headers = ['产线', '设备数量', '状态']
+      const rows = lineGroups.value.map(group => [
+        group.line,
+        `${group.devices.length} 台`,
+        `正常: ${group.devices.filter(d => d.status === '正常').length}, 故障: ${group.devices.filter(d => d.status === '故障').length}`
+      ])
+      addTableSlide(pptx, '产线设备分布', headers, rows)
+    }
+    
+    // 保存文件
+    const date = new Date().toISOString().slice(0, 10)
+    savePresentation(pptx, `AOI设备监控看板_${date}.pptx`)
+  } catch (error) {
+    console.error('导出PPT失败:', error)
+    alert('导出PPT失败，请重试')
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <style scoped>

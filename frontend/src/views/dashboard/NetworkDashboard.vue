@@ -9,7 +9,11 @@
         <button class="btn btn-sm btn-outline-secondary" @click="loadData">
           <span class="bi bi-arrow-clockwise"></span>刷新
         </button>
-        <button class="btn btn-sm btn-outline-primary" @click="handleCheckAll">
+        <button class="btn btn-sm btn-outline-primary" @click="exportPPT" :disabled="exporting">
+          <span class="bi" :class="exporting ? 'bi-hourglass-split' : 'bi-file-earmark-ppt'"></span>
+          {{ exporting ? '导出中...' : '导出PPT' }}
+        </button>
+        <button class="btn btn-sm btn-outline-warning" @click="handleCheckAll">
           <span class="bi bi-lightning-charge"></span>一键检测
         </button>
       </div>
@@ -126,8 +130,10 @@
 import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
 import { dashboardApi, networkApi } from '@/api'
+import { createPresentation, addTitleSlide, addStatsSlide, addChartSlide, addTableSlide, savePresentation, captureElement, colorMap } from '@/utils/pptExport'
 
 const data = ref(null)
+const exporting = ref(false)
 let gaugeChart = null
 
 const tagClass = (name) => {
@@ -241,6 +247,64 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', resize)
   gaugeChart && gaugeChart.dispose()
 })
+
+// 导出PPT
+const exportPPT = async () => {
+  exporting.value = true
+  try {
+    const pptx = createPresentation('车间网络看板')
+    
+    // 1. 标题页
+    addTitleSlide(pptx, '车间网络看板', '实时监测车间服务器 / WiFi / 老化架网络节点在线情况')
+    
+    // 2. 统计指标页
+    addStatsSlide(pptx, '网络状态', [
+      { label: '在线设备', value: data.value?.online_devices ?? 0, color: colorMap.green },
+      { label: '离线设备', value: data.value?.offline_devices ?? 0, color: colorMap.red },
+      { label: '在线率', value: `${data.value?.online_rate ?? 0}%`, color: data.value?.online_rate >= 90 ? colorMap.green : colorMap.yellow }
+    ])
+    
+    // 3. 仪表盘图表
+    const gaugeImg = await captureElement('gauge')
+    if (gaugeImg) {
+      addChartSlide(pptx, '在线率仪表盘', gaugeImg)
+    }
+    
+    // 4. 按线体分布
+    if (data.value?.lines?.length > 0) {
+      const headers = ['线体', '服务器', '老化架', 'WiFi AP']
+      const rows = data.value.lines.map(line => [
+        line.line || '-',
+        line.servers?.map(s => s.name).join(', ') || '-',
+        line.aging_racks?.map(a => `${a.name}(${a.slots}槽)`).join(', ') || '-',
+        line.wifi_aps?.map(ap => ap.ssid || 'AP').join(', ') || '-'
+      ])
+      addTableSlide(pptx, '按线体网络拓扑', headers, rows)
+    }
+    
+    // 5. 离线设备列表
+    if (data.value?.offline_list?.length > 0) {
+      const headers = ['类型', '名称', '线体', '状态', 'IP']
+      const rows = data.value.offline_list.map(item => [
+        item.type || '-',
+        item.name || '-',
+        item.line || '-',
+        item.status || '-',
+        item.ip || '-'
+      ])
+      addTableSlide(pptx, '离线设备列表', headers, rows)
+    }
+    
+    // 保存文件
+    const date = new Date().toISOString().slice(0, 10)
+    savePresentation(pptx, `车间网络看板_${date}.pptx`)
+  } catch (error) {
+    console.error('导出PPT失败:', error)
+    alert('导出PPT失败，请重试')
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <style scoped>
