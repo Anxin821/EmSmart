@@ -1,5 +1,5 @@
 <template>
-  <div class="page" style="padding: 20px 24px;">
+  <div class="page" style="padding: 0px 0px;">
     <div class="page-header">
       <div>
         <h1 class="page-title" style="color: var(--c-text);font-weight: 700;font-size: 18px;margin:0;display:flex;align-items:center;gap:8px;">
@@ -19,7 +19,7 @@
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 16px;
-      margin: 20px 0 28px 0;
+      margin: 0px 0 18px 0;
     ">
       <div class="anti-stat-card" style="color:#3b82f6;">
         <div class="anti-stat-num">{{ stats.total_devices }}</div>
@@ -217,7 +217,7 @@ const exportPPT = async () => {
   background: #fff;
   border: 1px solid var(--c-divider);
   border-radius: 10px;
-  padding: 28px 24px 24px;
+  padding: 0px 24px 0px;
   text-align: center;
   box-shadow: 0 2px 6px rgba(15,23,42,.04);
 }

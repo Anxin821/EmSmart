@@ -20,7 +20,7 @@
     </div>
 
     <div class="page-content">
-    <el-table :data="tableData" stripe border :height="'calc(100vh - 340px)'" style="width: 100%;" empty-text="暂无数据">
+    <el-table :data="tableData" stripe border :height="'calc(100vh - 210px)'" style="width: 100%;" empty-text="暂无数据">
 
         <el-table-column label="序号" width="70" align="center">
           <template #default="{ $index }">
