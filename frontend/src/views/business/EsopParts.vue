@@ -1,17 +1,7 @@
-<template>
+﻿<template>
   <div class="page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title"><span class="emoji">📋</span>ESOP料号管理</h1>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="resetFilters"><span class="bi bi-funnel"></span>重置筛选</button>
-        <template v-if="userStore.canEdit">
-          <button class="btn btn-sm btn-outline-primary" @click="showModal()"><span class="bi bi-plus-lg"></span>录入</button>
-        </template>
-      </div>
-    </div>
-
+    <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">📋</span> ESOP料号管理</h1>
       <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
         <template #actions="{ search, reset }">
           <el-button type="primary" @click="search">
@@ -20,9 +10,16 @@
           <el-button @click="reset(); loadData()">
             <el-icon><RefreshRight /></el-icon>重置
           </el-button>
+          <template v-if="userStore.canEdit">
+            <el-button type="success" @click="showModal()">
+              <el-icon><Plus /></el-icon>录入
+            </el-button>
+          </template>
         </template>
       </CommonFilterBar>
+    </div>
 
+    <div class="page-content">
     <el-table :data="tableData" stripe border style="width: 100%;" empty-text="暂无数据">
 
         <el-table-column label="序号" width="70" align="center">
@@ -31,19 +28,19 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="station_name" label="工位名称" width="120" align="center" />
+        <el-table-column prop="station_name" label="工位" width="100" align="center" />
 
-        <el-table-column prop="process_name" label="工序名称" min-width="200" align="center" show-overflow-tooltip />
+        <el-table-column prop="process_name" label="工序" min-width="150" align="center" show-overflow-tooltip />
 
-        <el-table-column prop="part_number" label="料号" min-width="180" align="center" show-overflow-tooltip />
+        <el-table-column prop="part_number" label="料号" width="120" align="center" show-overflow-tooltip />
 
-        <el-table-column prop="file_name" label="ESOP文件名称" min-width="180" align="center" show-overflow-tooltip>
+        <el-table-column prop="file_name" label="ESOP文件" min-width="150" align="center" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.file_name || '-' }}
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="160" align="center" fixed="right">
+        <el-table-column label="操作" width="180" align="center" fixed="right">
           <template #default="{ row }">
             <template v-if="userStore.canEdit">
               <el-button type="primary" link size="small" @click="showModal(row)">
@@ -61,10 +58,12 @@
 
       <CommonPagination
         v-model:page="page"
-        v-model:pageSize="pageSize"
+        v-model:page-size="pageSize"
         :total="total"
         compact
       />
+    </div>
+
     <CommonModal
       v-model:visible="modalVisible"
       :title="editingId ? '编辑料号' : '录入料号'"
@@ -103,7 +102,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { esopApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, RefreshRight, Plus } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
 import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
@@ -121,10 +120,7 @@ const editingId = ref(null)
 const form = ref({})
 const saving = ref(false)
 const filterFields = [
-  { type: 'input', key: 'keyword', label: '关键字', placeholder: '工位/工序/料号', autoSearch: false, clearable: true },
-  { type: 'input', key: 'station_name', label: '工位名称', placeholder: '请输入工位名称', autoSearch: false, clearable: true },
-  { type: 'input', key: 'process_name', label: '工序名称', placeholder: '请输入工序名称', autoSearch: false, clearable: true },
-  { type: 'input', key: 'file_name', label: 'ESOP文件名称', placeholder: '请输入文件名称', autoSearch: false, clearable: true },
+  { type: 'input', key: 'keyword', label: '', placeholder: '工位/工序/料号', autoSearch: false, clearable: true, width: 160 },
 ]
 const defaultForm = () => ({
   station_name: '',

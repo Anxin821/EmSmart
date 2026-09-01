@@ -1,23 +1,7 @@
-<template>
+﻿<template>
   <div class="page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">
-          <span class="emoji">💡</span>MES 需求管理
-        </h1>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="resetFilters">
-          <span class="bi bi-funnel"></span>重置筛选
-        </button>
-        <template v-if="userStore.canEdit">
-          <button class="btn btn-sm btn-outline-primary" @click="showModal()">
-            <span class="bi bi-plus-lg"></span>新增
-          </button>
-        </template>
-      </div>
-    </div>
-
+    <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">💡</span>MES 需求管理</h1>
       <CommonFilterBar
         :fields="filterFields"
         v-model:model-value="filters"
@@ -28,19 +12,30 @@
           <el-button type="primary" size="default" @click="scope.search">
             <el-icon style="margin-right: 6px;"><Search /></el-icon>搜索
           </el-button>
+          <el-button size="default" @click="scope.reset">
+            <el-icon style="margin-right: 6px;"><RefreshRight /></el-icon>重置
+          </el-button>
+          <template v-if="userStore.canEdit">
+            <el-button type="success" size="default" @click="showModal()">
+              <el-icon style="margin-right: 6px;"><Plus /></el-icon>新增
+            </el-button>
+          </template>
         </template>
       </CommonFilterBar>
+    </div>
 
+    <div class="page-content">
     <el-table
         v-loading="loading"
         :data="items"
         stripe
+        border
         style="width: 100%"
         :header-cell-style="{ fontWeight: 600 }"
-        :row-style="{ fontSize: '13px' }"
+        height="100%"
       >
 
-        <el-table-column label="需求ID" prop="request_id" min-width="120">
+        <el-table-column label="需求ID" prop="request_id" width="120" align="center" show-overflow-tooltip>
           <template #default="s">
             <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">
               {{ s.row.request_id }}
@@ -48,62 +43,49 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="标题" prop="title" min-width="200">
+        <el-table-column label="标题" prop="title" min-width="200" align="center" show-overflow-tooltip>
           <template #default="s">{{ s.row.title || '-' }}</template>
         </el-table-column>
 
-        <el-table-column label="优先级" prop="priority" min-width="100">
+        <el-table-column label="优先级" prop="priority" width="100" align="center">
           <template #default="s">
             <span :class="'status-badge ' + getStatusClass(cleanField(s.row.priority))">{{ cleanField(s.row.priority) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="状态" prop="status" min-width="100">
+        <el-table-column label="状态" prop="status" width="100" align="center">
           <template #default="s">
             <span :class="'status-badge ' + getStatusClass(cleanField(s.row.status))">{{ cleanField(s.row.status) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="提交人" prop="submitter" min-width="110">
+        <el-table-column label="提交人" prop="submitter" min-width="90" align="center" show-overflow-tooltip>
           <template #default="s">{{ s.row.submitter || '-' }}</template>
         </el-table-column>
 
-        <el-table-column label="指派给" prop="assignee" min-width="110">
+        <el-table-column label="指派给" prop="assignee" min-width="90" align="center" show-overflow-tooltip>
           <template #default="s">{{ s.row.assignee || '-' }}</template>
         </el-table-column>
 
-        <el-table-column label="期望日期" prop="expected_date" min-width="130">
+        <el-table-column label="期望日期" prop="expected_date" width="120" align="center">
           <template #default="s">{{ s.row.expected_date ? s.row.expected_date.slice(0, 10) : '-' }}</template>
         </el-table-column>
 
-        <el-table-column label="操作" width="260" fixed="right">
+        <el-table-column label="操作" width="210" align="center" fixed="right">
           <template #default="s">
-            <div class="row-actions">
-              <el-button
-                v-if="userStore.canEdit"
-                type="primary"
-                link
-                @click="showModal(s.row)"
-              >
-                <el-icon><Edit /></el-icon> 编辑
+            <template v-if="userStore.canEdit">
+              <el-button type="primary" link size="small" @click="showModal(s.row)">
+                <el-icon><Edit /></el-icon>编辑
               </el-button>
-              <el-button
-                v-if="userStore.canEdit"
-                type="warning"
-                link
-                @click="handleFlow(s.row)"
-              >
-                <el-icon><Refresh /></el-icon> 流转
+              <el-button type="warning" link size="small" @click="handleFlow(s.row)">
+                <el-icon><Refresh /></el-icon>流转
               </el-button>
-              <el-button
-                v-if="userStore.isAdmin"
-                type="danger"
-                link
-                @click="handleDelete(s.row)"
-              >
-                <el-icon><Delete /></el-icon> 删除
+            </template>
+            <template v-if="userStore.isAdmin">
+              <el-button type="danger" link size="small" @click="handleDelete(s.row)">
+                <el-icon><Delete /></el-icon>删除
               </el-button>
-            </div>
+            </template>
           </template>
         </el-table-column>
         <template #empty>
@@ -121,6 +103,8 @@
         :total="total"
         @change="onPagerChange"
       />
+    </div>
+
     <CommonModal
       v-model:visible="modalVisible"
       :width="680"
@@ -193,7 +177,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { mesApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, Refresh } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, Refresh, Plus, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'

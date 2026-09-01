@@ -1,24 +1,19 @@
-<template>
+﻿<template>
   <div class="page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title"><span class="emoji">📡</span> WiFi AP 管理</h1>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="resetFilters"><span class="bi bi-funnel"></span>重置筛选</button>
-        <template v-if="userStore.canEdit">
-          <button class="btn btn-sm btn-outline-primary" @click="openCreateModal"><span class="bi bi-plus-lg"></span>新增AP</button>
-        </template>
-      </div>
-    </div>
-
+    <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">📡</span> WiFi AP 管理</h1>
       <CommonFilterBar :fields="filterFields" v-model:model-value="filters" @search="loadData" @reset="onResetFromFilterBar">
         <template #actions="scope">
           <el-button type="primary" size="default" @click="scope.search"><el-icon style="margin-right:6px;"><Search /></el-icon>搜索</el-button>
           <el-button size="default" @click="resetFilters"><el-icon style="margin-right:6px;"><RefreshRight /></el-icon>重置</el-button>
+          <template v-if="userStore.canEdit">
+            <el-button type="success" size="default" @click="openCreateModal"><el-icon style="margin-right:6px;"><Plus /></el-icon>新增AP</el-button>
+          </template>
         </template>
       </CommonFilterBar>
+    </div>
 
+    <div class="page-content">
     <el-table v-loading="loading" :data="items" stripe border style="width:100%" empty-text="暂无数据" :header-cell-style="{fontWeight:600}">
 
         <el-table-column label="AP ID" min-width="120" align="center">
@@ -43,19 +38,19 @@
           <template #default="s">{{ s.row.location || '-' }}</template>
         </el-table-column>
 
-        <el-table-column label="信道" prop="channel" min-width="90" align="center" />
+        <el-table-column label="信道" prop="channel" width="80" align="center" />
 
-        <el-table-column label="已连接" prop="connected_devices" min-width="100" align="center">
+        <el-table-column label="已连接" prop="connected_devices" width="90" align="center">
           <template #default="s">{{ s.row.connected_devices || 0 }}</template>
         </el-table-column>
 
-        <el-table-column label="状态" prop="status" min-width="100" align="center">
+        <el-table-column label="状态" prop="status" width="90" align="center">
           <template #default="s">
             <span :class="'status-badge ' + statusClass(s.row.status)">{{ s.row.status }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="负责人" prop="responsible_person" min-width="110" align="center" show-overflow-tooltip>
+        <el-table-column label="负责人" prop="responsible_person" min-width="90" align="center" show-overflow-tooltip>
           <template #default="s">{{ s.row.responsible_person || '-' }}</template>
         </el-table-column>
 
@@ -78,7 +73,9 @@
         </template>
       </el-table>
 
-      <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact @change="onPagerChange" />
+      <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact />
+    </div>
+
     <!-- 新增/编辑 Modal -->
     <CommonModal
       v-model:visible="formModalVisible"
@@ -153,10 +150,10 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { networkApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, RefreshRight, Plus } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
 import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
@@ -331,6 +328,11 @@ const handleDelete = async (row) => {
 }
 
 const onPagerChange = () => loadData()
+
+// 监听分页变化
+watch([page, pageSize], () => {
+  loadData()
+})
 
 onMounted(() => {
   console.log('Wifi组件挂载')

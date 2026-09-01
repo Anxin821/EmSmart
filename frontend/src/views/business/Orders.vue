@@ -1,36 +1,30 @@
-<template>
+﻿<template>
   <div class="page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">
-          <span class="emoji">📝</span>MES 工单管理
-        </h1>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="resetFilters">
-          <span class="bi bi-funnel"></span>重置筛选
-        </button>
-        <template v-if="userStore.canEdit">
-          <button class="btn btn-sm btn-outline-primary" @click="showModal()">
-            <span class="bi bi-plus-lg"></span>新增
-          </button>
+    <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">📝</span>MES 工单管理</h1>
+      <CommonFilterBar
+        :fields="filterFields"
+        v-model:model-value="filters"
+        @search="loadData"
+        @reset="onResetFromFilterBar"
+      >
+        <template #actions="scope">
+          <el-button type="primary" size="default" @click="scope.search">
+            <el-icon style="margin-right: 6px;"><Search /></el-icon>搜索
+          </el-button>
+          <el-button size="default" @click="scope.reset">
+            <el-icon style="margin-right: 6px;"><RefreshRight /></el-icon>重置
+          </el-button>
+          <template v-if="userStore.canEdit">
+            <el-button type="success" size="default" @click="showModal()">
+              <el-icon style="margin-right: 6px;"><Plus /></el-icon>新增
+            </el-button>
+          </template>
         </template>
-      </div>
+      </CommonFilterBar>
     </div>
 
-    <CommonFilterBar
-      :fields="filterFields"
-      v-model:model-value="filters"
-      @search="loadData"
-      @reset="onResetFromFilterBar"
-    >
-      <template #actions="scope">
-        <el-button type="primary" size="default" @click="scope.search">
-          <el-icon style="margin-right: 6px;"><Search /></el-icon>搜索
-        </el-button>
-      </template>
-    </CommonFilterBar>
-
+    <div class="page-content">
     <el-table
       v-loading="loading"
       :data="items"
@@ -40,7 +34,7 @@
       :row-style="{ fontSize: '13px' }"
     >
 
-      <el-table-column label="工单号" prop="order_number" min-width="140">
+      <el-table-column label="工单号" prop="order_number" width="140">
         <template #default="s">
           <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px; font-weight: 600;">
             {{ s.row.order_number }}
@@ -48,7 +42,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="类型" prop="order_type" min-width="100">
+      <el-table-column label="类型" prop="order_type" width="90">
         <template #default="s">
           <span class="badge" style="padding: 2px 10px; border-radius: 12px; background: var(--info-bg); color: var(--info);">
             {{ s.row.order_type }}
@@ -56,35 +50,35 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="产品" prop="product_name" min-width="140">
+      <el-table-column label="产品" prop="product_name" min-width="200">
         <template #default="s">{{ s.row.product_name || '-' }}</template>
       </el-table-column>
 
-      <el-table-column label="优先级" prop="priority" min-width="100">
+      <el-table-column label="优先级" prop="priority" width="90">
         <template #default="s">
           <span :class="'status-badge ' + getStatusClass(s.row.priority)">{{ s.row.priority }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="计划开始" prop="planned_start" min-width="130">
+      <el-table-column label="计划开始" prop="planned_start" width="110">
         <template #default="s">{{ s.row.planned_start ? s.row.planned_start.slice(0, 10) : '-' }}</template>
       </el-table-column>
 
-      <el-table-column label="计划结束" prop="planned_end" min-width="130">
+      <el-table-column label="计划结束" prop="planned_end" width="110">
         <template #default="s">{{ s.row.planned_end ? s.row.planned_end.slice(0, 10) : '-' }}</template>
       </el-table-column>
 
-      <el-table-column label="状态" prop="status" min-width="110">
+      <el-table-column label="状态" prop="status" width="90">
         <template #default="s">
           <span :class="'status-badge ' + getStatusClass(s.row.status)">{{ s.row.status }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="负责人" prop="responsible_person" min-width="110">
+      <el-table-column label="负责人" prop="responsible_person" min-width="90">
         <template #default="s">{{ s.row.responsible_person || '-' }}</template>
       </el-table-column>
 
-      <el-table-column label="操作" width="260" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="s">
           <div class="row-actions">
             <el-button
@@ -123,12 +117,14 @@
       </template>
     </el-table>
 
-    <CommonPagination
-      v-model:page="page"
-      v-model:page-size="pageSize"
-      :total="total"
-      @change="onPagerChange"
-    />
+      <CommonPagination
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        @change="onPagerChange"
+      />
+    </div>
+
     <CommonModal
       v-model:visible="modalVisible"
       :width="680"
@@ -214,7 +210,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { mesApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, Refresh } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, Refresh, Plus, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'

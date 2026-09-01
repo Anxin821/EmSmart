@@ -1,46 +1,41 @@
-<template>
+﻿<template>
   <div class="page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title"><span class="emoji">🖥</span>服务器管理</h1>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="resetFilters"><span class="bi bi-funnel"></span>重置筛选</button>
-        <template v-if="userStore.isAdmin && userStore.canEdit">
-          <button class="btn btn-sm btn-outline-warning" @click="checkAll"><span class="bi bi-heart-pulse"></span>心跳检测</button>
+    <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">🖥</span>服务器管理</h1>
+      <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
+        <template #actions="{ search, reset }">
+          <el-button type="primary" @click="search">
+            <el-icon><Search /></el-icon>搜索
+          </el-button>
+          <el-button @click="reset(); loadData()">
+            <el-icon><RefreshRight /></el-icon>重置
+          </el-button>
+          <template v-if="userStore.canEdit">
+            <el-button type="success" @click="showModal()"><el-icon><Plus /></el-icon>新增服务器</el-button>
+          </template>
+          <template v-if="userStore.isAdmin && userStore.canEdit">
+            <el-button type="warning" @click="checkAll"><el-icon><Monitor /></el-icon>心跳检测</el-button>
+          </template>
         </template>
-        <template v-if="userStore.canEdit">
-          <button class="btn btn-sm btn-outline-primary" @click="showModal()"><span class="bi bi-plus-lg"></span>新增服务器</button>
-        </template>
-      </div>
+      </CommonFilterBar>
     </div>
 
-    <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
-      <template #actions="{ search, reset }">
-        <el-button type="primary" @click="search">
-          <el-icon><Search /></el-icon>搜索
-        </el-button>
-        <el-button @click="reset(); loadData()">
-          <el-icon><RefreshRight /></el-icon>重置
-        </el-button>
-      </template>
-    </CommonFilterBar>
-
+    <div class="page-content">
     <el-table v-loading="loading" :data="items" stripe border style="width: 100%;" empty-text="暂无数据">
 
-      <el-table-column prop="server_id" label="服务器ID" width="140" align="center" show-overflow-tooltip>
+      <el-table-column label="服务器ID" prop="server_id" width="120" align="center" show-overflow-tooltip>
         <template #default="{ row }">
           <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">{{ row.server_id }}</code>
         </template>
       </el-table-column>
 
-      <el-table-column prop="name" label="名称" min-width="120" align="center" show-overflow-tooltip>
+      <el-table-column prop="name" label="名称" min-width="200" align="center" show-overflow-tooltip>
         <template #default="{ row }"><span class="fw-semibold" style="color: var(--c-text);">{{ row.name }}</span></template>
       </el-table-column>
 
       <el-table-column prop="production_line" label="产线" width="80" align="center" />
 
-      <el-table-column prop="rack_location" label="机架" min-width="90" align="center" show-overflow-tooltip>
+      <el-table-column prop="rack_location" label="机架" min-width="110" align="center" show-overflow-tooltip>
         <template #default="{ row }">{{ row.rack_location || '-' }}</template>
       </el-table-column>
 
@@ -50,7 +45,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column prop="os" label="系统" min-width="100" align="center" show-overflow-tooltip>
+      <el-table-column prop="os" label="系统" width="90" align="center" show-overflow-tooltip>
         <template #default="{ row }">{{ row.os || '-' }}</template>
       </el-table-column>
 
@@ -72,7 +67,7 @@
         <template #default="{ row }">{{ row.responsible_person || '-' }}</template>
       </el-table-column>
 
-      <el-table-column label="操作" width="150" align="center" fixed="right">
+      <el-table-column label="操作" width="180" align="center" fixed="right">
         <template #default="{ row }">
           <template v-if="userStore.canEdit">
             <el-button type="primary" link size="small" @click="showModal(row)">
@@ -88,13 +83,14 @@
       </el-table-column>
     </el-table>
 
-    <CommonPagination
-      v-model:page="page"
-      v-model:pageSize="pageSize"
-      :total="total"
-      compact
-      @change="onPagerChange"
-    />
+      <CommonPagination
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        compact
+      />
+    </div>
+
     <CommonModal
       v-model:visible="modalVisible"
       :title="editingId ? '编辑服务器' : '新增服务器'"
@@ -155,7 +151,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { networkApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, RefreshRight, Plus, Monitor } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'

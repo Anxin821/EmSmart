@@ -160,7 +160,7 @@ const hasDefaultHeader = computed(() => {
   align-items: center;
   gap: 8px;
   margin: 0;
-  font-size: 24px;
+  font-size: var(--fn-xl);
   font-weight: 600;
   color: var(--c-text);
   line-height: 1;

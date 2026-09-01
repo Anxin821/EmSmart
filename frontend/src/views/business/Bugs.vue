@@ -1,17 +1,7 @@
-<template>
+﻿<template>
   <div class="page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title"><span class="emoji">🐛</span>MES BUG 管理</h1>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="resetFilters"><span class="bi bi-funnel"></span>重置筛选</button>
-        <template v-if="userStore.canEdit">
-          <button class="btn btn-sm btn-outline-primary" @click="showModal()"><span class="bi bi-plus-lg"></span>新增</button>
-        </template>
-      </div>
-    </div>
-
+    <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">🐛</span>MES BUG 管理</h1>
       <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
         <template #actions="{ search, reset }">
           <el-button type="primary" @click="search">
@@ -20,18 +10,31 @@
           <el-button @click="reset">
             <el-icon><RefreshRight /></el-icon>重置
           </el-button>
+          <template v-if="userStore.canEdit">
+            <el-button type="success" @click="showModal()"><el-icon><Plus /></el-icon>新增</el-button>
+          </template>
         </template>
       </CommonFilterBar>
+    </div>
 
-    <el-table v-loading="loading" :data="items" stripe border style="width: 100%;" empty-text="暂无数据">
+    <div class="page-content">
+    <el-table
+        v-loading="loading"
+        :data="items"
+        stripe
+        border
+        style="width: 100%"
+        :header-cell-style="{ fontWeight: 600 }"
+        height="100%"
+      >
 
-        <el-table-column prop="bug_id" label="BUG ID" width="140" align="center" show-overflow-tooltip>
+        <el-table-column label="BUG ID" prop="bug_id" width="120" align="center" show-overflow-tooltip>
           <template #default="{ row }">
             <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">{{ row.bug_id }}</code>
           </template>
         </el-table-column>
 
-        <el-table-column prop="title" label="标题" min-width="180" align="center" show-overflow-tooltip>
+        <el-table-column prop="title" label="标题" min-width="200" align="center" show-overflow-tooltip>
           <template #default="{ row }">{{ row.title || '-' }}</template>
         </el-table-column>
 
@@ -84,11 +87,12 @@
 
       <CommonPagination
         v-model:page="page"
-        v-model:pageSize="pageSize"
+        v-model:page-size="pageSize"
         :total="total"
         compact
-        @change="onPagerChange"
       />
+    </div>
+
     <CommonModal
       v-model:visible="modalVisible"
       :title="editingId ? '编辑BUG' : '新增BUG'"
@@ -191,7 +195,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { mesApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, Refresh, RefreshRight } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, Refresh, RefreshRight, Plus } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
 import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'

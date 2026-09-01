@@ -69,7 +69,7 @@ const onPageSizeChange = (s) => {
 </script>
 
 <style scoped>
-.common-pagination.compact :deep(.el-pagination) {
-  padding: 10px 16px !important;
+.common-pagination :deep(.el-pagination) {
+  padding: 0 24px !important;
 }
 </style>

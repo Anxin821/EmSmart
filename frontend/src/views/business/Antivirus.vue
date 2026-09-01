@@ -1,24 +1,19 @@
-<template>
+﻿<template>
   <div class="page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title"><span class="emoji">🛡</span> 设备杀毒记录</h1>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="resetFilters"><span class="bi bi-funnel"></span>重置筛选</button>
-        <template v-if="userStore.canEdit">
-          <button class="btn btn-sm btn-outline-primary" @click="openCreateModal"><span class="bi bi-plus-lg"></span>新增记录</button>
-        </template>
-      </div>
-    </div>
-
-      <CommonFilterBar :fields="filterFields" v-model:model-value="filters" @search="loadData" @reset="onResetFromFilterBar">
+    <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">🛡</span> 设备杀毒记录</h1>
+      <CommonFilterBar :fields="filterFields" v-model:model-value="filters" @search="loadData">
         <template #actions="scope">
           <el-button type="primary" size="default" @click="scope.search"><el-icon style="margin-right:6px;"><Search /></el-icon>搜索</el-button>
           <el-button size="default" @click="resetFilters"><el-icon style="margin-right:6px;"><RefreshRight /></el-icon>重置</el-button>
+          <template v-if="userStore.canEdit">
+            <el-button type="success" size="default" @click="openCreateModal"><el-icon style="margin-right:6px;"><Plus /></el-icon>新增记录</el-button>
+          </template>
         </template>
       </CommonFilterBar>
+    </div>
 
+    <div class="page-content">
     <el-table
         v-loading="loading"
         :data="items"
@@ -45,15 +40,15 @@
           <template #default="s">{{ (s.row.next_antivirus_time || '').slice(0,16).replace('T',' ') || '-' }}</template>
         </el-table-column>
 
-        <el-table-column label="周期" prop="cycle" min-width="80" align="center" />
+        <el-table-column label="周期" prop="cycle" width="80" align="center" />
 
-        <el-table-column label="状态" prop="status" min-width="120" align="center">
+        <el-table-column label="状态" prop="status" min-width="100" align="center">
           <template #default="s">
             <span :class="'status-badge ' + statusClass(s.row)">{{ statusText(s.row) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="操作人" prop="operator" min-width="120" align="center" show-overflow-tooltip>
+        <el-table-column label="操作人" prop="operator" min-width="100" align="center" show-overflow-tooltip>
           <template #default="s">{{ s.row.operator || '-' }}</template>
         </el-table-column>
 
@@ -76,7 +71,9 @@
         </template>
       </el-table>
 
-      <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact @change="onPagerChange" />
+      <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact />
+    </div>
+
     <!-- 新增/编辑 Modal -->
     <CommonModal
       v-model:visible="formModalVisible"
@@ -144,10 +141,10 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { antivirusApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, RefreshRight, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useNotify } from '@/composables/useNotify'
 import PageLayout       from '@/components/common/PageLayout.vue'
@@ -330,6 +327,11 @@ const handleDelete = async (row) => {
 }
 
 const onPagerChange = () => loadData()
+
+// 监听分页变化
+watch([page, pageSize], () => {
+  loadData()
+})
 
 onMounted(() => {
   console.log('Antivirus组件挂载')

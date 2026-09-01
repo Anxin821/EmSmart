@@ -1,46 +1,37 @@
-<template>
-  <PageLayout 
-    title="AOI&AI 设备管理" 
-    icon="🔍"
-  >
-    <template #header-actions>
-      <button class="btn btn-sm btn-outline-secondary" @click="resetFilters"><span class="bi bi-funnel"></span>重置筛选</button>
-      <template v-if="userStore.canEdit">
-        <button class="btn btn-sm btn-outline-primary" @click="showModal()"><span class="bi bi-plus-lg"></span>新增设备</button>
-      </template>
-    </template>
-    <!-- 页面内容区域 -->
-
-    <CommonFilterBar :model-value="filters" :fields="filterFields" @update:model-value="val => Object.assign(filters, val)" @search="loadData">
-      <template #actions="{ search, reset }">
-        <el-button type="primary" @click="search">
-          <el-icon><Search /></el-icon>搜索
-        </el-button>
-        <el-button @click="reset">
-          <el-icon><RefreshRight /></el-icon>重置
-        </el-button>
-        <el-button @click="handleExport">
-          <i class="bi bi-file-earmark-excel" style="margin-right: 4px;"></i>导出
-        </el-button>
-        <el-button v-if="userStore.canEdit" type="success" plain @click="handleImport">
-          <i class="bi bi-upload" style="margin-right: 4px;"></i>导入
-        </el-button>
-      </template>
-    </CommonFilterBar>
-
+﻿<template>
+  <div class="page">
+    <div class="page-header" style="display: flex; align-items: center; gap: 16px; flex-wrap: nowrap;">
+      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center;"><span class="emoji">🔍</span> AOI&AI 设备管理</h1>
+      <CommonFilterBar :model-value="filters" :fields="filterFields" @update:model-value="val => Object.assign(filters, val)" @search="loadData">
+        <template #actions="{ search, reset }">
+          <el-button type="primary" @click="search">
+            <el-icon><Search /></el-icon>搜索
+          </el-button>
+          <el-button @click="reset">
+            <el-icon><RefreshRight /></el-icon>重置
+          </el-button>
+          <template v-if="userStore.canEdit">
+            <el-button type="success" @click="showModal()">
+              <el-icon><Plus /></el-icon>新增设备
+            </el-button>
+          </template>
+        </template>
+      </CommonFilterBar>
+    </div>
+    <div class="page-content">
     <el-table v-loading="loading" :data="devices" stripe border style="width: 100%;" empty-text="暂无数据">
 
-      <el-table-column prop="device_id" label="设备ID" width="130" align="center" show-overflow-tooltip>
+      <el-table-column label="设备ID" prop="device_id" width="120" align="center" show-overflow-tooltip>
         <template #default="{ row }">
           <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">{{ row.device_id }}</code>
         </template>
       </el-table-column>
 
-      <el-table-column prop="name" label="名称" min-width="120" align="center" show-overflow-tooltip>
+      <el-table-column prop="name" label="名称" min-width="200" align="center" show-overflow-tooltip>
         <template #default="{ row }"><span class="fw-semibold" style="color: var(--c-text);">{{ row.name }}</span></template>
       </el-table-column>
 
-      <el-table-column prop="device_type" label="类型" width="90" align="center">
+      <el-table-column prop="device_type" label="类型" width="80" align="center">
         <template #default="{ row }">
           <span class="badge" :style="{ background: row.device_type === 'AOI' ? 'var(--info-bg)' : 'var(--purple-bg)', color: row.device_type === 'AOI' ? 'var(--info)' : 'var(--purple)', padding: '2px 10px', borderRadius: '12px' }">{{ row.device_type }}</span>
         </template>
@@ -72,7 +63,7 @@
         <template #default="{ row }">{{ row.install_date || '-' }}</template>
       </el-table-column>
 
-      <el-table-column label="操作" width="150" align="center" fixed="right">
+      <el-table-column label="操作" width="180" align="center" fixed="right">
         <template #default="{ row }">
           <template v-if="userStore.canEdit">
             <el-button type="primary" link size="small" @click="showModal(row)">
@@ -88,14 +79,14 @@
       </el-table-column>
     </el-table>
 
-    <CommonPagination
-      :page="page"
-      :page-size="pageSize"
-      :total="total"
-      compact
-      @change="onPagerChange"
-    />
-  </PageLayout>
+      <CommonPagination
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        compact
+      />
+    </div>
+  </div>
   <!-- 模态框保持在PageLayout外部 -->
   <CommonModal
     :visible="crud.modalVisible"
@@ -162,15 +153,14 @@
   <input type="file" ref="fileInput" accept=".xlsx,.xls" style="display:none" @change="handleFileChange">
 </template>
 <script setup>
-import { computed, onUnmounted } from 'vue'
+import { computed, onUnmounted, watch } from 'vue'
 import { devicesApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, RefreshRight, Plus } from '@element-plus/icons-vue'
 // ========= 复用层引入（逻辑复用，减少样板代码） =========
 import { useNotify }    from '@/composables/useNotify'
 import { useCrudModal } from '@/composables/useCrudModal'
 import { useCrudList }  from '@/composables/useCrudList'
-import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
@@ -178,12 +168,12 @@ const userStore = useUserStore()
 const { toast } = useNotify()
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线']
 const filterFields = [
-  { type: 'input',  key: 'keyword', label: '',          placeholder: '设备ID / 名称 / IP / 负责人', autoSearch: false, clearable: true },
-  { type: 'select', key: 'line',    label: '产线',      placeholder: '全部产线', autoSearch: true, clearable: true,
+  { type: 'input',  key: 'keyword', label: '',          placeholder: '设备ID / 名称 / IP / 负责人', autoSearch: false, clearable: true, width: 220 },
+  { type: 'select', key: 'line',    label: '产线',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
     options: [{ label: '全部产线', value: '' }, ...lines.map(l => ({ label: l, value: l }))] },
-  { type: 'select', key: 'status',  label: '状态',      placeholder: '全部状态', autoSearch: true, clearable: true,
+  { type: 'select', key: 'status',  label: '状态',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
     options: [{ label: '全部状态', value: '' }, { label: '正常', value: '正常' }, { label: '故障', value: '故障' }, { label: '保养中', value: '保养中' }] },
-  { type: 'select', key: 'type',    label: '类型',      placeholder: '全部类型', autoSearch: true, clearable: true,
+  { type: 'select', key: 'type',    label: '类型',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
     options: [{ label: '全部类型', value: '' }, { label: 'AOI', value: 'AOI' }, { label: 'AI', value: 'AI' }] },
 ]
 /* ====================== 业务纯函数（小而集中，方便 UT/复用） ====================== */
@@ -244,7 +234,18 @@ const handleSave = () => crud.submit(
     onSaved:    () => loadData(),
   }
 )
-const page      = computed(() => filters.page)
-const pageSize  = computed(() => filters.size)
+const page      = computed({
+  get: () => filters.page || 1,
+  set: (v) => { filters.page = v }
+})
+const pageSize  = computed({
+  get: () => filters.size || 20,
+  set: (v) => { filters.size = v; filters.page = 1 }
+})
 const totalPages = computed(() => Math.ceil((total.value || 0) / (pageSize.value || 1)))
+
+// 监听分页变化，自动加载数据
+watch([page, pageSize], () => {
+  loadData()
+})
 </script>

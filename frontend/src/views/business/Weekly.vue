@@ -1,27 +1,22 @@
-<template>
+﻿<template>
   <div class="page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title"><span class="emoji">📈</span>生产周报管理</h1>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="resetFilters"><span class="bi bi-funnel"></span>重置筛选</button>
-        <template v-if="userStore.canEdit"><button class="btn btn-sm btn-success" @click="importModalVisible = true"><span class="bi bi-file-earmark-arrow-up"></span>批量导入</button></template>
-        <template v-if="userStore.canEdit"><button class="btn btn-sm btn-outline-primary" @click="showModal()"><span class="bi bi-plus-lg"></span>录入</button></template>
-      </div>
+    <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">📈</span>生产周报管理</h1>
+      <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
+        <template #actions="{ search, reset }">
+          <el-button type="primary" @click="search">
+            <el-icon><Search /></el-icon>搜索
+          </el-button>
+          <el-button @click="reset()">
+            <el-icon><RefreshRight /></el-icon>重置
+          </el-button>
+          <template v-if="userStore.canEdit"><el-button type="success" @click="importModalVisible = true"><el-icon><Upload /></el-icon>批量导入</el-button></template>
+          <template v-if="userStore.canEdit"><el-button type="success" @click="showModal()"><el-icon><Plus /></el-icon>录入</el-button></template>
+        </template>
+      </CommonFilterBar>
     </div>
 
-    <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
-      <template #actions="{ search, reset }">
-        <el-button type="primary" @click="search">
-          <el-icon><Search /></el-icon>搜索
-        </el-button>
-        <el-button @click="reset(); loadData()">
-          <el-icon><RefreshRight /></el-icon>重置
-        </el-button>
-      </template>
-    </CommonFilterBar>
-
+    <div class="page-content">
     <el-table :data="tableData" stripe border style="width: 100%;" empty-text="暂无数据">
 
       <el-table-column prop="year" label="年" width="80" align="center" />
@@ -30,13 +25,13 @@
 
       <el-table-column prop="production_line" label="产线" width="100" align="center" />
 
-      <el-table-column prop="project" label="项目" min-width="120" align="center" />
+      <el-table-column prop="project" label="项目" min-width="200" align="center" show-overflow-tooltip />
 
       <el-table-column prop="total_output" label="总产量" min-width="110" align="center" />
 
       <el-table-column prop="qualified_count" label="合格数" min-width="110" align="center" />
 
-      <el-table-column label="直通率" width="120" align="center">
+      <el-table-column label="直通率" width="100" align="center">
         <template #default="{ row }">
           <span class="badge" style="background: var(--ok-bg); color: var(--ok); padding: 2px 10px; border-radius: 12px;">
             {{ row.yield_rate }}%
@@ -44,13 +39,13 @@
         </template>
       </el-table-column>
 
-      <el-table-column prop="recorder" label="录入人" min-width="110" align="center">
+      <el-table-column prop="recorder" label="录入人" min-width="90" align="center">
         <template #default="{ row }">
           {{ row.recorder || '-' }}
         </template>
       </el-table-column>
 
-      <el-table-column label="操作" width="160" align="center" fixed="right">
+      <el-table-column label="操作" width="180" align="center" fixed="right">
         <template #default="{ row }">
           <template v-if="userStore.canEdit">
             <el-button type="primary" link size="small" @click="showModal(row)">
@@ -66,12 +61,14 @@
       </el-table-column>
     </el-table>
 
-    <CommonPagination
-      v-model:page="page"
-      v-model:pageSize="pageSize"
-      :total="total"
-      compact
-    />
+      <CommonPagination
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        compact
+      />
+    </div>
+
     <!-- 批量导入弹窗 -->
     <CommonModal
       v-model:visible="importModalVisible"
@@ -158,7 +155,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { productionApi, optionsApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, UploadFilled, RefreshRight, Plus, Upload } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
 import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'

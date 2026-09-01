@@ -1,26 +1,20 @@
-<template>
+﻿<template>
   <div class="page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title"><span class="emoji">📊</span>生产月报管理</h1>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="resetFilters"><span class="bi bi-funnel"></span>重置筛选</button>
-        <template v-if="userStore.canEdit"><button class="btn btn-sm btn-outline-primary" @click="showModal()"><span class="bi bi-plus-lg"></span>录入</button></template>
-        <template v-if="userStore.isAdmin"><button class="btn btn-sm btn-outline-warning" @click="handleGenerate"><span class="bi bi-bar-chart-line"></span>汇总月报</button></template>
-      </div>
+    <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">📊</span>生产月报管理</h1>
+      <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
+        <template #actions="{ search, reset }">
+          <el-button type="primary" @click="search">
+            <el-icon><Search /></el-icon>搜索
+          </el-button>
+          <el-button @click="reset()">
+            <el-icon><RefreshRight /></el-icon>重置
+          </el-button>
+          <template v-if="userStore.canEdit"><el-button type="success" @click="showModal()"><el-icon><Plus /></el-icon>录入</el-button></template>
+          <template v-if="userStore.isAdmin"><el-button type="warning" @click="handleGenerate"><el-icon><DataAnalysis /></el-icon>汇总月报</el-button></template>
+        </template>
+      </CommonFilterBar>
     </div>
-
-    <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
-      <template #actions="{ search, reset }">
-        <el-button type="primary" @click="search">
-          <el-icon><Search /></el-icon>搜索
-        </el-button>
-        <el-button @click="reset(); loadData()">
-          <el-icon><RefreshRight /></el-icon>重置
-        </el-button>
-      </template>
-    </CommonFilterBar>
 
     <div v-if="stats.total_output" class="stats-summary-row">
       <StatCard color="green"  icon="bi bi-check-circle-fill" :num="stats.total_output?.toLocaleString() || '0'" label="总产量" delta="汇总值" delta-type="up"    />
@@ -28,19 +22,20 @@
       <StatCard color="yellow" icon="bi bi-percent"          :num="(stats.yield_rate || 0) + '%'"                  label="总直通率" delta="直通率" delta-type="muted" />
     </div>
 
+    <div class="page-content">
     <el-table :data="tableData" stripe border style="width: 100%;margin-top:16px;" empty-text="暂无数据">
 
       <el-table-column prop="year" label="年" width="80" align="center" />
 
       <el-table-column prop="month" label="月" width="80" align="center" />
 
-      <el-table-column prop="project" label="项目" min-width="140" align="center" />
+      <el-table-column prop="project" label="项目" min-width="200" align="center" show-overflow-tooltip />
 
       <el-table-column prop="monthly_total_output" label="月总产量" min-width="120" align="center" />
 
       <el-table-column prop="monthly_qualified_count" label="月合格数" min-width="120" align="center" />
 
-      <el-table-column label="月直通率" width="130" align="center">
+      <el-table-column label="月直通率" width="110" align="center">
         <template #default="{ row }">
           <span class="badge" style="background: var(--ok-bg); color: var(--ok); padding: 2px 10px; border-radius: 12px;">
             {{ row.monthly_yield_rate }}%
@@ -48,13 +43,13 @@
         </template>
       </el-table-column>
 
-      <el-table-column prop="recorder" label="录入人" min-width="110" align="center">
+      <el-table-column prop="recorder" label="录入人" min-width="90" align="center">
         <template #default="{ row }">
           {{ row.recorder || '-' }}
         </template>
       </el-table-column>
 
-      <el-table-column label="操作" width="160" align="center" fixed="right">
+      <el-table-column label="操作" width="180" align="center" fixed="right">
         <template #default="{ row }">
           <template v-if="userStore.canEdit">
             <el-button type="primary" link size="small" @click="showModal(row)">
@@ -70,12 +65,14 @@
       </el-table-column>
     </el-table>
 
-    <CommonPagination
-      v-model:page="page"
-      v-model:pageSize="pageSize"
-      :total="total"
-      compact
-    />
+      <CommonPagination
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        compact
+      />
+    </div>
+
     <CommonModal
       v-model:visible="modalVisible"
       :title="editingId ? '编辑月报' : '录入月报'"
@@ -120,7 +117,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { productionApi, optionsApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, RefreshRight, Plus, DataAnalysis } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
 import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'

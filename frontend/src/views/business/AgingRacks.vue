@@ -1,59 +1,54 @@
-<template>
+﻿<template>
   <div class="page">
-    <div class="page-header">
-      <div>
-        <h1 class="page-title"><span class="emoji">📦</span> 老化架管理</h1>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="resetFilters"><span class="bi bi-funnel"></span>重置筛选</button>
-        <template v-if="userStore.canEdit">
-          <button class="btn btn-sm btn-outline-primary" @click="openCreateModal"><span class="bi bi-plus-lg"></span>新增老化架</button>
+    <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">📦</span> 老化架管理</h1>
+      <CommonFilterBar :fields="filterFields" v-model:model-value="filters" @search="loadData">
+        <template #actions="scope">
+          <el-button type="primary" size="default" @click="scope.search"><el-icon style="margin-right:6px;"><Search /></el-icon>搜索</el-button>
+          <el-button size="default" @click="resetFilters"><el-icon style="margin-right:6px;"><RefreshRight /></el-icon>重置</el-button>
+          <template v-if="userStore.canEdit">
+            <el-button type="success" size="default" @click="openCreateModal"><el-icon style="margin-right:6px;"><Plus /></el-icon>新增老化架</el-button>
+          </template>
         </template>
-      </div>
+      </CommonFilterBar>
     </div>
 
-    <CommonFilterBar :fields="filterFields" v-model:model-value="filters" @search="loadData" @reset="onResetFromFilterBar">
-      <template #actions="scope">
-        <el-button type="primary" size="default" @click="scope.search"><el-icon style="margin-right:6px;"><Search /></el-icon>搜索</el-button>
-        <el-button size="default" @click="resetFilters"><el-icon style="margin-right:6px;"><RefreshRight /></el-icon>重置</el-button>
-      </template>
-    </CommonFilterBar>
-
+    <div class="page-content">
     <el-table v-loading="loading" :data="items" stripe border style="width:100%" empty-text="暂无数据" :header-cell-style="{fontWeight:600}">
 
-      <el-table-column label="老化架ID" prop="rack_id" min-width="120" align="center">
+      <el-table-column label="老化架ID" prop="rack_id" width="120" align="center" show-overflow-tooltip>
         <template #default="s">
           <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">{{ s.row.rack_id }}</code>
         </template>
       </el-table-column>
 
-      <el-table-column label="名称" prop="name" min-width="140" align="center" show-overflow-tooltip>
+      <el-table-column label="名称" prop="name" min-width="200" align="center" show-overflow-tooltip>
         <template #default="s"><span class="fw-semibold" style="color: var(--c-text);">{{ s.row.name }}</span></template>
       </el-table-column>
 
-      <el-table-column label="产线" prop="production_line" min-width="90" align="center" />
+      <el-table-column label="产线" prop="production_line" width="90" align="center" />
 
-      <el-table-column label="位置" prop="location" min-width="140" align="center" show-overflow-tooltip>
+      <el-table-column label="位置" prop="location" min-width="120" align="center" show-overflow-tooltip>
         <template #default="s">{{ s.row.location || '-' }}</template>
       </el-table-column>
 
-      <el-table-column label="IP" prop="ip_address" min-width="130" align="center" show-overflow-tooltip>
+      <el-table-column label="IP" prop="ip_address" width="130" align="center" show-overflow-tooltip>
         <template #default="s">
           <span style="font-family: Consolas, 'Courier New', monospace; font-size: var(--fn-sm);">{{ s.row.ip_address }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="槽位" min-width="110" align="center">
+      <el-table-column label="槽位" width="90" align="center">
         <template #default="s">{{ s.row.used_slots || 0 }}/{{ s.row.total_slots || 0 }}</template>
       </el-table-column>
 
-      <el-table-column label="状态" prop="status" min-width="100" align="center">
+      <el-table-column label="状态" prop="status" width="90" align="center">
         <template #default="s">
           <span :class="'status-badge ' + statusClass(s.row.status)">{{ s.row.status }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="负责人" prop="responsible_person" min-width="110" align="center" show-overflow-tooltip>
+      <el-table-column label="负责人" prop="responsible_person" min-width="90" align="center" show-overflow-tooltip>
         <template #default="s">{{ s.row.responsible_person || '-' }}</template>
       </el-table-column>
 
@@ -76,7 +71,9 @@
       </template>
     </el-table>
 
-    <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact @change="onPagerChange" />
+      <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact />
+    </div>
+
     <!-- 新增/编辑 Modal -->
     <CommonModal
       v-model:visible="formModalVisible"
@@ -151,10 +148,10 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { networkApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, RefreshRight, Plus } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
 import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
@@ -192,18 +189,17 @@ const filterFields = computed(() => [
     key: 'keyword',
     label: '',
     placeholder: '老化架ID / 名称 / IP / 负责人',
-    minWidth: 260,
+    width: 200,
     showSearchIcon: true,
     autoSearch: false
   },
-  { type: 'divider' },
   {
     type: 'select',
     key: 'line',
     label: '产线',
-    minWidth: 130,
+    width: 100,
     options: [
-      { label: '全部产线', value: '' },
+      { label: '全部', value: '' },
       ...lines.map(l => ({ label: l, value: l }))
     ],
     autoSearch: true
@@ -212,9 +208,9 @@ const filterFields = computed(() => [
     type: 'select',
     key: 'status',
     label: '状态',
-    minWidth: 130,
+    width: 100,
     options: [
-      { label: '全部状态', value: '' },
+      { label: '全部', value: '' },
       { label: '正常', value: '正常' },
       { label: '故障', value: '故障' }
     ],
@@ -329,6 +325,11 @@ const handleDelete = async (row) => {
 }
 
 const onPagerChange = () => loadData()
+
+// 监听分页变化
+watch([page, pageSize], () => {
+  loadData()
+})
 
 onMounted(() => {
   loadData()

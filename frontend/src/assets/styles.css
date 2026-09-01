@@ -55,6 +55,7 @@
 html, body, #app, #app-container {
   height: 100%;
   width: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -64,6 +65,7 @@ body {
   background: var(--c-bg);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
 }
 
 a { color: inherit; text-decoration: none; }
@@ -298,29 +300,49 @@ button { font-family: inherit; }
 /* —— 内容区 —— */
 .content {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   padding: var(--gap-block);
-  scrollbar-width: thin;
 }
-.content::-webkit-scrollbar { width: 8px; height: 8px; }
-.content::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
 
 /* =========================================================
    页面骨架容器（业务页/看板页统一包裹使用）
-   .page-header  .page-section
+   .page-header  .page-section  .page-content
    ========================================================= */
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--gap-block);
+  height: 100vh;
+  overflow: hidden;
+  background: var(--c-bg);
 }
 
 .page-header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
+  flex-shrink: 0;
+  padding: 16px var(--gap-block);
+  background: var(--c-card);
+  border-bottom: 1px solid var(--c-divider);
+  margin-bottom: var(--gap-block);
+}
+
+.page-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--gap-block);
+  background: var(--c-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--c-divider);
+}
+
+/* 表格容器：允许在页面内滚动 */
+.page-content > .el-table {
+  height: 100%;
+  width: 100%;
 }
 .page-header .page-title {
   display: flex;
@@ -330,6 +352,12 @@ button { font-family: inherit; }
   font-weight: 600;
   color: var(--c-text);
   line-height: 1;
+  padding-bottom: 0;
+}
+.page-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .page-header .page-title .emoji { font-size: 18px; }
 .page-header .page-sub {
@@ -1646,38 +1674,54 @@ button { font-family: inherit; }
   display: flex;
   flex-wrap: wrap;
   gap: 12px 14px;
-  align-items: flex-end;
-  padding: 16px 20px;
-  background: var(--c-card);
-  border-bottom: 1px solid var(--c-divider);
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
+  align-items: center;
+  padding: 0;
+  background: transparent;
+  border: none;
 }
 .common-filter-bar .field {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 180px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 .common-filter-bar .field > label {
-  font-size: var(--fn-sm);
-  color: var(--c-text-3);
+  font-size: var(--fn-base);
+  color: var(--c-text);
   font-weight: 500;
-  padding-left: 2px;
+  white-space: nowrap;
 }
 .common-filter-bar .divider {
   width: 1px;
-  height: 34px;
+  height: 24px;
   background: var(--c-divider);
-  align-self: flex-end;
+  align-self: center;
   margin-bottom: 0;
 }
 .common-filter-bar .actions {
-  margin-left: auto;
+  margin-left: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
-  align-self: flex-end;
+  align-items: center;
+}
+
+/* 通用分页组件样式 */
+.common-pagination {
+  position: fixed;
+  bottom: 0;
+  left: var(--sidebar-w);
+  right: 0;
+  flex-shrink: 0;
+  background: var(--c-card);
+  border-top: 1px solid var(--c-divider);
+  padding: 0 24px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
 }
 
 /* CommonModal 自定义 header/body/footer（当 Element Plus 内置 header 被隐藏后，我们补一套与原 modal-card 完全一致的语义） */
