@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 16px; flex-wrap: nowrap;">
       <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center;"><span class="emoji">🔍</span> AOI&AI 设备管理</h1>
@@ -19,7 +19,7 @@
       </CommonFilterBar>
     </div>
     <div class="page-content">
-    <el-table v-loading="loading" :data="devices" stripe border style="width: 100%;" empty-text="暂无数据">
+    <el-table v-loading="loading" :data="devices" stripe border :height="'calc(100vh - 210px)'" style="width: 100%;" empty-text="暂无数据">
 
       <el-table-column label="设备ID" prop="device_id" width="120" align="center" show-overflow-tooltip>
         <template #default="{ row }">

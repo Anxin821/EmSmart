@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">🛡</span> 设备杀毒记录</h1>
@@ -20,6 +20,7 @@
         stripe
         border
         style="width:100%;"
+        :height="'calc(100vh - 210px)'"
         empty-text="暂无数据"
         :header-cell-style="{fontWeight:600}"
       >

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">💡</span>MES 需求管理</h1>
@@ -32,7 +32,7 @@
         border
         style="width: 100%"
         :header-cell-style="{ fontWeight: 600 }"
-        height="100%"
+        :height="'calc(100vh - 210px)'"
       >
 
         <el-table-column label="需求ID" prop="request_id" width="120" align="center" show-overflow-tooltip>

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">🖥</span>服务器管理</h1>
@@ -21,7 +21,7 @@
     </div>
 
     <div class="page-content">
-    <el-table v-loading="loading" :data="items" stripe border style="width: 100%;" empty-text="暂无数据">
+    <el-table v-loading="loading" :data="items" stripe border :height="'calc(100vh - 210px)'" style="width: 100%;" empty-text="暂无数据">
 
       <el-table-column label="服务器ID" prop="server_id" width="120" align="center" show-overflow-tooltip>
         <template #default="{ row }">

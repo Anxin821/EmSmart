@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">📝</span>MES 工单管理</h1>
@@ -30,6 +30,7 @@
       :data="items"
       stripe
       style="width: 100%"
+      :height="'calc(100vh - 210px)'"
       :header-cell-style="{ fontWeight: 600 }"
       :row-style="{ fontSize: '13px' }"
     >

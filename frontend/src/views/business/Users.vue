@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">👥</span>用户管理</h1>
@@ -23,7 +23,7 @@
     </div>
 
     <div class="page-content">
-    <el-table :data="listFiltered" stripe border style="width: 100%;" empty-text="暂无数据">
+    <el-table :data="listFiltered" stripe border :height="'calc(100vh - 210px)'" style="width: 100%;" empty-text="暂无数据">
 
         <el-table-column prop="username" label="用户名" width="130" align="center" show-overflow-tooltip>
           <template #default="{ row }"><b>{{ row.username }}</b></template>
