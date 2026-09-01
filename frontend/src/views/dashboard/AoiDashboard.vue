@@ -8,9 +8,6 @@
         <div class="page-sub">设备运行状态、产线分布与产量直通率总览</div>
       </div>
       <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="loadData">
-          <span class="bi bi-arrow-clockwise"></span>刷新
-        </button>
         <button class="btn btn-sm btn-outline-primary" @click="exportPPT" :disabled="exporting">
           <span class="bi" :class="exporting ? 'bi-hourglass-split' : 'bi-file-earmark-ppt'"></span>
           {{ exporting ? '导出中...' : '导出PPT' }}

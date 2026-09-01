@@ -6,9 +6,6 @@
         <div class="page-sub">实时监测车间服务器 / WiFi / 老化架网络节点在线情况</div>
       </div>
       <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" @click="loadData">
-          <span class="bi bi-arrow-clockwise"></span>刷新
-        </button>
         <button class="btn btn-sm btn-outline-warning" @click="handleCheckAll">
           <span class="bi bi-lightning-charge"></span>一键检测
         </button>

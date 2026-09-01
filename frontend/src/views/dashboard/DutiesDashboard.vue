@@ -11,7 +11,6 @@
             <span class="bi bi-person-plus"></span>新增岗位
           </button>
         </template>
-        <button class="btn btn-sm btn-outline-secondary" @click="loadData"><span class="bi bi-arrow-clockwise"></span>刷新</button>
       </div>
     </div>
 
