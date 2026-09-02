@@ -26,9 +26,9 @@
         <div class="section-body no-pad">
           <div id="chart-bugs" class="chart-container"></div>
           <div class="chart-legend bug-legend">
-            <span class="dot bg-confirm"></span>确认新增
-            <span class="dot bg-fixing"></span>修复中
-            <span class="dot bg-closed"></span>解决关闭
+            <span class="lg-item"><span class="dot bg-confirm"></span>确认新增</span>
+            <span class="lg-item"><span class="dot bg-fixing"></span>修复中</span>
+            <span class="lg-item"><span class="dot bg-closed"></span>解决关闭</span>
           </div>
         </div>
       </section>
@@ -40,9 +40,9 @@
         <div class="section-body no-pad">
           <div id="chart-reqs" class="chart-container"></div>
           <div class="chart-legend req-legend">
-            <span class="dot bg-assess"></span>收集评估
-            <span class="dot bg-testing"></span>开发测试中
-            <span class="dot bg-online"></span>上线
+            <span class="lg-item"><span class="dot bg-assess"></span>收集评估</span>
+            <span class="lg-item"><span class="dot bg-testing"></span>开发测试中</span>
+            <span class="lg-item"><span class="dot bg-online"></span>上线</span>
           </div>
         </div>
       </section>
@@ -54,7 +54,7 @@
         <header class="section-head">
           <h2 class="sec-title"><span class="sec-emoji warn">⚠️</span>阻塞与风险归因 (TOP{{ data?.risks?.length || 2 }})</h2>
         </header>
-        <div class="section-body" style="padding: 8px 22px 22px;">
+        <div class="section-body" style="padding: 4px 18px 12px;">
           <div v-if="!data" class="empty-state">加载中…</div>
           <ul v-else class="risk-list">
             <li v-for="(r, idx) in data.risks" :key="idx">
@@ -77,7 +77,7 @@
         <header class="section-head">
           <h2 class="sec-title"><span class="sec-emoji ok">✅</span>本月里程碑 & 下月承诺</h2>
         </header>
-        <div class="section-body" style="padding: 8px 22px 22px;">
+        <div class="section-body" style="padding: 4px 18px 12px;">
           <div v-if="!data" class="empty-state">加载中…</div>
           <div v-else class="milestone-box">
             <div class="ms-top">
@@ -261,9 +261,14 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1.15fr) minmax(0, 0.85fr);
-  gap: var(--gap-block);
+  /* 三行：KPI(auto) / 图表(1fr 独占全部剩余高度，最高最显眼) / 底部风险·里程碑(auto 按内容自适应，不再出现滚动条；内容变高时图表自动让位，不会溢出屏) */
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
 }
+/* 卡片头收紧：全局 14px 18px → 10px 16px，省出纵向空间给图表 */
+.cockpit .section-head { padding: 10px 16px; }
+/* KPI 卡内边距收紧，压低首行高度 */
+.cockpit :deep(.stat-card) { padding: 12px 16px; }
 /* 覆盖全局 chart-card 固定最小高，图表随单元格弹性伸缩 */
 .cockpit .chart-card { min-height: 0; }
 .cockpit .chart-card .section-body {
@@ -307,17 +312,24 @@ onBeforeUnmount(() => {
 .chart-legend {
   display: flex;
   justify-content: center;
-  gap: 24px;
-  padding: 2px 0 18px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding: 0 0 6px;
   font-size: 13px;
   color: #4B5563;
 }
+/* 每个「色块 + 文字」包成一组 inline-flex，align-items:center 保证色块与文字垂直居中对齐
+   （flex 布局下 vertical-align 对色块无效，必须靠分组 + align-items） */
+.lg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .chart-legend .dot {
-  display: inline-block;
   width: 14px; height: 14px;
   border-radius: 3px;
-  vertical-align: -3px;
-  margin: 0 6px 0 0;
+  flex-shrink: 0;
 }
 .bg-confirm { background: #EF4444; }
 .bg-fixing  { background: #F59E0B; }
@@ -327,12 +339,12 @@ onBeforeUnmount(() => {
 .bg-online  { background: #10B981; }
 
 /* 风险 / 里程碑块 */
-.risk-list { list-style: none; margin: 0; padding: 6px 0 0; }
+.risk-list { list-style: none; margin: 0; padding: 2px 0 0; }
 .risk-list li {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 10px 0;
+  padding: 6px 0;
   border-bottom: 1px dashed #EEF0F6;
 }
 .risk-list li:last-child { border-bottom: none; }
@@ -347,7 +359,7 @@ onBeforeUnmount(() => {
 
 .milestone-box { padding: 4px 0; }
 .ms-top {
-  font-size: 15px; color: #111827; line-height: 1.7;
+  font-size: 15px; color: #111827; line-height: 1.5;
   display: flex; align-items: center; gap: 8px;
 }
 .ms-check {
@@ -356,12 +368,12 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 .ms-list {
-  margin-top: 6px;
-  padding: 10px 14px;
+  margin-top: 4px;
+  padding: 8px 12px;
   background: #F7FAFF;
   border-left: 3px solid #2C5CE8;
   border-radius: 0 6px 6px 0;
-  line-height: 1.7;
+  line-height: 1.5;
   font-size: 14px;
   color: #374151;
 }
