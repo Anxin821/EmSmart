@@ -14,7 +14,7 @@
     </div>
 
     <div class="page-content">
-    <el-table v-loading="loading" :data="items" stripe border style="width:100%" :height="'calc(100vh - 210px)'" empty-text="暂无数据" :header-cell-style="{fontWeight:600}">
+    <el-table ref="tableRef" v-loading="loading" :data="items" stripe border style="width:100%" height="100%" empty-text="暂无数据" :header-cell-style="{fontWeight:600}">
 
         <el-table-column label="AP ID" min-width="120" align="center">
           <template #default="s">
@@ -150,7 +150,7 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { networkApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight, Plus } from '@element-plus/icons-vue'
@@ -162,6 +162,7 @@ import CommonModal      from '@/components/common/CommonModal.vue'
 
 const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
+const tableRef = ref(null)
 const items = ref([])
 const page = ref(1)
 const pageSize = ref(20)
@@ -265,6 +266,9 @@ const loadData = async () => {
   } finally {
     loading.value = false
     abortController = null
+    // 带 height=100% + fixed="right" 的表格不会自动重算，数据变化后需 doLayout 避免固定“操作”列错位、按钮无法点击。
+    await nextTick()
+    tableRef.value?.doLayout()
   }
 }
 
@@ -334,6 +338,9 @@ const handleDelete = async (row) => {
 
 const onPagerChange = () => loadData()
 
+// 窗口尺寸变化时重算表格布局，避免固定列与主体错位
+const handleResize = () => tableRef.value?.doLayout()
+
 // 监听分页变化
 watch([page, pageSize], () => {
   loadData()
@@ -341,11 +348,13 @@ watch([page, pageSize], () => {
 
 onMounted(() => {
   console.log('Wifi组件挂载')
+  window.addEventListener('resize', handleResize)
   loadData()
 })
 
 onUnmounted(() => {
   console.log('Wifi组件卸载，清理资源')
+  window.removeEventListener('resize', handleResize)
   // 取消正在进行的请求
   if (abortController) {
     abortController.abort()
@@ -360,3 +369,14 @@ onUnmounted(() => {
   filters.value = { keyword:'', line:'', status:'' }
 })
 </script>
+
+<style scoped>
+/* .page 精确撑满父容器 .content（.content 已是 100vh - 顶栏56 - 内边距40）。
+   默认的 height:100vh 会比容器高约 96px，底部被 .content 的 overflow:hidden 裁掉，
+   并把表格末尾顶到 fixed 分页条后面 → 最后一行的编辑/删除按钮被遮挡、无法点击。 */
+.page { height: 100%; }
+
+/* 底部为 position:fixed 的分页条预留空间；表格改用 height="100%" 填满剩余区域，
+   末尾正好停在分页条上方，表头固定、仅数据区垂直滚动。 */
+.page-content { padding-bottom: 48px; }
+</style>

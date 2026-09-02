@@ -68,6 +68,7 @@ class AgingRackCreate(AgingRackBase):
 
 
 class AgingRackUpdate(BaseModel):
+    rack_id: Optional[str] = None
     name: Optional[str] = None
     production_line: Optional[str] = None
     location: Optional[str] = None
@@ -107,6 +108,7 @@ class WifiApCreate(WifiApBase):
 
 
 class WifiApUpdate(BaseModel):
+    ap_id: Optional[str] = None
     ssid: Optional[str] = None
     production_line: Optional[str] = None
     ip_address: Optional[str] = None
