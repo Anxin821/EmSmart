@@ -5,7 +5,7 @@
       <CommonFilterBar
         :fields="filterFields"
         v-model:model-value="filters"
-        @search="loadData"
+        @search="onSearch"
         @reset="onResetFromFilterBar"
       >
         <template #actions="scope">
@@ -257,6 +257,11 @@ const defaultForm = () => ({
 
 const resetFilters = () => {
   filters.value = { keyword: '', priority: '', status: '' }
+  page.value = 1
+  loadData()
+}
+// 搜索/筛选：先回到第 1 页再加载，避免停留在旧页码导致“筛选不生效”（筛选后结果变少，旧页码往往为空）
+const onSearch = () => {
   page.value = 1
   loadData()
 }

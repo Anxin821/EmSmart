@@ -180,7 +180,7 @@ const filters = ref({ keyword: '', role: '' })
 let abortController = null
 
 const filterFields = [
-  { type: 'input', key: 'keyword', label: '', placeholder: '用户名 / 姓名 / 邮箱', autoSearch: false, clearable: true },
+  { type: 'input', key: 'keyword', label: '', placeholder: '用户名 / 姓名 / 邮箱', autoSearch: false, clearable: true, minWidth: 260 },
   { type: 'select', key: 'role', label: '角色', placeholder: '全部角色', autoSearch: true, clearable: true,
     options: [
       { label: '全部角色', value: '' },

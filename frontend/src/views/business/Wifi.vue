@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">📡</span> WiFi AP 管理</h1>
-      <CommonFilterBar :fields="filterFields" v-model:model-value="filters" @search="loadData" @reset="onResetFromFilterBar">
+      <CommonFilterBar :fields="filterFields" v-model:model-value="filters" @search="onSearch" @reset="onResetFromFilterBar">
         <template #actions="scope">
           <el-button type="primary" size="default" @click="scope.search"><el-icon style="margin-right:6px;"><Search /></el-icon>搜索</el-button>
           <el-button size="default" @click="resetFilters"><el-icon style="margin-right:6px;"><RefreshRight /></el-icon>重置</el-button>
@@ -225,6 +225,11 @@ const statusClass = (s) => ({ '在线':'normal', '离线':'fault' }[s] || 'muted
 
 const resetFilters = () => {
   filters.value = { keyword:'', line:'', status:'' }
+  page.value = 1
+  loadData()
+}
+// 搜索/筛选：先回到第 1 页再加载，避免停留在旧页码导致“筛选不生效”（筛选后结果变少，旧页码往往为空）
+const onSearch = () => {
   page.value = 1
   loadData()
 }

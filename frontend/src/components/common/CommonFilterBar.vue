@@ -5,9 +5,10 @@
       <div v-if="field.type === 'divider'" class="divider"></div>
 
       <!-- 关键词输入框（带搜索 prefix） -->
-      <div v-else-if="field.type === 'input'" class="field" :style="fieldStyle(field)">
+      <div v-else-if="field.type === 'input'" class="field">
         <label v-if="field.label">{{ field.label }}</label>
         <el-input
+          :style="fieldStyle(field)"
           :model-value="getValue(field)"
           @update:model-value="setValue(field, $event)"
           :placeholder="field.placeholder || '请输入关键词'"
@@ -22,7 +23,7 @@
       </div>
 
       <!-- 下拉选择框 -->
-      <div v-else-if="field.type === 'select'" class="field" :style="fieldStyle(field)">
+      <div v-else-if="field.type === 'select'" class="field">
         <label v-if="field.label">{{ field.label }}</label>
         <el-select
           :model-value="getValue(field)"
@@ -30,7 +31,7 @@
           :placeholder="field.placeholder || '请选择'"
           :clearable="field.clearable !== false"
           :disabled="field.disabled"
-          style="width: 100%;"
+          :style="fieldStyle(field)"
         >
           <el-option
             v-for="opt in (field.options || [])"
@@ -42,7 +43,7 @@
       </div>
 
       <!-- 日期选择 -->
-      <div v-else-if="field.type === 'date'" class="field" :style="fieldStyle(field)">
+      <div v-else-if="field.type === 'date'" class="field">
         <label v-if="field.label">{{ field.label }}</label>
         <el-date-picker
           :model-value="getValue(field)"
@@ -51,7 +52,7 @@
           :placeholder="field.placeholder || '选择日期'"
           :disabled="field.disabled"
           value-format="YYYY-MM-DD"
-          style="width: 100%;"
+          :style="fieldStyle(field)"
         />
       </div>
     </template>
@@ -116,11 +117,25 @@ const setValue = (field, val) => {
   emit('update:modelValue', { ...props.modelValue, [field.key]: val })
 }
 
+// 宽度样式直接作用在“控件”（el-input/el-select/el-date-picker）上，而不是作用在
+// label + 控件 的整块 .field 上——否则 label 会挤占控件宽度，导致下拉框里的
+// “全部产线 / 全部优先级”、输入框里的占位符被截断显示不全。
 const fieldStyle = (field) => {
+  const toPx = (v) => (typeof v === 'number' ? v + 'px' : v)
   const style = {}
-  if (field.minWidth)  style.minWidth = typeof field.minWidth === 'number' ? field.minWidth + 'px' : field.minWidth
-  if (field.width)     style.width    = typeof field.width    === 'number' ? field.width    + 'px' : field.width
-  if (field.flex)      style.flex     = field.flex
+  // flex 优先：交给弹性布局，不强制固定宽度
+  if (field.flex) { style.flex = field.flex; style.minWidth = 0; return style }
+  // width 优先，其次 minWidth；都当作控件的固定宽度（下拉/输入需要明确宽度才能完整显示文字）
+  const w = field.width || field.minWidth
+  if (w) {
+    style.width = toPx(w)
+    style.minWidth = toPx(w)
+  } else {
+    // 未指定宽度：给一个按类型的默认宽度，保证占位符/选项文字完整可见
+    const def = (field.type === 'input') ? 180 : 150
+    style.width = def + 'px'
+    style.minWidth = def + 'px'
+  }
   return style
 }
 

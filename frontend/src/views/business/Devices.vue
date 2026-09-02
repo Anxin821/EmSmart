@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 16px; flex-wrap: nowrap;">
       <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center;"><span class="emoji">🔍</span> AOI&AI 设备管理</h1>
-      <CommonFilterBar :model-value="filters" :fields="filterFields" @update:model-value="val => Object.assign(filters, val)" @search="loadData">
+      <CommonFilterBar :model-value="filters" :fields="filterFields" @update:model-value="val => Object.assign(filters, val)" @search="onSearch">
         <template #actions="{ search, reset }">
           <el-button type="primary" @click="search">
             <el-icon><Search /></el-icon>搜索
@@ -168,7 +168,7 @@ const userStore = useUserStore()
 const { toast } = useNotify()
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线']
 const filterFields = [
-  { type: 'input',  key: 'keyword', label: '',          placeholder: '设备ID / 名称 / IP / 负责人', autoSearch: false, clearable: true, width: 220 },
+  { type: 'input',  key: 'keyword', label: '',          placeholder: '设备ID / 名称 / IP / 负责人', autoSearch: false, clearable: true, minWidth: 260 },
   { type: 'select', key: 'line',    label: '产线',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
     options: [{ label: '全部产线', value: '' }, ...lines.map(l => ({ label: l, value: l }))] },
   { type: 'select', key: 'status',  label: '状态',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
@@ -216,6 +216,11 @@ const handleDelete = (row) => del(row, {
   successMsg: '设备已删除',
 })
 const handleExport = () => doExport()
+// 搜索/筛选：先回到第 1 页再加载，避免停留在旧页码导致“筛选不生效”（筛选后结果变少，旧页码往往为空）
+const onSearch = () => {
+  filters.page = 1
+  loadData()
+}
 /* ================ 新增 / 编辑弹窗（useCrudModal 统一封装 visible/editing/form/saving/showCreate/showEdit/close/submit） ================ */
 const crud = useCrudModal(defaultForm)
 const showModal = (dev = null) => (dev ? crud.showEdit(dev) : crud.showCreate())

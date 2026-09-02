@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">📈</span>生产周报管理</h1>
-      <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
+      <CommonFilterBar v-model="filters" :fields="filterFields" @search="onSearch">
         <template #actions="{ search, reset }">
           <el-button type="primary" @click="search">
             <el-icon><Search /></el-icon>搜索
@@ -196,6 +196,11 @@ const defaultForm = () => ({
 })
 const resetFilters = () => {
   filters.value = { year: '', week: '', line: '' }
+  page.value = 1
+  loadData()
+}
+// 搜索/筛选：先回到第 1 页再加载，避免停留在旧页码导致“筛选不生效”（筛选后结果变少，旧页码往往为空）
+const onSearch = () => {
   page.value = 1
   loadData()
 }

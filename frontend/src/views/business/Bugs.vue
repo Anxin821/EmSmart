@@ -2,7 +2,7 @@
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">🐛</span>MES BUG 管理</h1>
-      <CommonFilterBar v-model="filters" :fields="filterFields" @search="loadData">
+      <CommonFilterBar v-model="filters" :fields="filterFields" @search="onSearch">
         <template #actions="{ search, reset }">
           <el-button type="primary" @click="search">
             <el-icon><Search /></el-icon>搜索
@@ -90,6 +90,7 @@
         v-model:page-size="pageSize"
         :total="total"
         compact
+        @change="onPagerChange"
       />
     </div>
 
@@ -230,7 +231,7 @@ const labelStyleNoRequired  = { color: 'var(--c-text-2)', '--required': 'none' }
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 
 const filterFields = [
-  { type: 'input', key: 'keyword', label: '', placeholder: 'BUG ID / 标题 / 模块 / 指派', autoSearch: false, clearable: true },
+  { type: 'input', key: 'keyword', label: '', placeholder: 'BUG ID / 标题 / 模块 / 指派', autoSearch: false, clearable: true, minWidth: 260 },
   { type: 'select', key: 'severity', label: '严重等级', placeholder: '全部等级', autoSearch: true, clearable: true,
     options: [
       { label: '全部等级', value: '' },
@@ -264,6 +265,11 @@ const defaultForm = () => ({
 
 const resetFilters = () => {
   filters.value = { keyword: '', severity: '', status: '' }
+  page.value = 1
+  loadData()
+}
+// 搜索/筛选：先回到第 1 页再加载，避免停留在旧页码导致“筛选不生效”（筛选后结果变少，旧页码往往为空）
+const onSearch = () => {
   page.value = 1
   loadData()
 }
