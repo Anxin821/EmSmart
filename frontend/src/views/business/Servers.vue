@@ -21,7 +21,7 @@
     </div>
 
     <div class="page-content">
-    <el-table v-loading="loading" :data="items" stripe border :height="'calc(100vh - 210px)'" style="width: 100%;" empty-text="暂无数据">
+    <el-table ref="tableRef" v-loading="loading" :data="items" stripe border height="100%" style="width: 100%;" empty-text="暂无数据">
 
       <el-table-column label="服务器ID" prop="server_id" width="120" align="center" show-overflow-tooltip>
         <template #default="{ row }">
@@ -29,7 +29,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column prop="name" label="名称" min-width="200" align="center" show-overflow-tooltip>
+      <el-table-column prop="name" label="名称" min-width="150" align="center" show-overflow-tooltip>
         <template #default="{ row }"><span class="fw-semibold" style="color: var(--c-text);">{{ row.name }}</span></template>
       </el-table-column>
 
@@ -149,7 +149,7 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { networkApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight, Plus, Monitor } from '@element-plus/icons-vue'
@@ -159,6 +159,7 @@ import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
 const userStore = useUserStore()
+const tableRef = ref(null)
 const items = ref([])
 const page = ref(1)
 const pageSize = ref(20)
@@ -252,6 +253,9 @@ const checkAll = async () => {
 }
 const onPagerChange = () => loadData()
 
+// 窗口尺寸变化时重算表格布局，避免固定列与主体错位
+const handleResize = () => tableRef.value?.doLayout()
+
 
 // 清理定时器和异步操作
 let abortController = null
@@ -282,16 +286,21 @@ const loadData = async () => {
   } finally {
     loading.value = false
     abortController = null
+    // 带 height=100% + fixed="right" 的表格不会自动重算，数据变化后需 doLayout 避免固定“操作”列错位/滑动。
+    await nextTick()
+    tableRef.value?.doLayout()
   }
 }
 
 onMounted(() => {
   console.log('Servers组件挂载')
+  window.addEventListener('resize', handleResize)
   loadData()
 })
 
 onUnmounted(() => {
   console.log('Servers组件卸载，清理资源')
+  window.removeEventListener('resize', handleResize)
   // 取消正在进行的请求
   if (abortController) {
     abortController.abort()
@@ -303,3 +312,14 @@ onUnmounted(() => {
   if (filters.value) filters.value = {}
 })
 </script>
+
+<style scoped>
+/* .page 精确撑满父容器 .content（.content 已是 100vh - 顶栏56 - 内边距40）。
+   默认的 height:100vh 会比容器高约 96px，底部被 .content 的 overflow:hidden 裁掉，
+   并把表格末尾顶到 fixed 分页条后面 → 最后一行 / 横向滚动条看不全、需手动滑动。 */
+.page { height: 100%; }
+
+/* 底部为 position:fixed 的分页条预留空间；表格改用 height="100%" 填满剩余区域，
+   末尾正好停在分页条上方，不再被遮挡。 */
+.page-content { padding-bottom: 48px; }
+</style>

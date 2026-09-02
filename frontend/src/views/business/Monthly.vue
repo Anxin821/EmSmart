@@ -23,7 +23,7 @@
     </div>
 
     <div class="page-content">
-    <el-table :data="tableData" stripe border :height="'calc(100vh - 210px)'" style="width: 100%;margin-top:16px;" empty-text="暂无数据">
+    <el-table ref="tableRef" :data="tableData" stripe border height="100%" style="width: 100%;" empty-text="暂无数据">
 
       <el-table-column prop="year" label="年" width="80" align="center" />
 
@@ -114,7 +114,7 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { productionApi, optionsApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight, Plus, DataAnalysis } from '@element-plus/icons-vue'
@@ -126,6 +126,7 @@ import CommonModal      from '@/components/common/CommonModal.vue'
 import StatCard         from '@/components/common/StatCard.vue'
 const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
+const tableRef = ref(null)
 const tableData = ref([])
 const projects = ref([])
 const filters = ref({ year: '', month: '', project: '' })
@@ -174,6 +175,10 @@ const loadData = async () => {
     tableData.value = res.data?.items || []
     stats.value = res.data?.extra || {}
     total.value = res.data?.total || 0
+    // stats-summary-row 是 v-if，数据加载后才出现会改变 .page-content 高度；
+    // 带 height=100% + fixed="right" 的表格不会自动重算，导致固定“操作”列错位/滑动，需手动 doLayout。
+    await nextTick()
+    tableRef.value?.doLayout()
   } catch (e) {
     console.error(e)
   }
@@ -233,9 +238,26 @@ const handleGenerate = async () => {
 watch([page, pageSize], () => {
   loadData()
 })
+// 窗口尺寸变化时重算表格布局，避免固定列与主体错位
+const handleResize = () => tableRef.value?.doLayout()
 onMounted(async () => {
+  window.addEventListener('resize', handleResize)
   const projRes = await optionsApi.projects()
   projects.value = projRes.data || []
   loadData()
 })
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+})
 </script>
+
+<style scoped>
+/* .page 精确撑满父容器 .content（.content 已是 100vh - 顶栏56 - 内边距40）。
+   默认的 height:100vh 会比容器高约 96px，底部被 .content 的 overflow:hidden 裁掉，
+   并把表格末尾顶到 fixed 分页条后面 → 最后一行 / 横向滚动条看不全、需手动滑动表头。 */
+.page { height: 100%; }
+
+/* 底部为 position:fixed 的分页条预留空间；表格改用 height="100%" 填满剩余区域，
+   末尾正好停在分页条上方，表头固定、仅数据区垂直滚动。 */
+.page-content { padding-bottom: 48px; }
+</style>

@@ -17,7 +17,7 @@
     </div>
 
     <div class="page-content">
-    <el-table :data="tableData" stripe border :height="'calc(100vh - 210px)'" style="width: 100%;" empty-text="暂无数据">
+    <el-table ref="tableRef" :data="tableData" stripe border height="100%" style="width: 100%;" empty-text="暂无数据">
 
       <el-table-column prop="year" label="年" width="80" align="center" />
 
@@ -152,7 +152,7 @@
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { productionApi, optionsApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, UploadFilled, RefreshRight, Plus, Upload } from '@element-plus/icons-vue'
@@ -163,6 +163,7 @@ import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
 const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
+const tableRef = ref(null)
 const tableData = ref([])
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线']
 const projects = ref([])
@@ -213,6 +214,9 @@ const loadData = async () => {
     const res = await productionApi.weekly(params)
     tableData.value = res.data?.items || []
     total.value = res.data?.total || 0
+    // 带 height=100% + fixed="right" 的表格不会自动重算，数据变化后需 doLayout 避免固定“操作”列错位/滑动。
+    await nextTick()
+    tableRef.value?.doLayout()
   } catch (e) {
     console.error(e)
   }
@@ -284,9 +288,15 @@ const handleImport = async () => {
 watch([page, pageSize], () => {
   loadData()
 })
+// 窗口尺寸变化时重算表格布局，避免固定列与主体错位
+const handleResize = () => tableRef.value?.doLayout()
 onMounted(async () => {
+  window.addEventListener('resize', handleResize)
   const projRes = await optionsApi.projects()
   projects.value = projRes.data || []
   loadData()
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
 })
 </script>
