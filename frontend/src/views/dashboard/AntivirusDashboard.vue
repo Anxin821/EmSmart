@@ -1,11 +1,6 @@
 <template>
-  <div class="page" style="padding: 0px 0px;">
+  <div id="anti-board" class="page" style="padding: 0px 0px;">
     <div class="page-header">
-      <div>
-        <h1 class="page-title" style="color: var(--c-text);font-weight: 700;font-size: 18px;margin:0;display:flex;align-items:center;gap:8px;">
-          <span style="color:#60a5fa;font-size:18px;">🛡</span>设备杀毒看板
-        </h1>
-      </div>
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-sm btn-outline-primary" @click="exportPPT" :disabled="exporting">
           <span class="bi" :class="exporting ? 'bi-hourglass-split' : 'bi-file-earmark-ppt'"></span>
@@ -122,7 +117,7 @@
 import { ref, onMounted } from 'vue'
 import { dashboardApi, antivirusApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { createPresentation, addTitleSlide, addStatsSlide, addTableSlide, savePresentation, colorMap } from '@/utils/pptExport'
+import { createPresentation, addFullImageSlide, savePresentation, captureElement } from '@/utils/pptExport'
 
 const stats = ref({ total_devices: 0, done_count: 0, pending_count: 0, overdue_count: 0 })
 const distribution = ref([])
@@ -168,50 +163,40 @@ const loadData = async () => {
 
 onMounted(loadData)
 
-// 导出PPT
+// 导出PPT：整屏看板截图，仅一页
 const exportPPT = async () => {
   exporting.value = true
+  const boardEl = document.getElementById('anti-board')
+  const headerEl = boardEl?.querySelector('.page-header')
   try {
+    // 截图前临时隐藏右上角操作按钮，导出图更干净
+    if (headerEl) headerEl.style.visibility = 'hidden'
+    await new Promise(r => setTimeout(r, 60))
+    const boardImg = await captureElement('anti-board')
     const pptx = createPresentation('设备杀毒看板')
-    
-    // 1. 标题页
-    addTitleSlide(pptx, '设备杀毒看板', '设备杀毒进度与超时设备统计')
-    
-    // 2. 统计指标页
-    addStatsSlide(pptx, '杀毒统计', [
-      { label: '设备总数', value: stats.value.total_devices, color: colorMap.blue },
-      { label: '已杀毒', value: stats.value.done_count, color: colorMap.green },
-      { label: '待杀毒', value: stats.value.pending_count, color: colorMap.yellow },
-      { label: '超时未杀毒', value: stats.value.overdue_count, color: colorMap.red }
-    ])
-    
-    // 3. 按线体分布表格
-    if (distribution.value.length > 0) {
-      const headers = ['线体', '设备总数', '已杀毒', '待杀毒', '超时', '进度']
-      const rows = distribution.value.map(row => [
-        row.line || '-',
-        String(row.total),
-        String(row.done),
-        String(row.pending),
-        String(row.overdue),
-        `${row.progress}%`
-      ])
-      addTableSlide(pptx, '按线体分布', headers, rows)
-    }
-    
-    // 保存文件
+    addFullImageSlide(pptx, boardImg)
     const date = new Date().toISOString().slice(0, 10)
     savePresentation(pptx, `设备杀毒看板_${date}.pptx`)
   } catch (error) {
     console.error('导出PPT失败:', error)
     ElMessage.error('导出PPT失败，请重试')
   } finally {
+    if (headerEl) headerEl.style.visibility = ''
     exporting.value = false
   }
 }
 </script>
 
 <style scoped>
+.page {
+  height: 100%;
+  overflow: hidden;
+}
+.page-header {
+  justify-content: flex-end;
+  padding: 10px var(--gap-block);
+  margin-bottom: 12px;
+}
 /* ---------- 统计卡片 ---------- */
 .anti-stat-card {
   background: #fff;

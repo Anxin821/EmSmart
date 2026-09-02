@@ -11,6 +11,7 @@ import pptxgen from 'pptxgenjs'
  */
 export function createPresentation(title) {
   const pptx = new pptxgen()
+  pptx.layout = 'LAYOUT_WIDE'
   pptx.title = title
   pptx.author = 'EmSmart System'
   pptx.subject = 'Dashboard Report'
@@ -266,6 +267,26 @@ export function addCardsSlide(pptx, title, cards, cols = 6) {
       })
     }
   })
+}
+
+/**
+ * 添加整屏截图页（图片等比 contain 铺满单页，不变形）
+ * @param {pptxgen} pptx - PPT实例
+ * @param {string} imageData - base64图片数据
+ */
+export function addFullImageSlide(pptx, imageData) {
+  const slide = pptx.addSlide()
+  slide.background = { color: 'FFFFFF' }
+  if (imageData) {
+    slide.addImage({
+      data: imageData,
+      x: 0,
+      y: 0,
+      w: 13.33,
+      h: 7.5,
+      sizing: { type: 'contain', w: 13.33, h: 7.5 }
+    })
+  }
 }
 
 /**

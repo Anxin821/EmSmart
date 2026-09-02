@@ -1,10 +1,6 @@
 <template>
   <div class="page" style="width:100%; min-width:0; box-sizing:border-box;">
     <div class="page-header" style="width:100%; min-width:0;">
-      <div>
-        <h1 class="page-title"><span class="emoji">📋</span>岗位职责看板</h1>
-        <div class="page-sub">各岗位核心职责条目管理</div>
-      </div>
       <div class="d-flex align-items-center gap-2">
         <template v-if="userStore.canEdit">
           <button class="btn btn-sm btn-outline-primary" @click="openDutyAddModal">
@@ -607,6 +603,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.page-header {
+  justify-content: flex-end;
+  padding: 10px var(--gap-block);
+  margin-bottom: 12px;
+}
 /* —— 卡片本体：height:100% 撑满列 → 与同 row 最长的那条卡严格等高；max-height 520px 保底 —— */
 .duty-el-card {
   display: flex;

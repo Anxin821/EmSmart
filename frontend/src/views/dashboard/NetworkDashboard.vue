@@ -1,10 +1,6 @@
 <template>
   <div id="page-container" class="page">
     <div class="page-header">
-      <div>
-        <h1 class="page-title"><span class="emoji">🌐</span>车间网络看板</h1>
-        <div class="page-sub">实时监测车间服务器 / WiFi / 老化架网络节点在线情况</div>
-      </div>
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-sm btn-outline-warning" @click="handleCheckAll">
           <span class="bi bi-lightning-charge"></span>一键检测
@@ -257,6 +253,11 @@ onBeforeUnmount(() => {
 <style scoped>
 .page {
   padding: 0px 24px;
+}
+.page-header {
+  justify-content: flex-end;
+  padding: 10px var(--gap-block);
+  margin-bottom: 12px;
 }
 
 /* ---- 顶部统计区 ---- */

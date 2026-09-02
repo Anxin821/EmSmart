@@ -1,9 +1,6 @@
 <template>
-  <div class="page">
+  <div id="mes-board" class="page">
     <div class="page-header">
-      <div>
-        <h1 class="page-title"><span class="emoji">📋</span>MES 管理看板</h1>
-      </div>
       <div class="d-flex align-items-center gap-2">
         <button class="btn btn-sm btn-outline-primary" @click="exportPPT" :disabled="exporting">
           <span class="bi" :class="exporting ? 'bi-hourglass-split' : 'bi-file-earmark-ppt'"></span>
@@ -12,15 +9,28 @@
       </div>
     </div>
 
-    <!-- 顶部 2 张大卡 -->
-    <div class="stat-grid" style="grid-template-columns: repeat(2, minmax(0,1fr));">
-      <div class="stat-card green-dash">
-        <div class="num-big fix-rate">{{ data?.fix_rate ?? 0 }}<em>%</em></div>
-        <div class="label">BUG修复率（已解决/全部）</div>
+    <div class="cockpit">
+    <!-- KPI 指标：BUG修复率 / 需求完成率 / 未关闭BUG / 延期需求 -->
+    <div class="stat-grid">
+      <div class="stat-card green">
+        <div class="icon-box"><span class="bi bi-bug-fill"></span></div>
+        <div class="num">{{ data?.fix_rate ?? 0 }}%</div>
+        <div class="label">BUG修复率</div>
       </div>
-      <div class="stat-card red-dash">
-        <div class="num-big delivery-rate">{{ data?.delivery_rate ?? 0 }}<em>%</em></div>
-        <div class="label">需求完成率（已上线/全部）</div>
+      <div class="stat-card blue">
+        <div class="icon-box"><span class="bi bi-check2-circle"></span></div>
+        <div class="num">{{ data?.delivery_rate ?? 0 }}%</div>
+        <div class="label">需求完成率</div>
+      </div>
+      <div class="stat-card red">
+        <div class="icon-box"><span class="bi bi-exclamation-octagon-fill"></span></div>
+        <div class="num">{{ openBugCount }}</div>
+        <div class="label">未关闭BUG</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="icon-box"><span class="bi bi-alarm-fill"></span></div>
+        <div class="num">{{ overdueReqCount }}</div>
+        <div class="label">延期需求</div>
       </div>
     </div>
 
@@ -98,16 +108,24 @@
         </div>
       </section>
     </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
 import { mesApi } from '@/api'
-import { createPresentation, addTitleSlide, addStatsSlide, addChartSlide, addTableSlide, savePresentation, captureElement, colorMap } from '@/utils/pptExport'
+import { createPresentation, addFullImageSlide, savePresentation, captureElement } from '@/utils/pptExport'
 
 const data = ref(null)
+
+// KPI 派生指标：未关闭BUG（总数 - 已解决）、延期需求（风险项中 overdue_req 的值）
+const openBugCount = computed(() => (data.value?.bug_count ?? 0) - (data.value?.bug_fixed ?? 0))
+const overdueReqCount = computed(() => {
+  const r = (data.value?.risks || []).find(x => x.icon === 'overdue_req')
+  return r?.value ?? 0
+})
 const exporting = ref(false)
 let cBugs = null, cReqs = null
 
@@ -220,67 +238,25 @@ const renderCharts = () => {
   })
 }
 
-const handleExportPPT = () => {
-  alert('PPT 导出：请在浏览器打印对话框中选择「另存为 PDF」再转 PPT，或等待后端实现（后续迭代）。')
-}
-
-// 导出PPT
+// 导出PPT：整屏看板截图，仅一页
 const exportPPT = async () => {
   exporting.value = true
+  const boardEl = document.getElementById('mes-board')
+  const headerEl = boardEl?.querySelector('.page-header')
   try {
+    // 截图前临时隐藏右上角操作按钮，导出图更干净
+    if (headerEl) headerEl.style.visibility = 'hidden'
+    await new Promise(r => setTimeout(r, 60))
+    const boardImg = await captureElement('mes-board')
     const pptx = createPresentation('MES 管理看板')
-    
-    // 1. 标题页
-    addTitleSlide(pptx, 'MES 管理看板', 'BUG修复率与需求完成率统计')
-    
-    // 2. 统计指标页
-    addStatsSlide(pptx, '核心指标', [
-      { label: 'BUG修复率', value: `${data.value?.fix_rate ?? 0}%`, color: colorMap.green },
-      { label: '需求完成率', value: `${data.value?.delivery_rate ?? 0}%`, color: colorMap.red }
-    ])
-    
-    // 3. BUG月度图表
-    const bugsChart = await captureElement('chart-bugs')
-    if (bugsChart) {
-      addChartSlide(pptx, 'BUG 月度状态分布', bugsChart)
-    }
-    
-    // 4. 需求月度图表
-    const reqsChart = await captureElement('chart-reqs')
-    if (reqsChart) {
-      addChartSlide(pptx, '需求月度状态分布', reqsChart)
-    }
-    
-    // 5. 风险列表
-    if (data.value?.risks?.length > 0) {
-      const headers = ['类型', '描述', '数量']
-      const rows = data.value.risks.map(r => [
-        r.label || '-',
-        r.items?.join('、') || '-',
-        `${r.value} ${r.unit || ''}`
-      ])
-      addTableSlide(pptx, '阻塞与风险归因', headers, rows)
-    }
-    
-    // 6. 里程碑
-    if (data.value?.milestones) {
-      const ms = data.value.milestones
-      const headers = ['里程碑', '需求数量', '需求列表']
-      const rows = [[
-        ms.label || '本月里程碑',
-        `${ms.count || 0} 个`,
-        ms.items?.join('、') || '-'
-      ]]
-      addTableSlide(pptx, '本月里程碑 & 下月承诺', headers, rows)
-    }
-    
-    // 保存文件
+    addFullImageSlide(pptx, boardImg)
     const date = new Date().toISOString().slice(0, 10)
     savePresentation(pptx, `MES管理看板_${date}.pptx`)
   } catch (error) {
     console.error('导出PPT失败:', error)
     alert('导出PPT失败，请重试')
   } finally {
+    if (headerEl) headerEl.style.visibility = ''
     exporting.value = false
   }
 }
@@ -297,34 +273,55 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* 顶部两张超大卡 */
-.stat-card.green-dash, .stat-card.red-dash {
-  padding: 26px 30px 24px;
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #E6E9F0;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, .03);
-  text-align: center;
+/* 一屏驾驶舱：撑满内容区，KPI / 图表 / 风险里程碑 三行弹性自适应视口，无页面级滚动 */
+.page {
+  height: 100%;
+  overflow: hidden;
 }
-.stat-card .num-big {
-  font-size: 46px;
-  font-weight: 700;
-  line-height: 1.1;
-  margin-top: 6px;
-  letter-spacing: -0.5px;
+.page-header {
+  justify-content: flex-end;
+  padding: 10px var(--gap-block);
+  margin-bottom: 12px;
 }
-.stat-card .num-big em {
-  font-size: 22px;
-  font-weight: 600;
-  font-style: normal;
-  margin-left: 2px;
+.cockpit {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: var(--gap-block);
 }
-.fix-rate       { color: #10B981; }
-.delivery-rate  { color: #EF4444; }
-.stat-card .label {
-  margin-top: 8px;
-  color: var(--muted, #6B7280);
-  font-size: 13px;
+/* 覆盖全局 chart-card 固定最小高，图表随单元格弹性伸缩 */
+.cockpit .chart-card { min-height: 0; }
+.cockpit .chart-card .section-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cockpit .chart-card .chart-container {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  width: 100%;
+}
+/* 底部风险 / 里程碑卡：卡内滚动，长列表不撑破一屏 */
+.cockpit .risk-card,
+.cockpit .milestone-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cockpit .risk-card .section-body,
+.cockpit .milestone-card .section-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* KPI 卡副信息允许换行 */
+.cockpit .stat-card .label {
+  padding-right: 0;
+  white-space: normal;
+  line-height: 1.4;
 }
 .sec-emoji {
   display: inline-flex;
@@ -398,15 +395,13 @@ onBeforeUnmount(() => {
   line-height: 1.7;
   font-size: 14px;
   color: #374151;
-  max-height: 108px;
-  overflow: auto;
 }
 .ms-list::-webkit-scrollbar-thumb { background: #D8DEEA; border-radius: 4px; }
 .ms-list::-webkit-scrollbar      { width: 6px; }
 
-/* 卡尺寸统一 */
+/* 卡尺寸统一：图表随容器高度自适应 */
 .chart-container {
   width: 100%;
-  height: 300px;
+  height: 100%;
 }
 </style>

@@ -9,24 +9,24 @@
 
       <div class="nav-title">数据看板</div>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'AoiDashboard' }" @click="go('/dashboard/aoi')">
-        <span class="bi bi-bar-chart-fill" aria-hidden="true"></span>AOI&AI 看板
+        <span class="bi bi-bar-chart-fill" aria-hidden="true"></span>AOI&AI看板
       </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'NetworkDashboard' }" @click="go('/dashboard/network')">
-        <span class="bi bi-hdd-network-fill" aria-hidden="true"></span>车间网络看板
+        <span class="bi bi-hdd-network-fill" aria-hidden="true"></span>网络看板
       </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'MesDashboard' }" @click="go('/dashboard/mes')">
-        <span class="bi bi-clipboard-data-fill" aria-hidden="true"></span>MES 看板
+        <span class="bi bi-clipboard-data-fill" aria-hidden="true"></span>MES看板
       </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'AntivirusDashboard' }" @click="go('/dashboard/antivirus')">
         <span class="bi bi-shield-check" aria-hidden="true"></span>杀毒看板
       </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'DutiesDashboard' }" @click="go('/dashboard/duties')">
-        <span class="bi bi-list-check" aria-hidden="true"></span>岗位职责看板
+        <span class="bi bi-list-check" aria-hidden="true"></span>职责看板
       </button>
 
       <div class="nav-title">业务管理</div>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'Devices' }" @click="go('/devices')">
-        <span class="bi bi-cpu-fill" aria-hidden="true"></span>AOI&AI 设备管理
+        <span class="bi bi-cpu-fill" aria-hidden="true"></span>AOI&AI设备管理
       </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'Weekly' }" @click="go('/weekly')">
         <span class="bi bi-graph-up-arrow" aria-hidden="true"></span>生产周报管理
@@ -41,13 +41,13 @@
         <span class="bi bi-box-seam-fill" aria-hidden="true"></span>老化架管理
       </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'Wifi' }" @click="go('/wifi')">
-        <span class="bi bi-wifi" aria-hidden="true"></span>WiFi AP 管理
+        <span class="bi bi-wifi" aria-hidden="true"></span>WiFi AP管理
       </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'Orders' }" @click="go('/orders')">
-        <span class="bi bi-journal-text" aria-hidden="true"></span>MES 工单管理
+        <span class="bi bi-journal-text" aria-hidden="true"></span>MES工单管理
       </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'Bugs' }" @click="go('/bugs')">
-        <span class="bi bi-bug-fill" aria-hidden="true"></span>MES BUG 管理
+        <span class="bi bi-bug-fill" aria-hidden="true"></span>MES BUG管理
       </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'DevReqs' }" @click="go('/devreqs')">
         <span class="bi bi-lightbulb-fill" aria-hidden="true"></span>MES 需求管理
