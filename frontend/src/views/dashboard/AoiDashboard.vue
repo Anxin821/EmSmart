@@ -14,7 +14,7 @@
     <div class="cockpit">
     <!-- KPI 指标：设备总数 / 可用率 / 本月产量 / 本月直通率 -->
     <div class="stat-grid">
-      <StatCard color="blue" icon="bi bi-pc-display-fill" :num="stats.total" label="设备总数" />
+      <StatCard color="blue" icon="bi bi-display-fill" :num="stats.total" label="设备总数" />
       <StatCard color="green" icon="bi bi-check-circle-fill" :num="`${availability}%`">
         <template #label>设备可用率（正常 {{ stats.normal }} / 故障 {{ stats.fault }}）</template>
       </StatCard>
