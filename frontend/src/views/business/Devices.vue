@@ -168,7 +168,7 @@ const userStore = useUserStore()
 const { toast } = useNotify()
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线']
 const filterFields = [
-  { type: 'input',  key: 'keyword', label: '',          placeholder: '设备ID / 名称 / IP / 负责人', autoSearch: false, clearable: true, minWidth: 260 },
+  { type: 'input',  key: 'keyword', label: '',          placeholder: '设备ID / 名称 / IP / 负责人', autoSearch: false, clearable: true, flex: '1 1 240px' },
   { type: 'select', key: 'line',    label: '产线',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
     options: [{ label: '全部产线', value: '' }, ...lines.map(l => ({ label: l, value: l }))] },
   { type: 'select', key: 'status',  label: '状态',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
@@ -254,3 +254,18 @@ watch([page, pageSize], () => {
   loadData()
 })
 </script>
+
+<style scoped>
+/* Devices 页头部：标题 + 搜索框 + 筛选下拉 + 搜索/重置/新增 全部保持单行水平，不换行 */
+.page-header :deep(.common-filter-bar) {
+  flex: 0 1 auto;      /* 不主动伸展；空间不足时允许整体收缩 */
+  min-width: 0;        /* 允许收缩到内容宽度以下，配合关键词框弹性伸缩 */
+  flex-wrap: nowrap;   /* 关键：字段与按钮不换行，始终排在同一行 */
+}
+/* 关键词搜索框作为唯一弹性元素：宽屏约 240px、窄屏收缩吸收宽度差，
+   让固定宽度的产线/状态/类型下拉与操作按钮始终留在同一行不被挤下去 */
+.page-header :deep(.common-filter-bar > .field:first-child) {
+  flex: 1 1 240px;
+  min-width: 120px;    /* 收缩下限，避免搜索框被挤没 */
+}
+</style>
