@@ -179,7 +179,7 @@ const renderGauge = () => {
       endAngle: -30,
       min: 0,
       max: 100,
-      radius: '85%',
+      radius: '90%', // 给边缘刻度和数字留出安全边距
       center: ['50%', '55%'],
       progress: { show: true, width: 14 },
       axisLine: {
@@ -213,14 +213,14 @@ const renderGauge = () => {
       },
       title: {
         show: true,
-        offsetCenter: [0, '20%'],
-        fontSize: 13,
+        offsetCenter: [0, '30%'],
+        fontSize: 16,
         color: '#6B7280',
       },
       detail: {
         valueAnimation: true,
-        offsetCenter: [0, '-2%'],
-        fontSize: 32,
+        offsetCenter: [0, '-8%'], // 👈 修改：从 -2% -> 5%，数字下移，避免和指针根部重叠
+        fontSize: 25,            // 👈 修改：从 32 -> 28，数字适当缩小，防止溢出
         fontWeight: 700,
         formatter: '{value}%',
         color: rate >= 90 ? '#10B981' : (rate >= 70 ? '#F59E0B' : '#EF4444'),
@@ -256,15 +256,19 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .page {
-  padding: 20px 24px;
+  padding: 0px 24px;
 }
 
 /* ---- 顶部统计区 ---- */
 .top-section {
   display: flex;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 5px;  /* 👈 减小底部外边距：从16px→12px */
+  margin-top: 1px;     /* 👈 添加顶部外边距：增加12px */
+  margin-left: -8px;    /* 👈 减小左侧外边距：从0→-8px */
+  margin-right: -8px;   /* 👈 减小右侧外边距：从0→-8px */
   align-items: stretch;
+  height: 180px;
 }
 
 .stat-pair {
@@ -277,10 +281,13 @@ onBeforeUnmount(() => {
   flex: 1;
   background: #fff;
   border-radius: 12px;
-  padding: 20px 24px;
+  padding: 10px 16px;
   text-align: center;
   border: 1px solid var(--c-divider);
   box-shadow: 0 2px 6px rgba(15, 23, 42, .03);
+  display: flex;          /* 👈 新增 */
+  flex-direction: column; /* 👈 新增 */
+  justify-content: center;/* 👈 新增：数字和文字在卡片内垂直居中 */
 }
 
 .stat-box .stat-num {
@@ -293,14 +300,14 @@ onBeforeUnmount(() => {
 .stat-box.offline .stat-num { color: var(--err); }
 
 .stat-box .stat-label {
-  margin-top: 8px;
+  margin-top: 4px;
   color: var(--c-text-3);
   font-size: 13px;
 }
 
 .gauge-wrapper {
-  width: 280px;
-  height: 220px;
+  width: 320px;
+  height: 100%;
   background: #fff;
   border-radius: 12px;
   border: 1px solid var(--c-divider);

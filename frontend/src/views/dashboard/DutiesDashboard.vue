@@ -3,7 +3,7 @@
     <div class="page-header" style="width:100%; min-width:0;">
       <div>
         <h1 class="page-title"><span class="emoji">📋</span>岗位职责看板</h1>
-        <div class="page-sub">各岗位核心职责条目管理（支持增删改）</div>
+        <div class="page-sub">各岗位核心职责条目管理</div>
       </div>
       <div class="d-flex align-items-center gap-2">
         <template v-if="userStore.canEdit">
