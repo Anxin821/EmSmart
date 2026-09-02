@@ -11,26 +11,10 @@
     <div class="cockpit">
     <!-- KPI 指标：BUG修复率 / 需求完成率 / 未关闭BUG / 延期需求 -->
     <div class="stat-grid">
-      <div class="stat-card green">
-        <div class="icon-box"><span class="bi bi-bug-fill"></span></div>
-        <div class="num">{{ data?.fix_rate ?? 0 }}%</div>
-        <div class="label">BUG修复率</div>
-      </div>
-      <div class="stat-card blue">
-        <div class="icon-box"><span class="bi bi-check2-circle"></span></div>
-        <div class="num">{{ data?.delivery_rate ?? 0 }}%</div>
-        <div class="label">需求完成率</div>
-      </div>
-      <div class="stat-card red">
-        <div class="icon-box"><span class="bi bi-exclamation-octagon-fill"></span></div>
-        <div class="num">{{ openBugCount }}</div>
-        <div class="label">未关闭BUG</div>
-      </div>
-      <div class="stat-card yellow">
-        <div class="icon-box"><span class="bi bi-alarm-fill"></span></div>
-        <div class="num">{{ overdueReqCount }}</div>
-        <div class="label">延期需求</div>
-      </div>
+      <StatCard color="green" icon="bi bi-bug-fill" :num="`${data?.fix_rate ?? 0}%`" label="BUG修复率" />
+      <StatCard color="blue" icon="bi bi-check2-circle" :num="`${data?.delivery_rate ?? 0}%`" label="需求完成率" />
+      <StatCard color="red" icon="bi bi-exclamation-octagon-fill" :num="openBugCount" label="未关闭BUG" />
+      <StatCard color="yellow" icon="bi bi-alarm-fill" :num="overdueReqCount" label="延期需求" />
     </div>
 
     <!-- 两张堆叠柱状图 -->
@@ -115,6 +99,7 @@
 import { ref, computed, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
 import { mesApi } from '@/api'
+import StatCard from '@/components/common/StatCard.vue'
 import { createPresentation, addFullImageSlide, savePresentation, captureElement } from '@/utils/pptExport'
 
 const data = ref(null)
@@ -306,8 +291,8 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow-y: auto;
 }
-/* KPI 卡副信息允许换行 */
-.cockpit .stat-card .label {
+/* KPI 卡副信息允许换行（StatCard 为子组件，需 :deep 穿透） */
+.cockpit :deep(.stat-card .label) {
   padding-right: 0;
   white-space: normal;
   line-height: 1.4;

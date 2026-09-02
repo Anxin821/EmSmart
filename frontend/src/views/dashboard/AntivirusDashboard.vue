@@ -1,5 +1,5 @@
 <template>
-  <div id="anti-board" class="page" style="padding: 0px 0px;">
+  <div id="anti-board" class="page">
     <!-- 操作按钮通过 Teleport 注入全局顶栏左侧空白区，不占用看板纵向空间 -->
     <Teleport defer to=".topbar-actions">
       <button class="btn btn-sm btn-outline-primary" @click="exportPPT" :disabled="exporting">
@@ -8,38 +8,30 @@
       </button>
     </Teleport>
 
-    <!-- 顶部 4 张统计卡：设备总数 / 已杀毒 / 待杀毒 / 超时未杀毒 -->
-    <div style="
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 16px;
-      margin: 0px 0 18px 0;
-    ">
-      <div class="anti-stat-card" style="color:#3b82f6;">
-        <div class="anti-stat-num">{{ stats.total_devices }}</div>
-        <div class="anti-stat-label">设备总数</div>
-      </div>
-      <div class="anti-stat-card" style="color:#10b981;">
-        <div class="anti-stat-num">{{ stats.done_count }}</div>
-        <div class="anti-stat-label">已杀毒</div>
-      </div>
-      <div class="anti-stat-card" style="color:#f59e0b;">
-        <div class="anti-stat-num">{{ stats.pending_count }}</div>
-        <div class="anti-stat-label">待杀毒</div>
-      </div>
-      <div class="anti-stat-card" style="color:#ef4444;">
-        <div class="anti-stat-num" style="cursor:pointer;" @click="showOverdueModal(null)">{{ stats.overdue_count }}</div>
-        <div class="anti-stat-label">超时未杀毒</div>
-      </div>
+    <!-- 顶部 4 张统计卡：统一走 StatCard 组件（与其它看板观感一致） -->
+    <div class="stat-grid kpi-row">
+      <StatCard color="blue" icon="bi bi-pc-display" :num="stats.total_devices" label="设备总数" />
+      <StatCard color="green" icon="bi bi-check-circle-fill" :num="stats.done_count" label="已杀毒" />
+      <StatCard color="yellow" icon="bi bi-clock-history" :num="stats.pending_count" label="待杀毒" />
+      <StatCard
+        color="red"
+        icon="bi bi-shield-exclamation"
+        :num="stats.overdue_count"
+        label="超时未杀毒"
+        clickable
+        @click="showOverdueModal(null)"
+      />
     </div>
 
-    <!-- 按线体分布：Element Plus el-table 表格 -->
-    <section class="page-section" style="padding:0;overflow:hidden;">
-      <div style="font-size:16px;font-weight:600;color:var(--c-text);margin:14px 0 14px 4px;">按线体分布</div>
+    <!-- 按线体分布：Element Plus el-table 表格（卡内滚动，不被一屏 overflow 裁切） -->
+    <section class="page-section table-section">
+      <div class="table-title">按线体分布</div>
+      <div class="table-scroll">
       <el-table
         :data="distribution"
         border
         stripe
+        height="100%"
         style="width:100%;"
         empty-text="暂无数据"
         :header-cell-style="{ fontWeight: 600, fontSize: '14px' }"
@@ -80,6 +72,7 @@
           </el-empty>
         </template>
       </el-table>
+      </div>
     </section>
 
     <!-- 超时未杀毒记录弹窗 -->
@@ -115,6 +108,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { dashboardApi, antivirusApi } from '@/api'
+import StatCard from '@/components/common/StatCard.vue'
 import { ElMessage } from 'element-plus'
 import { createPresentation, addFullImageSlide, savePresentation, captureElement } from '@/utils/pptExport'
 
@@ -182,28 +176,32 @@ const exportPPT = async () => {
 </script>
 
 <style scoped>
+/* 一屏驾驶舱：KPI 行固定，表格卡吃掉剩余高度并在卡内滚动，行多也不被裁切 */
 .page {
   height: 100%;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-block);
+  padding: 0;
 }
-/* ---------- 统计卡片 ---------- */
-.anti-stat-card {
-  background: #fff;
-  border: 1px solid var(--c-divider);
-  border-radius: 10px;
-  padding: 0px 24px 0px;
-  text-align: center;
-  box-shadow: 0 2px 6px rgba(15,23,42,.04);
+.kpi-row { flex-shrink: 0; }
+.table-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
-.anti-stat-num {
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 1.1;
+.table-title {
+  flex-shrink: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--c-text);
+  padding: 14px 0 14px 4px;
 }
-.anti-stat-label {
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--c-text-3);
+.table-scroll {
+  flex: 1;
+  min-height: 0;
 }
 
 /* ---------- 进度条（百分比内嵌在进度条上方，模仿截图） ---------- */

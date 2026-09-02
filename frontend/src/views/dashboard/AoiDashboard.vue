@@ -14,26 +14,16 @@
     <div class="cockpit">
     <!-- KPI 指标：设备总数 / 可用率 / 本月产量 / 本月直通率 -->
     <div class="stat-grid">
-      <div class="stat-card blue">
-        <div class="icon-box"><span class="bi bi-pc-display-fill"></span></div>
-        <div class="num">{{ stats.total }}</div>
-        <div class="label">设备总数</div>
-      </div>
-      <div class="stat-card green">
-        <div class="icon-box"><span class="bi bi-check-circle-fill"></span></div>
-        <div class="num">{{ availability }}%</div>
-        <div class="label">设备可用率（正常 {{ stats.normal }} / 故障 {{ stats.fault }}）</div>
-      </div>
-      <div class="stat-card purple">
-        <div class="icon-box"><span class="bi bi-box-seam-fill"></span></div>
-        <div class="num">{{ latestOutput }}</div>
-        <div class="label">本月产量 · 年累 {{ summary.total_output.toLocaleString() }}</div>
-      </div>
-      <div class="stat-card yellow">
-        <div class="icon-box"><span class="bi bi-bullseye"></span></div>
-        <div class="num">{{ latestYield }}%</div>
-        <div class="label">本月直通率 · 年均 {{ summary.yield_rate }}%</div>
-      </div>
+      <StatCard color="blue" icon="bi bi-pc-display-fill" :num="stats.total" label="设备总数" />
+      <StatCard color="green" icon="bi bi-check-circle-fill" :num="`${availability}%`">
+        <template #label>设备可用率（正常 {{ stats.normal }} / 故障 {{ stats.fault }}）</template>
+      </StatCard>
+      <StatCard color="purple" icon="bi bi-box-seam-fill" :num="latestOutput">
+        <template #label>本月产量 · 年累 {{ summary.total_output.toLocaleString() }}</template>
+      </StatCard>
+      <StatCard color="yellow" icon="bi bi-bullseye" :num="`${latestYield}%`">
+        <template #label>本月直通率 · 年均 {{ summary.yield_rate }}%</template>
+      </StatCard>
     </div>
 
     <!-- 图表:直通率折线 + 产量柱状 -->
@@ -71,6 +61,7 @@
 import { ref, reactive, computed, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
 import { devicesApi, productionApi } from '@/api'
+import StatCard from '@/components/common/StatCard.vue'
 import { createPresentation, addFullImageSlide, savePresentation, captureElement } from '@/utils/pptExport'
 
 const summary = ref({ total_output: 0, total_qualified: 0, yield_rate: 0, months: 0 })
@@ -272,8 +263,8 @@ const exportPPT = async () => {
   height: auto;
   width: 100%;
 }
-/* KPI 卡副信息允许换行，避免被省略号截断 */
-.cockpit .stat-card .label {
+/* KPI 卡副信息允许换行，避免被省略号截断（StatCard 为子组件，需 :deep 穿透） */
+.cockpit :deep(.stat-card .label) {
   padding-right: 0;
   white-space: normal;
   line-height: 1.4;

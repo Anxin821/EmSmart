@@ -6,8 +6,9 @@
   -->
   <div
     class="stat-card"
-    :class="colorClass"
+    :class="[colorClass, { clickable }]"
     :style="cardStyle"
+    @click="onClick"
   >
     <div class="icon-box"><span :class="icon"></span></div>
     <div class="num">
@@ -67,6 +68,8 @@ const cardStyle = computed(() =>
     ? { cursor: 'pointer', transition: 'transform .15s ease, box-shadow .15s ease' }
     : {}
 )
+// clickable 时点击整张卡向外抛出 click，供看板做“点击数字下钻”等交互
+const onClick = () => { if (props.clickable) emit('click') }
 </script>
 
 <style scoped>
@@ -94,6 +97,22 @@ const cardStyle = computed(() =>
 .stat-card:hover {
   transform: var(--stat-hover-transform, translateY(-1px));
   box-shadow: 0 4px 14px rgba(15,23,42,.06), 0 0 0 1px rgba(44,92,232,.08);
+}
+/* 可点击卡：右下角 chevron 提示“可下钻”，解决纯 cursor:pointer 无视觉暗示的问题 */
+.stat-card.clickable::after {
+  content: "\203A";
+  position: absolute;
+  right: 14px; bottom: 10px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--c-text-mute, #94A3B8);
+  opacity: .65;
+  transition: transform .15s ease, color .15s ease, opacity .15s ease;
+}
+.stat-card.clickable:hover::after {
+  color: var(--primary, #2C5CE8);
+  opacity: 1;
+  transform: translateX(2px);
 }
 /* 保证 scoped 下也能继承 num / label 列位置（Grid 规范：必须写 grid-column 才会对齐第二列）*/
 :deep(.num)   {

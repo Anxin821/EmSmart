@@ -10,14 +10,20 @@
     <!-- 顶部统计 + 仪表盘 -->
     <div class="top-section">
       <div class="stat-pair">
-        <div class="stat-box online">
-          <div class="stat-num">{{ data?.online_devices ?? 0 }}</div>
-          <div class="stat-label">全局在线设备</div>
-        </div>
-        <div class="stat-box offline">
-          <div class="stat-num">{{ data?.offline_devices ?? 0 }}</div>
-          <div class="stat-label">全局离线设备</div>
-        </div>
+        <StatCard
+          class="net-stat net-online"
+          color="green"
+          icon="bi bi-broadcast-pin"
+          :num="data?.online_devices ?? 0"
+          label="全局在线设备"
+        />
+        <StatCard
+          class="net-stat net-offline"
+          color="red"
+          icon="bi bi-wifi-off"
+          :num="data?.offline_devices ?? 0"
+          label="全局离线设备"
+        />
       </div>
       <div class="gauge-wrapper">
         <div id="gauge" class="gauge"></div>
@@ -28,74 +34,46 @@
     <div class="bottom-section">
       <section class="topology-card">
         <header class="section-head">
-          <h2 class="sec-title">按线体网络拓扑</h2>
-          <span class="card-subtitle">{{ data?.lines?.length || 0 }} 个线体 | {{ data?.lines?.reduce((sum, l) => (sum + (l.servers?.length || 0) + (l.aging_racks?.length || 0) + (l.wifi_aps?.length || 0)), 0) }} 个设备</span>
+          <h2 class="sec-title">按线体网络健康度</h2>
+          <span class="card-subtitle">{{ activeLines.length }} 条线体在网 | 共 {{ data?.total_devices ?? 0 }} 台设备</span>
         </header>
-        <div class="topology-grid">
+        <div class="health-grid">
           <div
-            v-for="line in data?.lines ?? []"
-            :key="line.line"
-            class="line-col"
+            v-for="ls in activeLines"
+            :key="ls.line"
+            class="line-health"
+            :class="'lv-' + ls.level"
           >
-            <div class="line-header">
-              {{ line.line }}
-              <span class="line-count">
-                <span class="count" title="服务器">{{ line.servers?.length || 0 }}</span>
-                <span class="count" title="老化架">{{ line.aging_racks?.length || 0 }}</span>
-                <span class="count" title="WiFi AP">{{ line.wifi_aps?.length || 0 }}</span>
+            <div class="lh-top">
+              <span class="lh-name">{{ ls.line }}</span>
+              <span class="lh-pill">
+                <template v-if="ls.level === 'ok'"><span class="bi bi-check-circle-fill"></span>全部正常</template>
+                <template v-else><span class="bi bi-exclamation-triangle-fill"></span>异常 {{ ls.offline }} 台</template>
               </span>
             </div>
-            <div class="line-body">
-              <!-- 服务器 -->
-              <div class="device-row" v-if="line.servers?.length">
-                <div class="device-label">服务器</div>
-                <div class="device-list">
-                  <div class="device-item server" v-for="s in line.servers" :key="s.id">
-                    <span class="device-icon bi bi-server"></span>
-                    <span class="device-name">{{ s.name }}</span>
-                    <span class="device-tag" :class="tagClass(s.name)">{{ s.name }}</span>
-                  </div>
-                </div>
-              </div>
-              <div class="device-row empty-row" v-else>
-                <div class="device-label">服务器</div>
-                <div class="device-list"><span class="empty-text">-</span></div>
-              </div>
 
-              <!-- 老化架 -->
-              <div class="device-row" v-if="line.aging_racks?.length">
-                <div class="device-label">老化架</div>
-                <div class="device-list">
-                  <div class="device-item aging" v-for="a in line.aging_racks" :key="a.id">
-                    <span class="device-icon bi bi-box-seam"></span>
-                    <span class="device-name">{{ a.name }}</span>
-                    <span class="device-tag" :class="{ 'tag-warn': a.status !== '正常', 'tag-ok': a.status === '正常' }">
-                      {{ a.status !== '正常' ? '⚠️' : '' }}{{ a.slots }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div class="device-row empty-row" v-else>
-                <div class="device-label">老化架</div>
-                <div class="device-list"><span class="empty-text">-</span></div>
-              </div>
-
-              <!-- AP -->
-              <div class="device-row" v-if="line.wifi_aps?.length">
-                <div class="device-label">WiFi AP</div>
-                <div class="device-list">
-                  <div class="device-item ap" v-for="ap in line.wifi_aps" :key="ap.id">
-                    <span class="device-icon bi bi-router"></span>
-                    <span class="device-name">{{ ap.ssid || 'AP' }}</span>
-                    <span class="ap-bar" :class="{ offline: ap.status !== '在线' }"></span>
-                  </div>
-                </div>
-              </div>
-              <div class="device-row empty-row" v-else>
-                <div class="device-label">WiFi AP</div>
-                <div class="device-list"><span class="empty-text">-</span></div>
-              </div>
+            <div class="lh-metric">
+              <span class="lh-rate">{{ ls.rate }}<small>%</small></span>
+              <span class="lh-frac">在线 <b>{{ ls.online }}</b> / {{ ls.total }} 台</span>
             </div>
+
+            <div class="lh-bar"><i :style="{ width: ls.rate + '%' }"></i></div>
+
+            <div class="lh-types">
+              <span class="lh-chip" :class="{ off: ls.servers.off }">
+                <span class="bi bi-server"></span>服务器 {{ ls.servers.total }}<em v-if="ls.servers.off">-{{ ls.servers.off }}</em>
+              </span>
+              <span class="lh-chip" :class="{ off: ls.racks.off }">
+                <span class="bi bi-box-seam"></span>老化架 {{ ls.racks.total }}<em v-if="ls.racks.off">-{{ ls.racks.off }}</em>
+              </span>
+              <span class="lh-chip" :class="{ off: ls.aps.off }">
+                <span class="bi bi-router"></span>AP {{ ls.aps.total }}<em v-if="ls.aps.off">-{{ ls.aps.off }}</em>
+              </span>
+            </div>
+          </div>
+
+          <div v-if="!activeLines.length" class="lh-empty">
+            <span class="bi bi-inbox"></span>暂无线体设备数据
           </div>
         </div>
       </section>
@@ -129,20 +107,40 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
 import { dashboardApi, networkApi } from '@/api'
+import StatCard from '@/components/common/StatCard.vue'
 
 const data = ref(null)
 let gaugeChart = null
 
-const tagClass = (name) => {
-  if (!name) return 'tag-default'
-  if (name.includes('信创') || name.includes('Kylin') || name.includes('KEY')) return 'tag-ok'
-  if (name.includes('PXE') || name.includes('X86')) return 'tag-info'
-  if (name.includes('DHCP')) return 'tag-warn'
-  return 'tag-default'
-}
+// 每条线体的健康概览：在线/总数、健康率、状态级别、三类设备各自离线数
+// —— 汇报视角：弱化单个设备名，突出“哪条线体有问题、异常几台”（离线明细仍在右侧列表可查）
+const activeLines = computed(() =>
+  (data.value?.lines ?? [])
+    .map((line) => {
+      const servers = line.servers ?? []
+      const racks   = line.aging_racks ?? []
+      const aps     = line.wifi_aps ?? []
+      const sOff = servers.filter(s => s.status !== '在线').length
+      const rOff = racks.filter(a => a.status !== '正常').length
+      const aOff = aps.filter(ap => ap.status !== '在线').length
+      const total   = servers.length + racks.length + aps.length
+      const offline = sOff + rOff + aOff
+      const online  = total - offline
+      const rate    = total ? Math.round(online / total * 100) : 0
+      let level = 'empty'
+      if (total > 0) level = offline === 0 ? 'ok' : (rate >= 70 ? 'warn' : 'danger')
+      return {
+        line: line.line, total, online, offline, rate, level,
+        servers: { total: servers.length, off: sOff },
+        racks:   { total: racks.length,   off: rOff },
+        aps:     { total: aps.length,     off: aOff },
+      }
+    })
+    .filter(ls => ls.total > 0)
+)
 
 const typeClass = (type) => {
   if (type === '服务器') return 'type-server'
@@ -164,63 +162,51 @@ const loadData = async () => {
 
 const renderGauge = () => {
   const rate = data.value?.online_rate ?? 0
+  // 阈值配色：≥90 绿 / ≥70 黄 / 其余红，与健康卡状态色统一
+  const rateColor = rate >= 90 ? '#10B981' : (rate >= 70 ? '#F59E0B' : '#EF4444')
   if (gaugeChart) gaugeChart.dispose()
   gaugeChart = echarts.init(document.getElementById('gauge'))
 
+  // 简洁环形进度：去掉刻度/锚点/指针，只保留进度环 + 中心超大在线率数字
   gaugeChart.setOption({
     series: [ {
       type: 'gauge',
-      startAngle: 210,
-      endAngle: -30,
+      startAngle: 90,
+      endAngle: -270,
       min: 0,
       max: 100,
-      radius: '90%', // 给边缘刻度和数字留出安全边距
-      center: ['50%', '55%'],
-      progress: { show: true, width: 14 },
-      axisLine: {
-        lineStyle: {
-          width: 14,
-          color: [
-            [0.3, '#EF4444'],
-            [0.7, '#F59E0B'],
-            [1, '#10B981'],
-          ],
-        },
-      },
-      pointer: {
+      radius: '88%',
+      center: ['50%', '52%'],
+      pointer: { show: false },
+      progress: {
         show: true,
-        length: '55%',
-        width: 4,
-        itemStyle: { color: '#1F2937' },
+        overlap: false,
+        roundCap: true,
+        clip: false,
+        width: 16,
+        itemStyle: { color: rateColor },
       },
-      axisTick: { show: true, length: 5, lineStyle: { color: '#999', width: 1 } },
-      splitLine: { show: true, length: 10, lineStyle: { color: '#666', width: 2 } },
-      axisLabel: {
-        show: true,
-        distance: 14,
-        color: '#6B7280',
-        fontSize: 10,
-      },
-      anchor: {
-        show: true,
-        size: 8,
-        itemStyle: { color: '#1F2937' },
-      },
+      axisLine: { lineStyle: { width: 16, color: [[1, '#EEF2F7']] } },
+      splitLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { show: false },
+      anchor: { show: false },
       title: {
         show: true,
-        offsetCenter: [0, '30%'],
-        fontSize: 16,
+        offsetCenter: [0, '34%'],
+        fontSize: 15,
+        fontWeight: 600,
         color: '#6B7280',
       },
       detail: {
         valueAnimation: true,
-        offsetCenter: [0, '-8%'], // 👈 修改：从 -2% -> 5%，数字下移，避免和指针根部重叠
-        fontSize: 25,            // 👈 修改：从 32 -> 28，数字适当缩小，防止溢出
-        fontWeight: 700,
+        offsetCenter: [0, '-2%'],
+        fontSize: 44,
+        fontWeight: 800,
         formatter: '{value}%',
-        color: rate >= 90 ? '#10B981' : (rate >= 70 ? '#F59E0B' : '#EF4444'),
+        color: rateColor,
       },
-      data: [{ value: rate, name: '在线率' }],
+      data: [{ value: rate, name: '设备在线率' }],
     } ],
   })
 }
@@ -251,7 +237,11 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .page {
+  /* 关键：全局 .page 为 height:100vh，但看板实际渲染在 .content（已扣除顶栏+内边距）内，
+     100vh 会超出内容区被 overflow:hidden 裁掉底部。改为 height:100% 贴合内容区，杜绝裁切。 */
+  height: 100%;
   padding: 0px 24px;
+  box-sizing: border-box;
 }
 
 /* ---- 顶部统计区 ---- */
@@ -264,41 +254,65 @@ onBeforeUnmount(() => {
   margin-right: -8px;   /* 👈 减小右侧外边距：从0→-8px */
   align-items: stretch;
   height: 180px;
+  flex-shrink: 0;
 }
 
 .stat-pair {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   flex: 1;
 }
-
-.stat-box {
+/* KPI 卡统一走 StatCard 组件；以下为汇报场景对这两张 hero 卡的视觉强化 */
+.stat-pair .stat-card {
   flex: 1;
-  background: #fff;
-  border-radius: 12px;
-  padding: 10px 16px;
+  min-width: 0;
+  position: relative;
+  padding: 16px 20px;
+  border-radius: 16px;
+  /* 居中堆叠：单列网格，图标 → 数字 → 标签 → 占比 全部水平+垂直居中 */
+  grid-template-columns: 1fr;
+  justify-items: center;
+  align-content: center;
+  row-gap: 6px;
   text-align: center;
-  border: 1px solid var(--c-divider);
-  box-shadow: 0 2px 6px rgba(15, 23, 42, .03);
-  display: flex;          /* 👈 新增 */
-  flex-direction: column; /* 👈 新增 */
-  justify-content: center;/* 👈 新增：数字和文字在卡片内垂直居中 */
+  overflow: hidden;
 }
-
-.stat-box .stat-num {
-  font-size: 42px;
-  font-weight: 700;
-  line-height: 1.1;
+/* 左侧主题色竖条：一眼区分在线/离线 */
+.stat-pair .net-stat::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 5px;
+  z-index: 2;
 }
-
-.stat-box.online .stat-num { color: var(--ok); }
-.stat-box.offline .stat-num { color: var(--err); }
-
-.stat-box .stat-label {
-  margin-top: 4px;
-  color: var(--c-text-3);
-  font-size: 13px;
+.net-online::before  { background: linear-gradient(180deg, #34D399, #059669); }
+.net-offline::before { background: linear-gradient(180deg, #F87171, #DC2626); }
+/* 卡片底色：主题色淡渐变 → 白，比纯白更有层次 */
+.stat-pair .net-online {
+  background: linear-gradient(135deg, #ECFDF5 0%, #FFFFFF 62%) !important;
+  border-color: rgba(16, 185, 129, .26) !important;
+  box-shadow: 0 6px 18px -8px rgba(16, 185, 129, .35) !important;
 }
+.stat-pair .net-offline {
+  background: linear-gradient(135deg, #FEF2F2 0%, #FFFFFF 62%) !important;
+  border-color: rgba(239, 68, 68, .26) !important;
+  box-shadow: 0 6px 18px -8px rgba(239, 68, 68, .35) !important;
+}
+/* 图标徽章：圆角实底 + 白色图标 + 主题色投影 */
+.stat-pair .net-stat :deep(.icon-box) {
+  grid-row: auto; grid-column: 1;   /* 取消全局 1/span2 左栏定位，改为堆叠首行居中 */
+  width: 52px; height: 52px;
+  border-radius: 15px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 2px;
+}
+.net-online  :deep(.icon-box) { background: linear-gradient(135deg, #10B981, #059669); box-shadow: 0 8px 18px -6px rgba(16, 185, 129, .6); }
+.net-offline :deep(.icon-box) { background: linear-gradient(135deg, #EF4444, #DC2626); box-shadow: 0 8px 18px -6px rgba(239, 68, 68, .6); }
+.stat-pair .net-stat :deep(.icon-box span) { color: #fff !important; font-size: 28px; }
+/* 超大主题色数字：单列居中，去掉避让 delta 的右 padding */
+.net-online  :deep(.num) { grid-column: 1; padding-right: 0; text-align: center; color: #059669; font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
+.net-offline :deep(.num) { grid-column: 1; padding-right: 0; text-align: center; color: #DC2626; font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
+.stat-pair .net-stat :deep(.label) { grid-column: 1; padding-right: 0; text-align: center; font-size: 15px; font-weight: 600; color: var(--c-text-2); letter-spacing: .3px; }
 
 .gauge-wrapper {
   width: 320px;
@@ -321,6 +335,8 @@ onBeforeUnmount(() => {
 .bottom-section {
   display: flex;
   gap: 12px;
+  flex: 1;
+  min-height: 0;
 }
 
 .topology-card {
@@ -330,6 +346,8 @@ onBeforeUnmount(() => {
   border: 1px solid var(--c-divider);
   box-shadow: 0 2px 6px rgba(15, 23, 42, .03);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .offline-card {
@@ -344,10 +362,11 @@ onBeforeUnmount(() => {
 }
 
 .section-head {
+  position: relative;
   padding: 12px 16px;
   border-bottom: 1px solid var(--c-divider);
   display: flex;
-  justify-content: space-between;
+  justify-content: center;   /* 标题居中 */
   align-items: center;
 }
 
@@ -361,150 +380,146 @@ onBeforeUnmount(() => {
 }
 
 .card-subtitle {
+  position: absolute;   /* 靠右，不占中间标题的居中位 */
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 12px;
   color: var(--c-text-3);
   font-weight: 400;
 }
 
-/* ---- 拓扑网格 ---- */
-.topology-grid {
+/* ---- 线体健康概览卡 ---- */
+.health-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  background: var(--c-divider);
-}
-
-.line-col {
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.line-header {
-  padding: 8px 6px;
-  text-align: center;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--c-text);
-  background: #F7FAFF;
-  border-bottom: 1px solid var(--c-divider);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-}
-
-.line-count {
-  display: flex;
-  gap: 4px;
-}
-
-.count {
-  font-size: 10px;
-  color: var(--c-text-3);
-  background: #fff;
-  padding: 1px 4px;
-  border-radius: 3px;
-  border: 1px solid var(--c-divider);
-}
-
-.line-body {
-  padding: 6px 4px;
+  gap: 12px;
+  padding: 14px 16px;
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  min-height: 0;
   overflow-y: auto;
+  align-content: start;
 }
+@media (max-width: 1200px) { .health-grid { grid-template-columns: repeat(2, 1fr); } }
 
-.device-row {
+.line-health {
+  position: relative;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 14px 16px 13px;
+  border: 1px solid var(--c-divider);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.line-health:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px -12px rgba(15, 23, 42, .28);
+}
+/* 左侧状态色条 */
+.line-health::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+}
+/* 三档状态配色：绿=全部正常 / 黄=轻度异常 / 红=严重异常 */
+.lv-ok::before     { background: #10B981; }
+.lv-warn::before   { background: #F59E0B; }
+.lv-danger::before { background: #EF4444; }
+.lv-ok     { background: linear-gradient(135deg, #F0FDF4 0%, #fff 55%); border-color: rgba(16, 185, 129, .25); }
+.lv-warn   { background: linear-gradient(135deg, #FFFBEB 0%, #fff 55%); border-color: rgba(245, 158, 11, .3); }
+.lv-danger { background: linear-gradient(135deg, #FEF2F2 0%, #fff 55%); border-color: rgba(239, 68, 68, .32); }
+
+.lh-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.lh-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--c-text);
+  letter-spacing: .3px;
+}
+.lh-pill {
+  display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 4px;
-}
-
-.device-label {
-  font-size: 10px;
-  color: var(--c-text-3);
-  font-weight: 600;
-  width: 48px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
   white-space: nowrap;
 }
+.lv-ok .lh-pill     { background: var(--ok-bg);   color: #059669; }
+.lv-warn .lh-pill   { background: var(--warn-bg); color: #B45309; }
+.lv-danger .lh-pill { background: var(--err-bg);  color: #DC2626; }
 
-.device-list {
-  flex: 1;
+.lh-metric {
   display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-}
-
-.empty-row {
-  color: var(--c-text-mute);
-  background: #f9fafb;
-}
-
-.empty-text {
-  font-size: 10px;
-  color: var(--c-text-mute);
-}
-
-.device-item {
-  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 3px 6px;
-  border-radius: 5px;
-  background: #F7FAFF;
-  font-size: 10px;
-  line-height: 1.2;
+  gap: 4px;
 }
-
-.device-item.empty {
-  color: var(--c-text-mute);
-  background: transparent;
+.lh-rate {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -1px;
 }
+.lh-rate small { font-size: 18px; font-weight: 700; margin-left: 1px; }
+.lv-ok .lh-rate     { color: #059669; }
+.lv-warn .lh-rate   { color: #D97706; }
+.lv-danger .lh-rate { color: #DC2626; }
+.lh-frac { font-size: 13px; color: var(--c-text-3); }
+.lh-frac b { color: var(--c-text); font-size: 14px; }
 
-.device-icon {
-  font-size: 11px;
-  color: var(--c-text-3);
-  flex-shrink: 0;
-}
-
-.device-name {
-  flex: 1;
-  white-space: nowrap;
+.lh-bar {
+  align-self: stretch;   /* 居中堆叠下仍保持进度条满宽，不塔缩 */
+  height: 7px;
+  border-radius: 999px;
+  background: #EEF2F7;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+.lh-bar i { display: block; height: 100%; border-radius: 999px; transition: width .5s ease; }
+.lv-ok .lh-bar i     { background: linear-gradient(90deg, #34D399, #10B981); }
+.lv-warn .lh-bar i   { background: linear-gradient(90deg, #FBBF24, #F59E0B); }
+.lv-danger .lh-bar i { background: linear-gradient(90deg, #F87171, #EF4444); }
+
+.lh-types { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.lh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
   color: var(--c-text-2);
+  background: #F5F7FB;
+  border: 1px solid var(--c-divider);
+  border-radius: 7px;
+  padding: 3px 8px;
 }
+.lh-chip .bi { font-size: 12px; color: var(--c-text-3); }
+.lh-chip em { font-style: normal; font-weight: 700; color: #DC2626; }
+.lh-chip.off { background: var(--err-bg); border-color: rgba(239, 68, 68, .3); }
 
-.device-tag {
-  font-size: 9px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
+.lh-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 0;
+  color: var(--c-text-mute);
+  font-size: 14px;
 }
-
-.tag-default { background: #E5E9F2; color: #4B5563; }
-.tag-ok      { background: var(--ok-bg); color: #059669; }
-.tag-info    { background: var(--info-bg); color: #1D4ED8; }
-.tag-warn    { background: var(--warn-bg); color: #B45309; }
-
-.ap-bar {
-  width: 20px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--ok);
-  flex-shrink: 0;
-}
-.ap-bar.offline {
-  background: var(--err);
-}
+.lh-empty .bi { font-size: 32px; }
 
 /* ---- 离线列表 ---- */
 .offline-body {
@@ -520,11 +535,12 @@ onBeforeUnmount(() => {
 }
 
 .all-ok {
+  height: 100%;              /* 撑满 offline-body 内容区 */
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 40px 0;
+  justify-content: center;   /* 垂直居中 */
+  gap: 12px;
   color: var(--ok);
   font-size: 15px;
 }
@@ -589,6 +605,10 @@ onBeforeUnmount(() => {
 }
 
 .badge {
+  position: absolute;   /* 靠右，不占中间标题的居中位 */
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
   padding: 2px 8px;
   border-radius: 12px;
   font-size: 12px;
@@ -610,7 +630,7 @@ onBeforeUnmount(() => {
 .offline-body::-webkit-scrollbar-thumb { background: #D8DEEA; border-radius: 4px; }
 .offline-body::-webkit-scrollbar-track { background: transparent; }
 
-.line-body::-webkit-scrollbar { width: 5px; }
-.line-body::-webkit-scrollbar-thumb { background: #D8DEEA; border-radius: 4px; }
-.line-body::-webkit-scrollbar-track { background: transparent; }
+.health-grid::-webkit-scrollbar { width: 6px; }
+.health-grid::-webkit-scrollbar-thumb { background: #D8DEEA; border-radius: 4px; }
+.health-grid::-webkit-scrollbar-track { background: transparent; }
 </style>

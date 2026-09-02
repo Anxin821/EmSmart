@@ -600,6 +600,22 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 溢出修复：全局 .page 高度为 100vh，比内容区（已减去顶栏 56px + 内边距）高，
+   岗位 >4 个换行时第二行会被裁掉且无法滚动。这里让 .page 撑满内容区，
+   并把滚动交给 .duties-grid，多行时可纵向滚动查看全部岗位。 */
+.page {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.duties-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  align-content: flex-start;
+}
+
 /* —— 卡片本体：height:100% 撑满列 → 与同 row 最长的那条卡严格等高；max-height 520px 保底 —— */
 .duty-el-card {
   display: flex;
