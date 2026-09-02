@@ -285,18 +285,18 @@ onBeforeUnmount(() => {
   width: 5px;
   z-index: 2;
 }
-.net-online::before  { background: linear-gradient(180deg, #34D399, #059669); }
-.net-offline::before { background: linear-gradient(180deg, #F87171, #DC2626); }
+.net-online::before  { background: transparent; }   /* 去掉绿边：在线卡不再显示左侧绿条 */
+.net-offline::before { background: transparent; }   /* 去掉红边：离线卡不再显示左侧红条 */
 /* 卡片底色：主题色淡渐变 → 白，比纯白更有层次 */
 .stat-pair .net-online {
   background: linear-gradient(135deg, #ECFDF5 0%, #FFFFFF 62%) !important;
-  border-color: rgba(16, 185, 129, .26) !important;
-  box-shadow: 0 6px 18px -8px rgba(16, 185, 129, .35) !important;
+  border-color: var(--c-divider) !important;   /* 去掉绿边：改中性描边 */
+  box-shadow: 0 2px 6px rgba(15, 23, 42, .03) !important;   /* 去掉绿色光晕 */
 }
 .stat-pair .net-offline {
   background: linear-gradient(135deg, #FEF2F2 0%, #FFFFFF 62%) !important;
-  border-color: rgba(239, 68, 68, .26) !important;
-  box-shadow: 0 6px 18px -8px rgba(239, 68, 68, .35) !important;
+  border-color: var(--c-divider) !important;   /* 去掉红边：改中性描边 */
+  box-shadow: 0 2px 6px rgba(15, 23, 42, .03) !important;   /* 去掉红色光晕 */
 }
 /* 图标徽章：圆角实底 + 白色图标 + 主题色投影 */
 .stat-pair .net-stat :deep(.icon-box) {
@@ -429,10 +429,10 @@ onBeforeUnmount(() => {
   width: 4px;
 }
 /* 三档状态配色：绿=全部正常 / 黄=轻度异常 / 红=严重异常 */
-.lv-ok::before     { background: #10B981; }
+.lv-ok::before     { background: transparent; }   /* 去掉绿边：正常线体不显示左侧绿条 */
 .lv-warn::before   { background: #F59E0B; }
 .lv-danger::before { background: #EF4444; }
-.lv-ok     { background: linear-gradient(135deg, #F0FDF4 0%, #fff 55%); border-color: rgba(16, 185, 129, .25); }
+.lv-ok     { background: linear-gradient(135deg, #F0FDF4 0%, #fff 55%); border-color: var(--c-divider); }   /* 去掉绿边：改中性描边 */
 .lv-warn   { background: linear-gradient(135deg, #FFFBEB 0%, #fff 55%); border-color: rgba(245, 158, 11, .3); }
 .lv-danger { background: linear-gradient(135deg, #FEF2F2 0%, #fff 55%); border-color: rgba(239, 68, 68, .32); }
 
