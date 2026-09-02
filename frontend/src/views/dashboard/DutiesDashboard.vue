@@ -10,15 +10,15 @@
     <div class="duties-grid" style="width:100%; min-width:0; box-sizing:border-box;">
       <div
         class="duty-col"
-        v-for="(duty, index) in duties"
+        v-for="duty in duties"
         :key="duty.id"
-        :style="{ '--duty-accent': getAccent(index), width:'100%' }"
+        :style="{ '--duty-accent': getAccent(duty), width:'100%' }"
       >
         <el-card class="duty-el-card">
           <template #header>
             <div class="duty-header">
               <div class="duty-header-row">
-                <span class="duty-icon">{{ getIcon(index) }}</span>
+                <span class="duty-icon">{{ getIcon(duty) }}</span>
                 <div class="duty-title">
                   <div class="duty-name">{{ duty.name }}</div>
                   <div class="duty-role">{{ duty.title }}</div>
@@ -98,8 +98,8 @@
         <el-form :model="itemForm" label-width="84px" label-position="right">
           <!-- 所属岗位：改成只读 chip（不再用 disabled input，更美观） -->
           <el-form-item label="所属岗位">
-            <div class="item-duty-chip" :style="{ '--duty-accent': (itemDuty ? presetAccents[ duties.value.indexOf(itemDuty) % presetAccents.length ] : presetAccents[0]) }">
-              <span class="item-duty-avatar">{{ itemDuty ? presetIcons[ duties.value.indexOf(itemDuty) % presetIcons.length ] : '👤' }}</span>
+            <div class="item-duty-chip" :style="{ '--duty-accent': getAccent(itemDuty) }">
+              <span class="item-duty-avatar">{{ getIcon(itemDuty) }}</span>
               <span class="item-duty-name">{{ itemDuty?.name }}</span>
               <span class="item-duty-dot">/</span>
               <span class="item-duty-title">{{ itemDuty?.title }}</span>
@@ -357,12 +357,19 @@ const toggleActiveRow = (dutyId, idx) => {
 }
 const isRowActive = (dutyId, idx) => activeRowKey.value === `${dutyId}-${idx}`
 
-// 预设卡片颜色 & 图标（超过 4 个岗位时循环使用，前端视觉不依赖后端存储）
-const presetAccents = ['#4f46e5', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0ea5e9', '#be123c']
-const presetIcons   = ['🔧', '💻', '🏭', '📡', '🔬', '🎯', '📊', '👷']
+// 按岗位职称固定映射图标与主题色（同职称 → 同图标同色，不再随列表顺序变化）
+const titleTheme = {
+  '工程师':     { icon: '💻', accent: '#4f46e5' },
+  '高级工程师': { icon: '🔬', accent: '#7c3aed' },
+  '技术员':     { icon: '🔧', accent: '#0891b2' },
+  '主管':       { icon: '🎯', accent: '#d97706' },
+  '组长':       { icon: '👷', accent: '#059669' },
+}
+// 未知/自定义职称的兜底样式
+const fallbackTheme = { icon: '👤', accent: '#0ea5e9' }
 
-const getAccent = (i) => presetAccents[i % presetAccents.length]
-const getIcon   = (i) => presetIcons[i % presetIcons.length]
+const getAccent = (duty) => (titleTheme[duty?.title] || fallbackTheme).accent
+const getIcon   = (duty) => (titleTheme[duty?.title] || fallbackTheme).icon
 
 // ================= 职责条目弹窗 =================
 const itemModalVisible = ref(false)
