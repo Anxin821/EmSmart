@@ -1,12 +1,11 @@
 <template>
   <div id="page-container" class="page">
-    <div class="page-header">
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-warning" @click="handleCheckAll">
-          <span class="bi bi-lightning-charge"></span>一键检测
-        </button>
-      </div>
-    </div>
+    <!-- 操作按钮通过 Teleport 注入全局顶栏左侧空白区，不占用看板纵向空间 -->
+    <Teleport defer to=".topbar-actions">
+      <button class="btn btn-sm btn-outline-warning" @click="handleCheckAll">
+        <span class="bi bi-lightning-charge"></span>一键检测
+      </button>
+    </Teleport>
 
     <!-- 顶部统计 + 仪表盘 -->
     <div class="top-section">
@@ -253,11 +252,6 @@ onBeforeUnmount(() => {
 <style scoped>
 .page {
   padding: 0px 24px;
-}
-.page-header {
-  justify-content: flex-end;
-  padding: 10px var(--gap-block);
-  margin-bottom: 12px;
 }
 
 /* ---- 顶部统计区 ---- */

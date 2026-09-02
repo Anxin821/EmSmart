@@ -1,14 +1,11 @@
 <template>
   <div class="page" style="width:100%; min-width:0; box-sizing:border-box;">
-    <div class="page-header" style="width:100%; min-width:0;">
-      <div class="d-flex align-items-center gap-2">
-        <template v-if="userStore.canEdit">
-          <button class="btn btn-sm btn-outline-primary" @click="openDutyAddModal">
-            <span class="bi bi-person-plus"></span>新增岗位
-          </button>
-        </template>
-      </div>
-    </div>
+    <!-- 操作按钮通过 Teleport 注入全局顶栏左侧空白区，不占用看板纵向空间 -->
+    <Teleport defer to=".topbar-actions">
+      <button v-if="userStore.canEdit" class="btn btn-sm btn-outline-primary" @click="openDutyAddModal">
+        <span class="bi bi-person-plus"></span>新增岗位
+      </button>
+    </Teleport>
 
     <div class="duties-grid" style="width:100%; min-width:0; box-sizing:border-box;">
       <div
@@ -603,11 +600,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-header {
-  justify-content: flex-end;
-  padding: 10px var(--gap-block);
-  margin-bottom: 12px;
-}
 /* —— 卡片本体：height:100% 撑满列 → 与同 row 最长的那条卡严格等高；max-height 520px 保底 —— */
 .duty-el-card {
   display: flex;

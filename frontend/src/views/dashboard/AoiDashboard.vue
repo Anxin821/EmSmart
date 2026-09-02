@@ -1,16 +1,15 @@
 <template>
   <div id="aoi-board" class="page">
-    <div class="page-header">
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-primary" @click="exportPPT" :disabled="exporting">
-          <span class="bi" :class="exporting ? 'bi-hourglass-split' : 'bi-file-earmark-ppt'"></span>
-          {{ exporting ? '导出中...' : '导出PPT' }}
-        </button>
-        <router-link class="btn btn-sm btn-primary" to="/devices">
-          <span class="bi bi-arrow-right"></span>进入管理
-        </router-link>
-      </div>
-    </div>
+    <!-- 操作按钮通过 Teleport 注入全局顶栏左侧空白区，不占用看板纵向空间 -->
+    <Teleport defer to=".topbar-actions">
+      <button class="btn btn-sm btn-outline-primary" @click="exportPPT" :disabled="exporting">
+        <span class="bi" :class="exporting ? 'bi-hourglass-split' : 'bi-file-earmark-ppt'"></span>
+        {{ exporting ? '导出中...' : '导出PPT' }}
+      </button>
+      <router-link class="btn btn-sm btn-primary" to="/devices">
+        <span class="bi bi-arrow-right"></span>进入管理
+      </router-link>
+    </Teleport>
 
     <div class="cockpit">
     <!-- KPI 指标：设备总数 / 可用率 / 本月产量 / 本月直通率 -->
@@ -230,12 +229,8 @@ onBeforeUnmount(() => {
 // 导出PPT：整屏看板截图，仅一页
 const exportPPT = async () => {
   exporting.value = true
-  const boardEl = document.getElementById('aoi-board')
-  const headerEl = boardEl?.querySelector('.page-header')
   try {
-    // 截图前临时隐藏右上角操作按钮，导出图更干净
-    if (headerEl) headerEl.style.visibility = 'hidden'
-    await new Promise(r => setTimeout(r, 60))
+    // 操作按钮已移至全局顶栏（不在看板截图范围内），无需再临时隐藏
     const boardImg = await captureElement('aoi-board')
     const pptx = createPresentation('AOI&AI 设备监控看板')
     addFullImageSlide(pptx, boardImg)
@@ -245,7 +240,6 @@ const exportPPT = async () => {
     console.error('导出PPT失败:', error)
     alert('导出PPT失败，请重试')
   } finally {
-    if (headerEl) headerEl.style.visibility = ''
     exporting.value = false
   }
 }
@@ -256,11 +250,6 @@ const exportPPT = async () => {
 .page {
   height: 100%;
   overflow: hidden;
-}
-.page-header {
-  justify-content: flex-end;
-  padding: 10px var(--gap-block);
-  margin-bottom: 12px;
 }
 .cockpit {
   flex: 1;

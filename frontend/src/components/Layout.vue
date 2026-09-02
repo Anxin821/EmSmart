@@ -66,6 +66,9 @@
     <!-- 主内容区 -->
     <main class="main">
       <div class="topbar">
+        <!-- 看板操作按钮承载区：各看板通过 <Teleport to=".topbar-actions"> 注入 -->
+        <div class="topbar-actions"></div>
+
         <!-- 用户区 -->
         <div class="user-right">
           <div class="user" @mouseenter="showMenu = true" @mouseleave="showMenu = false">
