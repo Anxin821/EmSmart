@@ -48,9 +48,9 @@
           >
             <div class="lh-top">
               <span class="lh-name">{{ ls.line }}</span>
-              <span class="lh-pill">
-                <template v-if="ls.level === 'ok'"><span class="bi bi-check-circle-fill"></span>全部正常</template>
-                <template v-else><span class="bi bi-exclamation-triangle-fill"></span>异常 {{ ls.offline }} 台</template>
+              <!-- 正常时不再冗余显示“全部正常”（绿色 100% + 进度条已表达）；仅异常时提醒 -->
+              <span v-if="ls.level !== 'ok'" class="lh-pill">
+                <span class="bi bi-exclamation-triangle-fill"></span>异常 {{ ls.offline }} 台
               </span>
             </div>
 
@@ -405,7 +405,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 10px;
+  gap: 0px;
   padding: 14px 16px 13px;
   border: 1px solid var(--c-divider);
   border-radius: 12px;
@@ -489,7 +489,14 @@ onBeforeUnmount(() => {
 .lv-warn .lh-bar i   { background: linear-gradient(90deg, #FBBF24, #F59E0B); }
 .lv-danger .lh-bar i { background: linear-gradient(90deg, #F87171, #EF4444); }
 
-.lh-types { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+/* 设备芯片：整块流动 + 文字不折行。能并排就并排，放不下时整块换到下一行，
+   绝不把“服务器 3”拆成两行（之前用刚性 2 列网格，窄卡下 auto 列被压缩导致芯片内文字折行） */
+.lh-types {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
 .lh-chip {
   display: inline-flex;
   align-items: center;
@@ -499,7 +506,8 @@ onBeforeUnmount(() => {
   background: #F5F7FB;
   border: 1px solid var(--c-divider);
   border-radius: 7px;
-  padding: 3px 8px;
+  padding: 2px 7px;
+  white-space: nowrap;   /* 芯片文字（如“服务器 3”）不折行 */
 }
 .lh-chip .bi { font-size: 12px; color: var(--c-text-3); }
 .lh-chip em { font-style: normal; font-weight: 700; color: #DC2626; }
