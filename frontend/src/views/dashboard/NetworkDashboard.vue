@@ -11,6 +11,7 @@
     <div class="top-section">
       <div class="stat-pair">
         <StatCard
+          centered
           class="net-stat net-online"
           color="green"
           icon="bi bi-broadcast-pin"
@@ -18,6 +19,7 @@
           label="全局在线设备"
         />
         <StatCard
+          centered
           class="net-stat net-offline"
           color="red"
           icon="bi bi-wifi-off"
@@ -269,13 +271,8 @@ onBeforeUnmount(() => {
   position: relative;
   padding: 16px 20px;
   border-radius: 16px;
-  /* 居中堆叠：单列网格，图标 → 数字 → 标签 → 占比 全部水平+垂直居中 */
-  grid-template-columns: 1fr;
-  justify-items: center;
-  align-content: center;
-  row-gap: 6px;
-  text-align: center;
   overflow: hidden;
+  /* 居中堆叠布局已由 StatCard 的 centered prop 提供，这里只保留 hero 卡专属尺寸/圆角 */
 }
 /* 左侧主题色竖条：一眼区分在线/离线 */
 .stat-pair .net-stat::before {
@@ -300,19 +297,18 @@ onBeforeUnmount(() => {
 }
 /* 图标徽章：圆角实底 + 白色图标 + 主题色投影 */
 .stat-pair .net-stat :deep(.icon-box) {
-  grid-row: auto; grid-column: 1;   /* 取消全局 1/span2 左栏定位，改为堆叠首行居中 */
+  /* grid 定位由 centered prop 处理，这里只做 hero 卡图标徽章的尺寸/圆角 */
   width: 52px; height: 52px;
   border-radius: 15px;
   display: flex; align-items: center; justify-content: center;
-  margin-bottom: 2px;
 }
 .net-online  :deep(.icon-box) { background: linear-gradient(135deg, #10B981, #059669); box-shadow: 0 8px 18px -6px rgba(16, 185, 129, .6); }
 .net-offline :deep(.icon-box) { background: linear-gradient(135deg, #EF4444, #DC2626); box-shadow: 0 8px 18px -6px rgba(239, 68, 68, .6); }
 .stat-pair .net-stat :deep(.icon-box span) { color: #fff !important; font-size: 28px; }
-/* 超大主题色数字：单列居中，去掉避让 delta 的右 padding */
-.net-online  :deep(.num) { grid-column: 1; padding-right: 0; text-align: center; color: #059669; font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
-.net-offline :deep(.num) { grid-column: 1; padding-right: 0; text-align: center; color: #DC2626; font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
-.stat-pair .net-stat :deep(.label) { grid-column: 1; padding-right: 0; text-align: center; font-size: 15px; font-weight: 600; color: var(--c-text-2); letter-spacing: .3px; }
+/* 超大主题色数字：居中/去 padding 由 centered prop 处理，这里只保留 hero 卡的字号与主题色 */
+.net-online  :deep(.num) { color: #059669; font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
+.net-offline :deep(.num) { color: #DC2626; font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
+.stat-pair .net-stat :deep(.label) { font-size: 15px; font-weight: 600; color: var(--c-text-2); letter-spacing: .3px; }
 
 .gauge-wrapper {
   width: 320px;

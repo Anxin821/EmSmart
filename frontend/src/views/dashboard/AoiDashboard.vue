@@ -14,14 +14,14 @@
     <div class="cockpit">
     <!-- KPI 指标：设备总数 / 可用率 / 本月产量 / 本月直通率 -->
     <div class="stat-grid">
-      <StatCard color="blue" icon="bi bi-display-fill" :num="stats.total" label="设备总数" />
-      <StatCard color="green" icon="bi bi-check-circle-fill" :num="`${availability}%`">
+      <StatCard centered color="blue" icon="bi bi-display-fill" :num="stats.total" label="设备总数" />
+      <StatCard centered color="green" icon="bi bi-check-circle-fill" :num="`${availability}%`">
         <template #label>设备可用率（正常 {{ stats.normal }} / 故障 {{ stats.fault }}）</template>
       </StatCard>
-      <StatCard color="purple" icon="bi bi-box-seam-fill" :num="latestOutput">
+      <StatCard centered color="purple" icon="bi bi-box-seam-fill" :num="latestOutput">
         <template #label>本月产量 · 年累 {{ summary.total_output.toLocaleString() }}</template>
       </StatCard>
-      <StatCard color="yellow" icon="bi bi-bullseye" :num="`${latestYield}%`">
+      <StatCard centered color="yellow" icon="bi bi-bullseye" :num="`${latestYield}%`">
         <template #label>本月直通率 · 年均 {{ summary.yield_rate }}%</template>
       </StatCard>
     </div>
@@ -263,10 +263,5 @@ const exportPPT = async () => {
   height: auto;
   width: 100%;
 }
-/* KPI 卡副信息允许换行，避免被省略号截断（StatCard 为子组件，需 :deep 穿透） */
-.cockpit :deep(.stat-card .label) {
-  padding-right: 0;
-  white-space: normal;
-  line-height: 1.4;
-}
+/* KPI 卡居中已由 StatCard 的 centered prop 统一提供（见模板 <StatCard centered>），此处不再重复布局 CSS */
 </style>

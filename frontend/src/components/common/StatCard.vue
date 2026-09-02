@@ -6,7 +6,7 @@
   -->
   <div
     class="stat-card"
-    :class="[colorClass, { clickable }]"
+    :class="[colorClass, { clickable, centered }]"
     :style="cardStyle"
     @click="onClick"
   >
@@ -38,6 +38,7 @@
  *   delta?  —— 右上角小徽标文字（如 "正常率 98%"），传 ''/undefined/null 则不显示
  *   deltaType? —— 'up' | 'down' | 'muted'（默认 muted）
  *   clickable? boolean —— 整张卡是否鼠标可点击（cursor pointer + 轻微 hover）
+ *   centered?  boolean —— 内容单列居中堆叠（图标/数字/标签全居中），用于投屏汇报的 hero KPI 卡；默认 false 保持原布局
  * emits:
  *   'click' —— clickable=true 时点击整张卡触发
  */
@@ -50,7 +51,8 @@ const props = defineProps({
   label:     { type: String, default: '' },
   delta:     { type: [String, Number], default: '' },
   deltaType: { type: String, default: 'muted' },
-  clickable: { type: Boolean, default: false }
+  clickable: { type: Boolean, default: false },
+  centered:  { type: Boolean, default: false }
 })
 const emit = defineEmits(['click'])
 
@@ -130,4 +132,33 @@ const onClick = () => { if (props.clickable) emit('click') }
   box-sizing: border-box;
 }
 :deep(.delta) { grid-column: auto; }
+
+/* centered 变体：单列居中堆叠（图标 → 数字 → 标签 → delta 全部水平+垂直居中）
+   用于面向领导投屏的 hero KPI 卡；默认 false 时保持“图标左 + 文字右”原布局，不影响现有页面 */
+.stat-card.centered {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  align-content: center;
+  text-align: center;
+}
+.stat-card.centered :deep(.icon-box) {
+  grid-row: auto;      /* 取消默认跨两行左栏定位，回到堆叠首行 */
+  grid-column: 1;
+}
+.stat-card.centered :deep(.num),
+.stat-card.centered :deep(.label) {
+  grid-column: 1;
+  padding-right: 0;    /* 无 delta 避让需求，去掉右侧预留 */
+  text-align: center;
+}
+.stat-card.centered :deep(.label) {
+  white-space: normal; /* 长副信息允许换行居中，不被省略号截断 */
+  line-height: 1.4;
+}
+.stat-card.centered :deep(.delta) {
+  position: static;    /* 改为堆叠末尾的居中胶囊，不再绝对定位到右上角 */
+  grid-column: 1;
+  justify-self: center;
+  margin-top: 2px;
+}
 </style>

@@ -10,10 +10,11 @@
 
     <!-- 顶部 4 张统计卡：统一走 StatCard 组件（与其它看板观感一致） -->
     <div class="stat-grid kpi-row">
-      <StatCard color="blue" icon="bi bi-pc-display" :num="stats.total_devices" label="设备总数" />
-      <StatCard color="green" icon="bi bi-check-circle-fill" :num="stats.done_count" label="已杀毒" />
-      <StatCard color="yellow" icon="bi bi-clock-history" :num="stats.pending_count" label="待杀毒" />
+      <StatCard centered color="blue" icon="bi bi-pc-display" :num="stats.total_devices" label="设备总数" />
+      <StatCard centered color="green" icon="bi bi-check-circle-fill" :num="stats.done_count" label="已杀毒" />
+      <StatCard centered color="yellow" icon="bi bi-clock-history" :num="stats.pending_count" label="待杀毒" />
       <StatCard
+        centered
         color="red"
         icon="bi bi-shield-exclamation"
         :num="stats.overdue_count"
