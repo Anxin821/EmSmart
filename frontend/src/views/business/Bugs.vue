@@ -140,11 +140,9 @@
         <div class="col-6">
           <label class="small form-label">状态</label>
           <el-select v-model="form.status" style="width: 100%;">
-            <el-option label="新建" value="新建" />
-            <el-option label="确认" value="确认" />
+            <el-option label="确认新增" value="确认新增" />
             <el-option label="修复中" value="修复中" />
-            <el-option label="已解决" value="已解决" />
-            <el-option label="关闭" value="关闭" />
+            <el-option label="解决关闭" value="解决关闭" />
           </el-select>
         </div>
         <div class="col-6">
@@ -177,7 +175,7 @@
     >
       <el-form label-width="96px" label-position="right">
         <el-form-item label="当前状态">
-          <el-tag :type="flowRow?.status==='已解决'||flowRow?.status==='关闭' ? 'success' : flowRow?.status==='修复中' ? 'warning' : flowRow?.status==='确认' ? 'danger' : 'info'">
+          <el-tag :type="flowRow?.status==='解决关闭' ? 'success' : flowRow?.status==='修复中' ? 'warning' : flowRow?.status==='确认新增' ? 'danger' : 'info'">
             {{ flowRow?.status }}
           </el-tag>
         </el-form-item>
@@ -228,7 +226,7 @@ let abortController = null
 const flowModalVisible = ref(false)
 const flowRow = ref(null)
 const flowStatus = ref('')
-const FLOW_STATUSES = ['新建', '确认', '修复中', '已解决', '关闭']
+const FLOW_STATUSES = ['确认新增', '修复中', '解决关闭']
 const labelStyleNormal      = { color: 'var(--c-text-2)' }
 const labelStyleNoRequired  = { color: 'var(--c-text-2)', '--required': 'none' }
 
@@ -247,11 +245,9 @@ const filterFields = [
   { type: 'select', key: 'status', label: '状态', placeholder: '全部', autoSearch: true, clearable: true, width: 100,
     options: [
       { label: '全部', value: '' },
-      { label: '新建', value: '新建' },
-      { label: '确认', value: '确认' },
+      { label: '确认新增', value: '确认新增' },
       { label: '修复中', value: '修复中' },
-      { label: '已解决', value: '已解决' },
-      { label: '关闭', value: '关闭' }
+      { label: '解决关闭', value: '解决关闭' }
     ] }
 ]
 
@@ -260,13 +256,13 @@ const cleanStatus = (v) => (v == null ? '' : String(v).replace(/^\s*\|*\s*/, '')
 const formatTime = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : '-')
 
 const getStatusClass = (s) => {
-  const map = { '致命': 'severe', '严重': 'severe', '一般': 'muted', '建议': 'muted', '新建': 'fault', '确认': 'severe', '修复中': 'progress', '已解决': 'normal', '关闭': 'normal' }
+  const map = { '致命': 'severe', '严重': 'severe', '一般': 'muted', '建议': 'muted', '确认新增': 'severe', '修复中': 'progress', '解决关闭': 'normal' }
   return map[s] || 'muted'
 }
 
 const defaultForm = () => ({
   bug_id: '', title: '', severity: '一般', module: '',
-  status: '新建', discoverer: '', assignee: '', deadline: ''
+  status: '确认新增', discoverer: '', assignee: '', deadline: ''
 })
 
 const resetFilters = () => {
@@ -285,16 +281,16 @@ const loadData = async () => {
   if (abortController) {
     abortController.abort()
   }
-  
+
   abortController = new AbortController()
   loading.value = true
-  
+
   try {
     const params = { page: page.value, page_size: pageSize.value }
     if (filters.value.keyword)  params.keyword  = filters.value.keyword
     if (filters.value.severity) params.severity = filters.value.severity
     if (filters.value.status)   params.status   = filters.value.status
-    
+
     const res = await mesApi.bugs(params)
     items.value = res.data?.items || []
     total.value = res.data?.total || 0
@@ -365,7 +361,7 @@ const handleDelete = async (row) => {
 // ---------- 流转 ----------
 const handleFlow = (row) => {
   flowRow.value = row
-  flowStatus.value = row.status || '新建'
+  flowStatus.value = row.status || '确认新增'
   flowModalVisible.value = true
 }
 

@@ -144,10 +144,8 @@
         <div class="col-6">
           <label class="small">状态</label>
           <el-select v-model="form.status" style="width: 100%;">
-            <el-option label="收集" value="收集" />
-            <el-option label="评估" value="评估" />
-            <el-option label="开发中" value="开发中" />
-            <el-option label="测试" value="测试" />
+            <el-option label="收集评估" value="收集评估" />
+            <el-option label="开发测试中" value="开发测试中" />
             <el-option label="上线" value="上线" />
           </el-select>
         </div>
@@ -242,10 +240,8 @@ const filterFields = computed(() => [
     minWidth: 100,
     options: [
       { label: '全部', value: '' },
-      { label: '收集', value: '收集' },
-      { label: '评估', value: '评估' },
-      { label: '开发中', value: '开发中' },
-      { label: '测试', value: '测试' },
+      { label: '收集评估', value: '收集评估' },
+      { label: '开发测试中', value: '开发测试中' },
       { label: '上线', value: '上线' }
     ],
     autoSearch: true
@@ -257,12 +253,12 @@ const cleanField = (v) => (v == null ? '' : String(v).replace(/^\s*\|*\s*/, '').
 const formatTime = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : '-')
 
 const getStatusClass = (s) => {
-  const map = { '紧急': 'severe', '高': 'severe', '中': 'info', '低': 'muted', '收集': 'info', '评估': 'purple', '开发中': 'progress', '测试': 'warn', '上线': 'normal' }
+  const map = { '紧急': 'severe', '高': 'severe', '中': 'info', '低': 'muted', '收集评估': 'info', '开发测试中': 'progress', '上线': 'normal' }
   return map[s] || 'muted'
 }
 
 const defaultForm = () => ({
-  request_id: '', title: '', priority: '中', status: '收集',
+  request_id: '', title: '', priority: '中', status: '收集评估',
   submitter: '', assignee: '', expected_date: ''
 })
 
@@ -287,16 +283,16 @@ const loadData = async () => {
   if (abortController) {
     abortController.abort()
   }
-  
+
   abortController = new AbortController()
   loading.value = true
-  
+
   try {
     const params = { page: page.value, page_size: pageSize.value }
     if (filters.value.keyword)  params.keyword  = filters.value.keyword
     if (filters.value.priority) params.priority = filters.value.priority
     if (filters.value.status)   params.status   = filters.value.status
-    
+
     const res = await mesApi.devreqs(params)
     items.value = res.data?.items || []
     total.value = res.data?.total || 0
@@ -372,12 +368,12 @@ const handleDelete = async (row) => {
 
 const handleFlow = async (s) => {
   const { value } = await ElMessageBox.prompt(
-    '请输入新状态 (收集/评估/开发中/测试/上线)',
+    '请输入新状态 (收集评估/开发测试中/上线)',
     '需求流转',
     {
       confirmButtonText: '确认流转',
       cancelButtonText: '取消',
-      inputPattern: /^(收集|评估|开发中|测试|上线)$/,
+      inputPattern: /^(收集评估|开发测试中|上线)$/,
       inputErrorMessage: '状态值不正确',
       inputValue: s.status,
       center: true

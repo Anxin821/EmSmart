@@ -31,7 +31,7 @@ class Bug(Base):
     title = Column(String(200), nullable=False)
     severity = Column(String(10), nullable=False)            # 致命 / 严重 / 一般 / 建议
     module = Column(String(100))
-    status = Column(String(20), nullable=False, default="新建")  # 新建 / 确认 / 修复中 / 已解决 / 关闭
+    status = Column(String(20), nullable=False, default="确认新增")  # 确认新增 / 修复中 / 解决关闭
     discoverer = Column(String(50))
     assignee = Column(String(50))
     created_date = Column(Date, default=datetime.utcnow)
@@ -50,7 +50,7 @@ class DevRequest(Base):
     title = Column(String(200), nullable=False)
     source = Column(String(100))
     priority = Column(String(10), nullable=False, default="中")
-    status = Column(String(20), nullable=False, default="收集")  # 收集 / 评估 / 开发中 / 测试 / 上线
+    status = Column(String(20), nullable=False, default="收集评估")  # 收集评估 / 开发测试中 / 上线
     submitter = Column(String(50))         # 提出人
     assignee = Column(String(50))          # 责任人
     expected_date = Column(Date)

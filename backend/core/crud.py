@@ -281,10 +281,13 @@ _BUG_STATUS_MAP = {
     "解决关闭":  "解决关闭",
 }
 _REQ_STATUS_MAP = {
+    "收集":       "收集评估",
+    "评估":       "收集评估",
     "收集评估":   "收集评估",
     "待评估":     "收集评估",
     "开发测试中": "开发测试中",
     "开发中":     "开发测试中",
+    "测试":       "开发测试中",
     "测试中":     "开发测试中",
     "上线":       "上线",
     "已上线":     "上线",
@@ -772,33 +775,11 @@ def get_bugs_paginated(
     if severity:
         query = query.filter(Bug.severity.like(f"%{severity}%"))
     total = query.count()
-    # 按「紧急程度」排序：综合 严重等级 + 截止日期 + 是否已关闭
-    # ① 已关闭 BUG 放最后（解决关闭 / 关闭 / 已解决 / 解决 → 1，其它 → 0）
-    # ② 严重等级：致命 0 > 严重 1 > 一般 2 > 建议 3 > 其它 9（越严重越靠前）
-    # ③ 截止日：未设截止日放最后；其余按距今天数升序（越早过期越靠前，负数即已过期的排最前）
-    # ④ 兜底：同紧急度按 id 倒序（新创建在前）
-    now = date.today()
-    _closed_statuses = ["解决关闭", "关闭", "已解决", "解决"]
+    # 默认按“录入时间倒序”展示：最新录入在前
+    # 兼容原有业务使用：同一录入时间下再按 id 倒序兜底
     items = (
         query.order_by(
-            # status/severity 可能是脏值（两端 | 和空格，见 _bug_to_dict 清洗），排序里的
-            # 精确 == / in_ 会匹配不到 → 用 LIKE 兼容，保证「已关闭下沉、严重度优先」正常生效
-            case(
-                (or_(*[Bug.status.like(f"%{s}%") for s in _closed_statuses]), 1),
-                else_=0,
-            ).asc(),
-            case(
-                (Bug.severity.like("%致命%"), 0),
-                (Bug.severity.like("%严重%"), 1),
-                (Bug.severity.like("%一般%"), 2),
-                (Bug.severity.like("%建议%"), 3),
-                else_=9,
-            ).asc(),
-            case(
-                (Bug.deadline.is_(None), 1),
-                else_=0,
-            ).asc(),
-            func.datediff(text("day"), func.cast(now, DateType), Bug.deadline).asc(),
+            Bug.created_at.desc(),
             Bug.id.desc(),
         )
         .offset((page - 1) * page_size)
@@ -863,33 +844,11 @@ def get_dev_requests_paginated(
     if priority:
         query = query.filter(DevRequest.priority.like(f"%{priority}%"))
     total = query.count()
-    # 按「优先级（紧急情况）」排序：priority → 状态 → 期望交付日期 → id
-    # ① 优先级：紧急 0 > 高 1 > 中 2 > 低 3 > 其它 9
-    # ② 已完成状态（上线/关闭）下沉，未完成需求排前
-    # ③ 期望交付日期：未设的放最后，其余越临近越优先（过期的排最前）
-    # ④ 兜底：id 倒序（新创建在前）
-    now = date.today()
-    _done_statuses = ["上线", "关闭", "已上线", "已完成"]
+    # 默认按“录入时间倒序”展示：最新录入在前
+    # 兼容同一录入时间下的稳定排序：id 倒序
     items = (
         query.order_by(
-            # priority/status 可能是脏值（两端 | 和空格，见 _req_to_dict 清洗），排序里的
-            # 精确 == / in_ 会匹配不到 → 用 LIKE 兼容，保证「优先级、已完成下沉」正常生效
-            case(
-                (DevRequest.priority.like("%紧急%"), 0),
-                (DevRequest.priority.like("%高%"), 1),
-                (DevRequest.priority.like("%中%"), 2),
-                (DevRequest.priority.like("%低%"), 3),
-                else_=9,
-            ).asc(),
-            case(
-                (or_(*[DevRequest.status.like(f"%{s}%") for s in _done_statuses]), 1),
-                else_=0,
-            ).asc(),
-            case(
-                (DevRequest.expected_date.is_(None), 1),
-                else_=0,
-            ).asc(),
-            func.datediff(text("day"), func.cast(now, DateType), DevRequest.expected_date).asc(),
+            DevRequest.created_at.desc(),
             DevRequest.id.desc(),
         )
         .offset((page - 1) * page_size)

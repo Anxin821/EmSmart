@@ -108,8 +108,8 @@ def option_order_statuses():
 @router.get("/options/mes-statuses")
 def option_mes_statuses():
     return ApiResponse(data={
-        "bug": ["新建", "确认", "修复中", "已解决", "关闭"],
-        "req": ["收集", "评估", "开发中", "测试", "上线"],
+        "bug": ["确认新增", "修复中", "解决关闭"],
+        "req": ["收集评估", "开发测试中", "上线"],
         "order_priority": ["紧急", "高", "中", "低"],
         "bug_severity": ["致命", "严重", "一般", "建议"],
     })

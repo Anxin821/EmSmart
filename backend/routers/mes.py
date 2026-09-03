@@ -189,7 +189,7 @@ def update_bug_status(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("admin", "engineer")),
 ):
-    valid = ["新建", "确认", "修复中", "已解决", "关闭"]
+    valid = ["确认新增", "修复中", "解决关闭"]
     new_status = body.status
     if new_status not in valid:
         raise HTTPException(400, f"无效状态，可选值: {', '.join(valid)}")
