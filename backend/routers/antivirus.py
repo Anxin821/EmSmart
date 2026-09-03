@@ -51,6 +51,22 @@ def _dedupe_latest_by_device_line(records):
     return list(latest.values())
 
 
+def _classify_antivirus_status(next_antivirus_time: Optional[datetime], now: datetime, pending_window_hours: int = 24) -> str:
+    """杀毒状态判定：
+    - overdue: 过期且已到截止时间（<= now)
+    - pending: 距离应杀毒截止时间在 24 小时内（now < next_time <= now + 24h）
+    - done: 还未到待杀毒窗口（> now + 24h）
+    - no_due: 无应杀毒时间，视为待处理
+    """
+    if not next_antivirus_time:
+        return "pending"
+    if next_antivirus_time <= now:
+        return "overdue"
+    if next_antivirus_time <= now + timedelta(hours=pending_window_hours):
+        return "pending"
+    return "done"
+
+
 # ==================== CRUD ====================
 
 @router.get("/records")
@@ -215,16 +231,8 @@ def antivirus_dashboard(db: Session = Depends(get_db), current_user=Depends(get_
     line_order = [f"{i}线" for i in range(1, 9)] + ["品质线", "维修线"]
     line_map = {ln: {"line": ln, "total": 0, "done": 0, "pending": 0, "overdue": 0} for ln in line_order}
 
-    def _classify(r):
-        if r.next_antivirus_time and r.next_antivirus_time > now:
-            return "done"
-        elif r.next_antivirus_time and r.next_antivirus_time <= now:
-            return "overdue"
-        else:
-            return "pending"
-
     for r in records:
-        tag = _classify(r)
+        tag = _classify_antivirus_status(r.next_antivirus_time, now)
         if   tag == "done":    done_count    += 1
         elif tag == "overdue": overdue_count += 1
         else:                  pending_count += 1
