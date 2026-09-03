@@ -25,6 +25,7 @@ class ServerCreate(ServerBase):
 
 
 class ServerUpdate(BaseModel):
+    server_id: Optional[str] = None
     name: Optional[str] = None
     production_line: Optional[str] = None
     rack_location: Optional[str] = None

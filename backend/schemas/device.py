@@ -20,6 +20,7 @@ class AoiAiDeviceCreate(AoiAiDeviceBase):
 
 
 class AoiAiDeviceUpdate(BaseModel):
+    device_id: Optional[str] = None
     name: Optional[str] = None
     device_type: Optional[str] = None
     production_line: Optional[str] = None

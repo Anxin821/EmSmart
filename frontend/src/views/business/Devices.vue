@@ -230,7 +230,7 @@ const handleSave = () => crud.submit(
     const payload = { ...form }
     payload.status = cleanStatus(payload.status)
     return isEdit
-      ? await devicesApi.update(editing.item_id, payload)
+      ? await devicesApi.update(editing.id, payload)
       : await devicesApi.create(payload)
   },
   {

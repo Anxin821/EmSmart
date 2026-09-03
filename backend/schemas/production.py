@@ -20,6 +20,10 @@ class WeeklyProductionCreate(WeeklyProductionBase):
 
 
 class WeeklyProductionUpdate(BaseModel):
+    year: Optional[int] = None
+    week_number: Optional[int] = None
+    production_line: Optional[str] = None
+    project: Optional[str] = None
     total_output: Optional[int] = None
     qualified_count: Optional[int] = None
     recorder: Optional[str] = None
@@ -50,6 +54,9 @@ class MonthlyProductionCreate(MonthlyProductionBase):
 
 
 class MonthlyProductionUpdate(BaseModel):
+    year: Optional[int] = None
+    month: Optional[int] = None
+    project: Optional[str] = None
     monthly_total_output: Optional[int] = None
     monthly_qualified_count: Optional[int] = None
     recorder: Optional[str] = None

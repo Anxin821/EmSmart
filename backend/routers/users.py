@@ -97,6 +97,10 @@ def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db), c
     u = db.query(User).filter(User.id == user_id).first()
     if not u:
         raise HTTPException(404, "用户不存在")
+    if data.username is not None and data.username != u.username:
+        if db.query(User).filter(User.username == data.username, User.id != user_id).first():
+            raise HTTPException(400, "用户名已存在")
+        u.username = data.username
     if data.full_name is not None:
         u.full_name = data.full_name
     if data.role is not None:

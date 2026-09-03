@@ -27,6 +27,7 @@ class WorkOrderCreate(WorkOrderBase):
 
 
 class WorkOrderUpdate(BaseModel):
+    order_number: Optional[str] = None
     order_type: Optional[str] = None
     product_name: Optional[str] = None
     priority: Optional[str] = None
@@ -74,6 +75,7 @@ class BugCreate(BugBase):
 
 
 class BugUpdate(BaseModel):
+    bug_id: Optional[str] = None
     title: Optional[str] = None
     severity: Optional[str] = None
     module: Optional[str] = None
@@ -115,6 +117,7 @@ class DevRequestCreate(DevRequestBase):
 
 
 class DevRequestUpdate(BaseModel):
+    request_id: Optional[str] = None
     title: Optional[str] = None
     source: Optional[str] = None
     priority: Optional[str] = None

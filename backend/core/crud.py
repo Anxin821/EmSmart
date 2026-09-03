@@ -754,9 +754,9 @@ def get_bugs_paginated(
         kw = f"%{keyword}%"
         query = query.filter(or_(Bug.title.like(kw), Bug.bug_id.like(kw)))
     if status:
-        query = query.filter(Bug.status == status)
+        query = query.filter(Bug.status.like(f"%{status}%"))
     if severity:
-        query = query.filter(Bug.severity == severity)
+        query = query.filter(Bug.severity.like(f"%{severity}%"))
     total = query.count()
     # 按「紧急程度」排序：综合 严重等级 + 截止日期 + 是否已关闭
     # ① 已关闭 BUG 放最后（解决关闭 / 关闭 / 已解决 / 解决 → 1，其它 → 0）
@@ -767,15 +767,17 @@ def get_bugs_paginated(
     _closed_statuses = ["解决关闭", "关闭", "已解决", "解决"]
     items = (
         query.order_by(
+            # status/severity 可能是脏值（两端 | 和空格，见 _bug_to_dict 清洗），排序里的
+            # 精确 == / in_ 会匹配不到 → 用 LIKE 兼容，保证「已关闭下沉、严重度优先」正常生效
             case(
-                (Bug.status.in_(_closed_statuses), 1),
+                (or_(*[Bug.status.like(f"%{s}%") for s in _closed_statuses]), 1),
                 else_=0,
             ).asc(),
             case(
-                (Bug.severity == "致命", 0),
-                (Bug.severity == "严重", 1),
-                (Bug.severity == "一般", 2),
-                (Bug.severity == "建议", 3),
+                (Bug.severity.like("%致命%"), 0),
+                (Bug.severity.like("%严重%"), 1),
+                (Bug.severity.like("%一般%"), 2),
+                (Bug.severity.like("%建议%"), 3),
                 else_=9,
             ).asc(),
             case(
@@ -864,10 +866,13 @@ def get_dev_requests_paginated(
     if keyword:
         kw = f"%{keyword}%"
         query = query.filter(or_(DevRequest.title.like(kw), DevRequest.request_id.like(kw)))
+    # 数据库中 status/priority 存的是脏值（如 "|开发中|"，见 routers/mes.py 的 _req_to_dict 会剔除两端 | 和空格），
+    # 用精确 == 会匹配不到 → 筛选结果为空、表现为“筛选不生效”；改用 LIKE 包含匹配兼容脏值。
+    # （status/priority 的枚举值互不为子串，不会产生误匹配）
     if status:
-        query = query.filter(DevRequest.status == status)
+        query = query.filter(DevRequest.status.like(f"%{status}%"))
     if priority:
-        query = query.filter(DevRequest.priority == priority)
+        query = query.filter(DevRequest.priority.like(f"%{priority}%"))
     total = query.count()
     # 按「优先级（紧急情况）」排序：priority → 状态 → 期望交付日期 → id
     # ① 优先级：紧急 0 > 高 1 > 中 2 > 低 3 > 其它 9
@@ -878,15 +883,17 @@ def get_dev_requests_paginated(
     _done_statuses = ["上线", "关闭", "已上线", "已完成"]
     items = (
         query.order_by(
+            # priority/status 可能是脏值（两端 | 和空格，见 _req_to_dict 清洗），排序里的
+            # 精确 == / in_ 会匹配不到 → 用 LIKE 兼容，保证「优先级、已完成下沉」正常生效
             case(
-                (DevRequest.priority == "紧急", 0),
-                (DevRequest.priority == "高", 1),
-                (DevRequest.priority == "中", 2),
-                (DevRequest.priority == "低", 3),
+                (DevRequest.priority.like("%紧急%"), 0),
+                (DevRequest.priority.like("%高%"), 1),
+                (DevRequest.priority.like("%中%"), 2),
+                (DevRequest.priority.like("%低%"), 3),
                 else_=9,
             ).asc(),
             case(
-                (DevRequest.status.in_(_done_statuses), 1),
+                (or_(*[DevRequest.status.like(f"%{s}%") for s in _done_statuses]), 1),
                 else_=0,
             ).asc(),
             case(

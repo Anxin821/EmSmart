@@ -257,7 +257,7 @@ const loadData = async () => {
 }
 
 const showModal = (u = null) => {
-  editingId.value = u?.user_id
+  editingId.value = u?.id
   form.value = u ? { ...u, password: '' } : defaultForm()
   modalVisible.value = true
 }
@@ -315,7 +315,14 @@ const showPermModal = (u) => {
 const handlePermSave = async () => {
   permSaving.value = true
   try {
-    await usersApi.permissions(currentUser.value.user_id, perms.value)
+    const payload = {
+      permissions: modules.map(m => ({
+        module_key: m,
+        can_read: perms.value[m]?.can_read ?? false,
+        can_write: perms.value[m]?.can_write ?? false,
+      }))
+    }
+    await usersApi.permissions(currentUser.value.id, payload)
     permModalVisible.value = false
     ElMessage.success('权限保存成功')
   } catch (e) {
