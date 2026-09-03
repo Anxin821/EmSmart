@@ -13,8 +13,8 @@
     <div class="stat-grid">
       <StatCard centered color="green" icon="bi bi-bug-fill" :num="`${data?.fix_rate ?? 0}%`" label="BUG修复率" />
       <StatCard centered color="blue" icon="bi bi-check2-circle" :num="`${data?.delivery_rate ?? 0}%`" label="需求完成率" />
-      <StatCard centered color="red" icon="bi bi-exclamation-octagon-fill" :num="openBugCount" label="未关闭BUG" />
-      <StatCard centered color="yellow" icon="bi bi-alarm-fill" :num="overdueReqCount" label="延期需求" />
+      <StatCard centered color="red" icon="bi bi-exclamation-octagon-fill" :num="openBugCount" label="未关闭BUG" clickable @click="showOpenBugsModal(null)" />
+      <StatCard centered color="yellow" icon="bi bi-alarm-fill" :num="overdueReqCount" label="延期需求" clickable @click="showOverdueReqModal(null)" />
     </div>
 
     <!-- 两张堆叠柱状图 -->
@@ -92,26 +92,237 @@
       </section>
     </div>
     </div>
+
+    <!-- 未关闭 BUG 弹窗 -->
+    <el-dialog
+      v-model="openBugModalVisible"
+      :title="openBugTitle"
+      width="900px"
+      align-center
+      destroy-on-close
+    >
+      <el-table :data="openBugRecords" stripe border style="width:100%;" max-height="420" empty-text="暂无未关闭 BUG">
+        <el-table-column prop="bug_id" label="BUG ID" min-width="140" align="center" show-overflow-tooltip />
+        <el-table-column prop="title" label="标题" min-width="200" align="center" show-overflow-tooltip />
+        <el-table-column prop="severity" label="严重等级" width="100" align="center">
+          <template #default="s"><span :class="'status-badge ' + getStatusClass(cleanStatus(s.row.severity))">{{ cleanStatus(s.row.severity) }}</span></template>
+        </el-table-column>
+        <el-table-column prop="module" label="模块" min-width="110" align="center" show-overflow-tooltip />
+        <el-table-column prop="status" label="状态" width="100" align="center" />
+        <el-table-column prop="discoverer" label="发现人" width="100" align="center" />
+        <el-table-column prop="assignee" label="指派给" width="100" align="center" />
+        <el-table-column prop="deadline" label="截止日期" width="120" align="center" />
+        <el-table-column label="录入时间" width="160" align="center">
+          <template #default="s">{{ formatTime(s.row.created_at) }}</template>
+        </el-table-column>
+      </el-table>
+      <div style="margin-top:12px;display:flex;align-items:center;justify-content:center;position:relative;">
+        <el-button @click="openBugModalVisible = false">关闭</el-button>
+        <span style="position:absolute;right:0;color:var(--c-text-3);font-size:13px;">共 {{ openBugTotal }} 条记录</span>
+      </div>
+    </el-dialog>
+
+    <!-- 延期需求 弹窗 -->
+    <el-dialog
+      v-model="overdueReqModalVisible"
+      :title="overdueReqTitle"
+      width="900px"
+      align-center
+      destroy-on-close
+    >
+      <el-table :data="overdueReqRecords" stripe border style="width:100%;" max-height="420" empty-text="暂无延期需求">
+        <el-table-column prop="request_id" label="需求ID" min-width="140" align="center" show-overflow-tooltip />
+        <el-table-column prop="title" label="标题" min-width="200" align="center" show-overflow-tooltip />
+        <el-table-column prop="priority" label="优先级" width="100" align="center" />
+        <el-table-column prop="status" label="状态" width="100" align="center" />
+        <el-table-column prop="submitter" label="提交人" width="100" align="center" />
+        <el-table-column prop="assignee" label="指派给" width="100" align="center" />
+        <el-table-column prop="expected_date" label="期望日期" width="120" align="center" />
+        <el-table-column label="录入时间" width="160" align="center">
+          <template #default="s">{{ formatTime(s.row.created_at) }}</template>
+        </el-table-column>
+      </el-table>
+      <div style="margin-top:12px;display:flex;align-items:center;justify-content:center;position:relative;">
+        <el-button @click="overdueReqModalVisible = false">关闭</el-button>
+        <span style="position:absolute;right:0;color:var(--c-text-3);font-size:13px;">共 {{ overdueReqTotal }} 条记录</span>
+      </div>
+    </el-dialog>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, nextTick, onBeforeUnmount, getCurrentInstance } from 'vue'
 import * as echarts from 'echarts'
 import { mesApi } from '@/api'
 import StatCard from '@/components/common/StatCard.vue'
+import { ElMessage } from 'element-plus'
 import { createPresentation, addFullImageSlide, savePresentation, captureElement } from '@/utils/pptExport'
 
 const data = ref(null)
 
-// KPI 派生指标：未关闭BUG（总数 - 已解决）、延期需求（风险项中 overdue_req 的值）
-const openBugCount = computed(() => (data.value?.bug_count ?? 0) - (data.value?.bug_fixed ?? 0))
-const overdueReqCount = computed(() => {
-  const r = (data.value?.risks || []).find(x => x.icon === 'overdue_req')
-  return r?.value ?? 0
-})
+// KPI 派生指标：按真实 BUG 列表计算，和弹窗保持一致。
+const openBugCount = ref(0)
+const overdueReqCount = ref(0)
 const exporting = ref(false)
 let cBugs = null, cReqs = null
+
+// 未关闭 BUG 弹窗数据
+const openBugModalVisible = ref(false)
+const openBugTitle = ref('未关闭 BUG')
+const openBugRecords = ref([])
+const openBugTotal = ref(0)
+const openBugLoading = ref(false) // 防止重复打开
+const openBugLastOpen = ref(0)    // 时间戳防抖
+// 全局防重复（跨组件实例）
+if (typeof window !== 'undefined' && !window.__openBugDialog) window.__openBugDialog = false
+
+// 延期需求 弹窗数据
+const overdueReqModalVisible = ref(false)
+const overdueReqTitle = ref('延期需求')
+const overdueReqRecords = ref([])
+const overdueReqTotal = ref(0)
+const overdueReqLoading = ref(false) // 防止重复打开
+const overdueReqLastOpen = ref(0)    // 时间戳防抖
+if (typeof window !== 'undefined' && !window.__overdueReqDialog) window.__overdueReqDialog = false
+
+// 工具：清理字段显示
+const cleanStatus = (v) => (v == null ? '-' : String(v))
+// 时间格式化（与需求时间保持一致，显示到分钟）
+const formatTime = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : '-')
+const getStatusClass = (s) => {
+  const map = { '致命': 'severe', '严重': 'severe', '一般': 'muted', '建议': 'muted', '确认新增': 'severe', '修复中': 'progress', '解决关闭': 'normal' }
+  return map[s] || 'muted'
+}
+
+// 点击显示未关闭 BUG 列表（与杀毒超时弹窗一致风格）
+const showOpenBugsModal = async () => {
+  const now = Date.now()
+  if (openBugModalVisible.value || openBugLoading.value || (now - openBugLastOpen.value) < 800) return
+  // 跨实例全局锁
+  if (typeof window !== 'undefined' && window.__openBugDialog) {
+    console.warn('openBug blocked by global lock')
+    return
+  }
+  openBugLastOpen.value = now
+  openBugLoading.value = true
+  if (typeof window !== 'undefined') window.__openBugDialog = true
+  const vm = getCurrentInstance()
+  console.trace('showOpenBugsModal triggered, instance uid=', vm?.uid)
+  openBugModalVisible.value = true
+  openBugRecords.value = []
+  openBugTotal.value = 0
+  try {
+    const params = { page: 1, page_size: 100 }
+    const res = await mesApi.bugs(params)
+    // 过滤未关闭（非 '解决关闭'）
+    const items = res.data?.items || []
+    const list = items.filter(i => (i.status || '') !== '解决关闭')
+    openBugRecords.value = list
+    openBugTotal.value = list.length
+  } catch (e) {
+    console.error(e)
+    ElMessage.error(e.response?.data?.message || '加载未关闭BUG失败')
+  } finally {
+    openBugLoading.value = false
+    if (typeof window !== 'undefined') window.__openBugDialog = false
+    // 防止紧接着又触发，短时内保留 lastOpen，1.5s 后清除
+    setTimeout(() => { openBugLastOpen.value = 0 }, 1500)
+  }
+}
+
+// 点击显示延期需求（按期望日期计算 overdue，与风险数据一致）
+const showOverdueReqModal = async () => {
+  const now = Date.now()
+  if (overdueReqModalVisible.value || overdueReqLoading.value || (now - overdueReqLastOpen.value) < 800) return
+  // 跨实例全局锁
+  if (typeof window !== 'undefined' && window.__overdueReqDialog) {
+    console.warn('overdueReq blocked by global lock')
+    return
+  }
+  overdueReqLastOpen.value = now
+  overdueReqLoading.value = true
+  if (typeof window !== 'undefined') window.__overdueReqDialog = true
+  const vm = getCurrentInstance()
+  console.trace('showOverdueReqModal triggered, instance uid=', vm?.uid)
+  overdueReqModalVisible.value = true
+  overdueReqRecords.value = []
+  overdueReqTotal.value = 0
+
+  const params = { page: 1, page_size: 100 }
+
+  // 先直接获取全部（客户端过滤更可靠），再按需尝试后端筛选作为备用
+  try {
+    const res = await mesApi.devreqs(params)
+    const items = (res && (res.data?.items || res.items || res.data || [])) || []
+
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0)
+    const list = items.filter(i => {
+      const expectedRaw = i.expected_date || i.expected || ''
+      if (!expectedRaw) return false
+      let expectedDate
+      try {
+        expectedDate = new Date(expectedRaw)
+        if (isNaN(expectedDate)) expectedDate = new Date(String(expectedRaw).slice(0,10))
+      } catch (err) {
+        return false
+      }
+      expectedDate.setHours(0,0,0,0)
+      return expectedDate.getTime() < todayStart.getTime() && (i.status || '') !== '上线'
+    })
+
+    console.debug('showOverdueReqModal: fetched', items.length, 'items, filtered', list.length)
+
+    if (list.length > 0) {
+      overdueReqRecords.value = list
+      overdueReqTotal.value = list.length
+    } else if (items.length > 0) {
+      const marked = items.map(i => {
+        const expectedRaw = i.expected_date || i.expected || ''
+        let expectedDate = null
+        try { expectedDate = new Date(expectedRaw) } catch(e) { expectedDate = null }
+        const isOverdue = expectedDate ? (new Date(expectedDate).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)) : false
+        return { ...i, _isOverdue: isOverdue }
+      })
+      overdueReqRecords.value = marked
+      overdueReqTotal.value = marked.length
+      ElMessage.info('后端返回了 ' + items.length + ' 条需求，但没有符合延期筛选，已显示全部以便检查')
+    } else {
+      overdueReqRecords.value = []
+      overdueReqTotal.value = 0
+    }
+  } catch (err) {
+    console.warn('showOverdueReqModal primary fetch failed, trying backend filters', err)
+    // 备用：尝试后端筛选
+    const attempts = [
+      (p) => mesApi.devreqs({ ...p, status: 'overdue' }),
+      (p) => mesApi.devreqs({ ...p, overdue: true })
+    ]
+    let lastErr = null
+    for (const fn of attempts) {
+      try {
+        const res = await fn(params)
+        const items = (res && (res.data?.items || res.items || res.data || [])) || []
+        overdueReqRecords.value = items
+        overdueReqTotal.value = items.length
+        lastErr = null
+        break
+      } catch (e) {
+        lastErr = e
+        console.warn('showOverdueReqModal attempt failed:', e)
+      }
+    }
+    if (lastErr) {
+      console.error('加载延期需求最终失败：', lastErr)
+      const msg = lastErr?.response?.data?.message || lastErr?.message || '加载延期需求失败'
+      ElMessage.error(msg)
+    }
+  } finally {
+    overdueReqLoading.value = false
+    if (typeof window !== 'undefined') window.__overdueReqDialog = false
+    setTimeout(() => { overdueReqLastOpen.value = 0 }, 1500)
+  }
+}
 
 const resize = () => {
   cBugs && cBugs.resize()
@@ -122,6 +333,41 @@ const loadData = async () => {
   try {
     const res = await mesApi.dashboard()
     data.value = res.data || null
+
+    // 先同步未关闭 BUG 数：与弹窗使用同一份真实数据源（mesApi.bugs）
+    try {
+      const bugRes = await mesApi.bugs({ page: 1, page_size: 100 })
+      const items = bugRes.data?.items || []
+      const openList = items.filter(i => (i.status || '') !== '解决关闭')
+      openBugCount.value = openList.length
+    } catch (err) {
+      console.warn('计算未关闭 BUG 数时拉取 bugs 失败：', err)
+      openBugCount.value = Math.max((data.value?.bug_count ?? 0) - (data.value?.bug_fixed ?? 0), 0)
+    }
+
+    // 同步计算延期需求数：以 devreqs 接口为准，按期望日期且非上线视为延期
+    try {
+      const r = await mesApi.devreqs({ page: 1, page_size: 100 })
+      const items = (r && (r.data?.items || r.items || r.data || [])) || []
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0)
+      const overdueList = items.filter(i => {
+        const expectedRaw = i.expected_date || i.expected || ''
+        if (!expectedRaw) return false
+        let expectedDate
+        try {
+          expectedDate = new Date(expectedRaw)
+          if (isNaN(expectedDate)) expectedDate = new Date(String(expectedRaw).slice(0,10))
+        } catch (err) { return false }
+        expectedDate.setHours(0,0,0,0)
+        return expectedDate.getTime() < todayStart.getTime() && (i.status || '') !== '上线'
+      })
+      overdueReqCount.value = overdueList.length
+    } catch (err) {
+      console.warn('计算延期需求数时拉取 devreqs 失败：', err)
+      const r = (data.value?.risks || []).find(x => x.icon === 'overdue_req')
+      overdueReqCount.value = r?.value ?? 0
+    }
+
     await nextTick()
     renderCharts()
   } catch (e) {
