@@ -623,14 +623,14 @@ onMounted(() => {
   align-content: flex-start;
 }
 
-/* —— 卡片本体：height:100% 撑满列 → 与同 row 最长的那条卡严格等高；max-height 520px 保底 —— */
+/* —— 卡片本体：height:100% 撑满列 → 与同 row 最长的那条卡严格等高；min-height 保底（Header + 4条 Body） —— */
 .duty-el-card {
   display: flex;
   flex-direction: column;
   width: 100% !important;
   min-width: 0;
   height: 100% !important;
-  min-height: 480px;              /* 保底：Header + 6条 Body + Footer ≈ 480px，保证统一高度 */
+  min-height: 280px;              /* 保底：Header(60) + Body(20 内边距 + 200 滚动区) ≈ 280px（无 footer）；含 Footer 约 340px，由内容自然撑开 */
   max-height: none !important;
   border-radius: 18px !important;
   overflow: hidden;
@@ -740,7 +740,7 @@ onMounted(() => {
   background: rgba(255,255,255,.22) !important;
   transform: translateY(-1px);
 }
-/* —— body：flex:1 吃掉剩余 → 滚动内容区固定（6 条高度），footer 贴底 —— */
+/* —— body：flex:1 吃掉剩余 → 滚动内容区固定（4 条高度），footer 贴底 —— */
 .duty-el-card :deep(.el-card__body) {
   flex: 1 1 auto;
   min-height: 0;

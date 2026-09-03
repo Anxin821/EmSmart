@@ -972,12 +972,12 @@ button { font-family: inherit; }
   box-shadow: 0 2px 6px rgba(0,0,0,.08) inset, 0 1px 2px rgba(0,0,0,.08);
 }
 
-/* —— 内容区：最多显示 6 条职责（~340px 可用高度），>6 条时内部滚动；同时 body flex:1 配合卡片统一等高 —— */
+/* —— 内容区：最多显示 4 条职责（~200px 可用高度），>4 条时内部滚动查看；同时 body flex:1 配合卡片统一等高 —— */
 .duty-scroll {
   flex: 1 1 auto;
   height: 0;                   /* 让滚动容器高度由父级 flex 分配（配合 el-card__body 的 flex:1） */
-  min-height: 260px;           /* 至少能稳稳显示 4~5 条，不被压扁 */
-  max-height: 340px;           /* 关键硬上限：刚好约 6 条职责行（每行 ~41px + 10px gap × 5） */
+  min-height: 200px;           /* 固定 4 条高度：每行 42px × 4 + gap 8px × 3 + body/wrap 内边距 ≈ 198px，留 2px 余量 */
+  max-height: 200px;           /* 关键硬上限：刚好 4 条职责行，第 5 条起（≈206px）被裁入滚动区，滑动查看 */
   width: 100%;
 }
 .duty-scroll .el-scrollbar__wrap {
