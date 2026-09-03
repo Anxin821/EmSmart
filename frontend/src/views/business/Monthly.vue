@@ -282,7 +282,7 @@ onBeforeUnmount(() => {
 .page { height: 100%; }
 /* 底部为 position:fixed 的分页条预留空间；表格改用 height="100%" 填满剩余区域，
    末尾正好停在分页条上方，表头固定、仅数据区垂直滚动。 */
-.page-content { padding-bottom: 48px; }
+.page-content { padding-bottom: 20px; }
 /* 收紧筛选栏与汇总卡、汇总卡与表格之间的间距 */
 .stats-summary-row {
   margin-top: -18px;    /* 越负越靠近上方筛选栏 */

@@ -37,6 +37,20 @@ def _calc_next_time(antivirus_time: datetime, cycle: str) -> datetime:
         return antivirus_time + timedelta(days=7)
 
 
+def _dedupe_latest_by_device_line(records):
+    """按 (device_id, production_line) 线内查重：同一设备在某条线可能有多条历史杀毒记录，
+    仅保留该设备在该线的最新一条（antivirus_time 最大，相同则 id 最大）作为其在该线的当前状态。
+    采用线内去重而非全局去重：同一设备可能在多条线（如生产线→品质线/维修线）都有记录，
+    若按全局最新一条归属，会让设备从历史所在线“消失”，导致该线分布被严重低估。"""
+    latest = {}
+    for r in records:
+        key = (r.device_id, r.production_line)
+        cur = latest.get(key)
+        if cur is None or (r.antivirus_time, r.id) > (cur.antivirus_time, cur.id):
+            latest[key] = r
+    return list(latest.values())
+
+
 # ==================== CRUD ====================
 
 @router.get("/records")
@@ -164,22 +178,33 @@ def list_overdue_records(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """查询超时未杀毒记录（按线体筛选）"""
+    """查询超时未杀毒记录（按线体筛选）。
+    按 (device_id, production_line) 线内查重：每台设备在本线只取最新一条记录，仅当该记录已超时才计入，
+    口径与看板 overdue 一致，避免同一设备多条历史记录重复出现、数字对不上。"""
     now = datetime.utcnow()
-    q = db.query(AntivirusRecord).filter(AntivirusRecord.next_antivirus_time <= now)
-    if production_line:
-        q = q.filter(AntivirusRecord.production_line == production_line)
-    total = q.count()
-    records = q.order_by(AntivirusRecord.next_antivirus_time.asc()).offset((page - 1) * page_size).limit(page_size).all()
+    # 线内去重后再筛超时，保证“超时未杀毒”KPI/分布数字与本弹窗列表条数一致
+    latest = _dedupe_latest_by_device_line(db.query(AntivirusRecord).all())
+    overdue = [
+        r for r in latest
+        if r.next_antivirus_time and r.next_antivirus_time <= now
+        and (not production_line or r.production_line == production_line)
+    ]
+    overdue.sort(key=lambda r: (r.next_antivirus_time, r.id))
+    total = len(overdue)
+    start = (page - 1) * page_size
+    records = overdue[start:start + page_size]
     return {"code": 200, "data": PaginatedData(total=total, page=page, page_size=page_size, items=[_record_to_dict(r) for r in records])}
 
 
 @router.get("/dashboard")
 def antivirus_dashboard(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    """设备杀毒看板：全局统计 + 按线体分布（含进度百分比），基于全部记录"""
+    """设备杀毒看板：全局统计 + 按线体分布（含进度百分比）。按 (device_id, 产线) 线内查重，每台设备在每条线取最新一条记录统计。"""
     now = datetime.utcnow()
 
-    records = db.query(AntivirusRecord).all()
+    # 按 (device_id, production_line) 线内查重：每台设备在每条线只取最新一条记录，
+    # 统计口径为“设备(按线)”而非“记录条数”；采用线内而非全局去重，
+    # 防止设备因在其它线有更新记录而从本线分布中“消失”导致数字偏少。
+    records = _dedupe_latest_by_device_line(db.query(AntivirusRecord).all())
 
     total_devices = len(records)
     done_count = 0
