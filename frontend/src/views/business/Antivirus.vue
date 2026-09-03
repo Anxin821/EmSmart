@@ -182,7 +182,7 @@ const filterFields = computed(() => [
     key: 'keyword',
     label: '',
     placeholder: '设备ID / 操作人',
-    minWidth: 260,
+    minWidth: 180,
     showSearchIcon: true,
     autoSearch: false
   },
@@ -191,7 +191,7 @@ const filterFields = computed(() => [
     type: 'select',
     key: 'line',
     label: '产线',
-    minWidth: 140,
+    minWidth: 100,
     options: [
       { label: '全部', value: '' },
       ...lines.map(l => ({ label: l, value: l })),

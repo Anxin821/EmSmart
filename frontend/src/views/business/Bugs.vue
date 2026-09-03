@@ -231,8 +231,8 @@ const labelStyleNoRequired  = { color: 'var(--c-text-2)', '--required': 'none' }
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 
 const filterFields = [
-  { type: 'input', key: 'keyword', label: '', placeholder: 'BUG ID / 标题 / 模块 / 指派', autoSearch: false, clearable: true, minWidth: 260 },
-  { type: 'select', key: 'severity', label: '严重等级', placeholder: '全部', autoSearch: true, clearable: true,
+  { type: 'input', key: 'keyword', label: '', placeholder: 'BUG ID / 标题 / 模块 / 指派', autoSearch: false, clearable: true, minWidth: 220 },
+  { type: 'select', key: 'severity', label: '严重等级', placeholder: '全部', autoSearch: true, clearable: true, width: 90,
     options: [
       { label: '全部', value: '' },
       { label: '致命', value: '致命' },
@@ -240,7 +240,7 @@ const filterFields = [
       { label: '一般', value: '一般' },
       { label: '建议', value: '建议' }
     ] },
-  { type: 'select', key: 'status', label: '状态', placeholder: '全部', autoSearch: true, clearable: true,
+  { type: 'select', key: 'status', label: '状态', placeholder: '全部', autoSearch: true, clearable: true, width: 100,
     options: [
       { label: '全部', value: '' },
       { label: '新建', value: '新建' },

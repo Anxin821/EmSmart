@@ -207,7 +207,7 @@ const filterFields = computed(() => [
     key: 'keyword',
     label: '',
     placeholder: '需求ID/标题/指派/提交',
-    minWidth: 260,
+    minWidth: 220,
     showSearchIcon: true,
     autoSearch: false
   },
@@ -216,7 +216,7 @@ const filterFields = computed(() => [
     type: 'select',
     key: 'priority',
     label: '优先级',
-    minWidth: 130,
+    minWidth: 100,
     options: [
       { label: '全部', value: '' },
       { label: '紧急', value: '紧急' },
@@ -230,7 +230,7 @@ const filterFields = computed(() => [
     type: 'select',
     key: 'status',
     label: '状态',
-    minWidth: 130,
+    minWidth: 100,
     options: [
       { label: '全部', value: '' },
       { label: '收集', value: '收集' },

@@ -168,12 +168,12 @@ const userStore = useUserStore()
 const { toast } = useNotify()
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线']
 const filterFields = [
-  { type: 'input',  key: 'keyword', label: '',          placeholder: '设备ID / 名称 / IP / 负责人', autoSearch: false, clearable: true, flex: '1 1 240px' },
-  { type: 'select', key: 'line',    label: '产线',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
+  { type: 'input',  key: 'keyword', label: '',          placeholder: '设备ID / 名称 / IP / 负责人', autoSearch: false, clearable: true, width: 220 },
+  { type: 'select', key: 'line',    label: '产线',      placeholder: '全部', autoSearch: true, clearable: true, width: 90,
     options: [{ label: '全部', value: '' }, ...lines.map(l => ({ label: l, value: l }))] },
-  { type: 'select', key: 'status',  label: '状态',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
+  { type: 'select', key: 'status',  label: '状态',      placeholder: '全部', autoSearch: true, clearable: true, width: 100,
     options: [{ label: '全部', value: '' }, { label: '正常', value: '正常' }, { label: '故障', value: '故障' }, { label: '保养中', value: '保养中' }] },
-  { type: 'select', key: 'type',    label: '类型',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
+  { type: 'select', key: 'type',    label: '类型',      placeholder: '全部', autoSearch: true, clearable: true, width: 90,
     options: [{ label: '全部', value: '' }, { label: 'AOI', value: 'AOI' }, { label: 'AI', value: 'AI' }] },
 ]
 /* ====================== 业务纯函数（小而集中，方便 UT/复用） ====================== */
@@ -262,10 +262,9 @@ watch([page, pageSize], () => {
   min-width: 0;        /* 允许收缩到内容宽度以下，配合关键词框弹性伸缩 */
   flex-wrap: nowrap;   /* 关键：字段与按钮不换行，始终排在同一行 */
 }
-/* 关键词搜索框作为唯一弹性元素：宽屏约 240px、窄屏收缩吸收宽度差，
-   让固定宽度的产线/状态/类型下拉与操作按钮始终留在同一行不被挤下去 */
+/* 关键词搜索框改为固定宽度（刚好容下占位符），外层 field 不再弹性拉伸，
+   与产线/状态/类型下拉、操作按钮一起紧凑排在同一行 */
 .page-header :deep(.common-filter-bar > .field:first-child) {
-  flex: 1 1 240px;
-  min-width: 120px;    /* 收缩下限，避免搜索框被挤没 */
+  flex: 0 0 auto;
 }
 </style>

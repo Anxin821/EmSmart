@@ -192,7 +192,7 @@ const filterFields = computed(() => [
     key: 'keyword',
     label: '',
     placeholder: 'AP ID / SSID / IP / 负责人',
-    minWidth: 260,
+    minWidth: 245,
     showSearchIcon: true,
     autoSearch: false
   },
@@ -201,7 +201,7 @@ const filterFields = computed(() => [
     type: 'select',
     key: 'line',
     label: '产线',
-    minWidth: 130,
+    minWidth: 100,
     options: [
       { label: '全部', value: '' },
       ...lines.map(l => ({ label: l, value: l }))
@@ -212,7 +212,7 @@ const filterFields = computed(() => [
     type: 'select',
     key: 'status',
     label: '状态',
-    minWidth: 130,
+    minWidth: 100,
     options: [
       { label: '全部', value: '' },
       { label: '在线', value: '在线' },

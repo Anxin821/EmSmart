@@ -1708,6 +1708,10 @@ button { font-family: inherit; }
   align-self: center;
   margin-bottom: 0;
 }
+/* 搜索框（关键词 / 年月周等输入框）内文字水平居中，占位符一并居中 */
+.common-filter-bar .el-input__inner {
+  text-align: center;
+}
 .common-filter-bar .actions {
   margin-left: 0;
   display: flex;

@@ -173,10 +173,10 @@ const saving = ref(false)
 const form = ref({})
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 const filterFields = [
-  { type: 'input', key: 'keyword', label: '', placeholder: '服务器ID / 名称 / IP / 负责人', autoSearch: false, clearable: true, minWidth: 260 },
-  { type: 'select', key: 'line', label: '产线', placeholder: '全部', autoSearch: true, clearable: true,
+  { type: 'input', key: 'keyword', label: '', placeholder: '服务器ID / 名称 / IP / 负责人', autoSearch: false, clearable: true, minWidth: 235 },
+  { type: 'select', key: 'line', label: '产线', placeholder: '全部', autoSearch: true, clearable: true, width: 90,
     options: [{ label: '全部', value: '' }, ...lines.map(l => ({ label: l, value: l }))] },
-  { type: 'select', key: 'status', label: '状态', placeholder: '全部', autoSearch: true, clearable: true,
+  { type: 'select', key: 'status', label: '状态', placeholder: '全部', autoSearch: true, clearable: true, width: 90,
     options: [
       { label: '全部', value: '' },
       { label: '在线', value: '在线' },

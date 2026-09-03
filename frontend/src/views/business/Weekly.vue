@@ -182,9 +182,9 @@ const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const filterFields = [
-  { type: 'input', key: 'year', label: '年', placeholder: '请输入年份（数字）', autoSearch: false, clearable: true },
-  { type: 'input', key: 'week', label: '周', placeholder: '请输入周数（数字）', autoSearch: false, clearable: true },
-  { type: 'select', key: 'line', label: '产线', placeholder: '全部', autoSearch: false, clearable: true,
+  { type: 'input', key: 'year', label: '年', placeholder: '全部', autoSearch: false, clearable: true, width: 90 },
+  { type: 'input', key: 'week', label: '周', placeholder: '全部', autoSearch: false, clearable: true, width: 90 },
+  { type: 'select', key: 'line', label: '产线', placeholder: '全部', autoSearch: false, clearable: true, width: 90,
     options: lines.map(l => ({ label: l, value: l })) }
 ]
 const defaultForm = () => ({

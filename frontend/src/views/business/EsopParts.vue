@@ -120,7 +120,7 @@ const editingId = ref(null)
 const form = ref({})
 const saving = ref(false)
 const filterFields = [
-  { type: 'input', key: 'keyword', label: '', placeholder: '工位/工序/料号', autoSearch: false, clearable: true, width: 160 },
+  { type: 'input', key: 'keyword', label: '', placeholder: '工位/工序/料号', autoSearch: false, clearable: true, width: 145 },
 ]
 const defaultForm = () => ({
   station_name: '',
