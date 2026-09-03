@@ -117,16 +117,9 @@
       @ok="handleSave"
     >
       <div class="row g-3">
-        <div class="col-6">
-          <label class="small">
-            需求ID <span v-if="!editingId" style="font-weight:400;color:#10B981;font-size:12px;margin-left:6px;">（保存时自动生成）</span>
-          </label>
-          <el-input
-            v-model="form.request_id"
-            :disabled="!editingId"
-            clearable
-            :placeholder="editingId ? '请输入需求编号' : '保存时自动生成随机5位编号'"
-          />
+        <div v-if="false" class="col-6">
+          <label class="small">需求ID</label>
+          <el-input v-model="form.request_id" :disabled="true" clearable placeholder="需求编号" />
         </div>
         <div class="col-6">
           <label class="small">标题</label>

@@ -106,19 +106,11 @@
       @ok="handleSave"
     >
       <div class="row g-3">
-        <div class="col-6">
-          <label
-            class="small form-label"
-            :style="editingId ? labelStyleNormal : labelStyleNoRequired"
-          >
-            BUG ID <span v-if="!editingId" style="font-weight:400;color:#10B981;font-size:12px;margin-left:6px;">（保存时自动生成）</span>
+        <div v-if="false" class="col-6">
+          <label class="small form-label" :style="labelStyleNormal">
+            BUG ID
           </label>
-          <el-input
-            v-model="form.bug_id"
-            :disabled="!editingId"
-            clearable
-            :placeholder="editingId ? '请输入BUG编号' : '保存时自动生成随机5位编号'"
-          />
+          <el-input v-model="form.bug_id" :disabled="true" clearable placeholder="BUG编号" />
         </div>
         <div class="col-6">
           <label class="small form-label"><span style="color:var(--danger);">*</span> 标题</label>
