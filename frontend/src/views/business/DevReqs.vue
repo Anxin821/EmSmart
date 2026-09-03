@@ -218,7 +218,7 @@ const filterFields = computed(() => [
     label: '优先级',
     minWidth: 130,
     options: [
-      { label: '全部优先级', value: '' },
+      { label: '全部', value: '' },
       { label: '紧急', value: '紧急' },
       { label: '高', value: '高' },
       { label: '中', value: '中' },
@@ -232,7 +232,7 @@ const filterFields = computed(() => [
     label: '状态',
     minWidth: 130,
     options: [
-      { label: '全部状态', value: '' },
+      { label: '全部', value: '' },
       { label: '收集', value: '收集' },
       { label: '评估', value: '评估' },
       { label: '开发中', value: '开发中' },

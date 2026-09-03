@@ -232,17 +232,17 @@ const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 
 const filterFields = [
   { type: 'input', key: 'keyword', label: '', placeholder: 'BUG ID / 标题 / 模块 / 指派', autoSearch: false, clearable: true, minWidth: 260 },
-  { type: 'select', key: 'severity', label: '严重等级', placeholder: '全部等级', autoSearch: true, clearable: true,
+  { type: 'select', key: 'severity', label: '严重等级', placeholder: '全部', autoSearch: true, clearable: true,
     options: [
-      { label: '全部等级', value: '' },
+      { label: '全部', value: '' },
       { label: '致命', value: '致命' },
       { label: '严重', value: '严重' },
       { label: '一般', value: '一般' },
       { label: '建议', value: '建议' }
     ] },
-  { type: 'select', key: 'status', label: '状态', placeholder: '全部状态', autoSearch: true, clearable: true,
+  { type: 'select', key: 'status', label: '状态', placeholder: '全部', autoSearch: true, clearable: true,
     options: [
-      { label: '全部状态', value: '' },
+      { label: '全部', value: '' },
       { label: '新建', value: '新建' },
       { label: '确认', value: '确认' },
       { label: '修复中', value: '修复中' },

@@ -193,7 +193,7 @@ const filterFields = computed(() => [
     label: '产线',
     minWidth: 140,
     options: [
-      { label: '全部产线', value: '' },
+      { label: '全部', value: '' },
       ...lines.map(l => ({ label: l, value: l })),
       { label: '品质线', value: '品质线' },
       { label: '维修线', value: '维修线' }

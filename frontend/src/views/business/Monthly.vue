@@ -145,7 +145,7 @@ const projectOptions = computed(() =>
 const filterFields = computed(() => [
   { type: 'input', key: 'year', label: '年', placeholder: '请输入年份（数字）', autoSearch: false, clearable: true },
   { type: 'input', key: 'month', label: '月', placeholder: '请输入月份（数字）', autoSearch: false, clearable: true },
-  { type: 'select', key: 'project', label: '项目', placeholder: '全部项目', autoSearch: false, clearable: true,
+  { type: 'select', key: 'project', label: '项目', placeholder: '全部', autoSearch: false, clearable: true,
     options: projectOptions.value }
 ])
 const defaultForm = () => ({

@@ -170,11 +170,11 @@ const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线']
 const filterFields = [
   { type: 'input',  key: 'keyword', label: '',          placeholder: '设备ID / 名称 / IP / 负责人', autoSearch: false, clearable: true, flex: '1 1 240px' },
   { type: 'select', key: 'line',    label: '产线',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
-    options: [{ label: '全部产线', value: '' }, ...lines.map(l => ({ label: l, value: l }))] },
+    options: [{ label: '全部', value: '' }, ...lines.map(l => ({ label: l, value: l }))] },
   { type: 'select', key: 'status',  label: '状态',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
-    options: [{ label: '全部状态', value: '' }, { label: '正常', value: '正常' }, { label: '故障', value: '故障' }, { label: '保养中', value: '保养中' }] },
+    options: [{ label: '全部', value: '' }, { label: '正常', value: '正常' }, { label: '故障', value: '故障' }, { label: '保养中', value: '保养中' }] },
   { type: 'select', key: 'type',    label: '类型',      placeholder: '全部', autoSearch: true, clearable: true, width: 120,
-    options: [{ label: '全部类型', value: '' }, { label: 'AOI', value: 'AOI' }, { label: 'AI', value: 'AI' }] },
+    options: [{ label: '全部', value: '' }, { label: 'AOI', value: 'AOI' }, { label: 'AI', value: 'AI' }] },
 ]
 /* ====================== 业务纯函数（小而集中，方便 UT/复用） ====================== */
 const cleanStatus = (s) => (s == null ? '正常' : String(s).replace(/^\s*\|*\s*/, '').replace(/\s*\|*\s*$/, '').trim() || '正常')

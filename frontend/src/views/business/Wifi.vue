@@ -203,7 +203,7 @@ const filterFields = computed(() => [
     label: '产线',
     minWidth: 130,
     options: [
-      { label: '全部产线', value: '' },
+      { label: '全部', value: '' },
       ...lines.map(l => ({ label: l, value: l }))
     ],
     autoSearch: true
@@ -214,7 +214,7 @@ const filterFields = computed(() => [
     label: '状态',
     minWidth: 130,
     options: [
-      { label: '全部状态', value: '' },
+      { label: '全部', value: '' },
       { label: '在线', value: '在线' },
       { label: '离线', value: '离线' }
     ],
