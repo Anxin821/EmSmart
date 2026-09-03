@@ -256,8 +256,13 @@ onBeforeUnmount(() => {
    默认的 height:100vh 会比容器高约 96px，底部被 .content 的 overflow:hidden 裁掉，
    并把表格末尾顶到 fixed 分页条后面 → 最后一行 / 横向滚动条看不全、需手动滑动表头。 */
 .page { height: 100%; }
-
 /* 底部为 position:fixed 的分页条预留空间；表格改用 height="100%" 填满剩余区域，
    末尾正好停在分页条上方，表头固定、仅数据区垂直滚动。 */
 .page-content { padding-bottom: 48px; }
+/* 收紧筛选栏与汇总卡、汇总卡与表格之间的间距 */
+.stats-summary-row {
+  margin-top: -18px;    /* 越负越靠近上方筛选栏 */
+  padding-top: 8px;
+  padding-bottom: 6px;  /* 汇总卡与下方表格的间距 */
+}
 </style>
