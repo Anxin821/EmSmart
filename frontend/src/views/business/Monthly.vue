@@ -17,9 +17,9 @@
     </div>
 
     <div v-if="stats.total_output" class="stats-summary-row">
-      <StatCard color="green"  icon="bi bi-check-circle-fill" :num="stats.total_output?.toLocaleString() || '0'" label="总产量" delta="汇总值" delta-type="up"    />
-      <StatCard color="blue"   icon="bi bi-graph-up"         :num="stats.total_qualified?.toLocaleString() || '0'" label="总合格数" delta="汇总值" delta-type="muted" />
-      <StatCard color="yellow" icon="bi bi-percent"          :num="(stats.yield_rate || 0) + '%'"                  label="总直通率" delta="直通率" delta-type="muted" />
+      <StatCard centered color="green" icon="bi bi-check-circle-fill" :num="stats.total_output?.toLocaleString() || '0'" label="总产量" />
+      <StatCard centered color="blue"  icon="bi bi-graph-up"          :num="stats.total_qualified?.toLocaleString() || '0'" label="总合格数" />
+      <StatCard centered :color="yieldColor" icon="bi bi-percent"     :num="(stats.yield_rate || 0) + '%'" label="总直通率" />
     </div>
 
     <div class="page-content">
@@ -142,6 +142,11 @@ const total = ref(0)
 const projectOptions = computed(() =>
   (projects.value || []).map(p => ({ label: p.project_name, value: p.project_code }))
 )
+// 总直通率按阈值动态着色：≥95% 绿 / ≥85% 黄 / <85% 红（预警），让 KPI 好坏一眼可辨
+const yieldColor = computed(() => {
+  const r = Number(stats.value.yield_rate) || 0
+  return r >= 95 ? 'green' : r >= 85 ? 'yellow' : 'red'
+})
 // 年/月改为下拉：值是有限集合（年=近6年、月=1~12），下拉可杜绝非法输入、点选即筛选
 // 选项降序排列：「全部」在首位，其后最大（最新）的年/月排在最上面
 const currentYear = new Date().getFullYear()
