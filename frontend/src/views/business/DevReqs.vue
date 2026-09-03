@@ -69,6 +69,10 @@
           <template #default="s">{{ s.row.expected_date ? s.row.expected_date.slice(0, 10) : '-' }}</template>
         </el-table-column>
 
+        <el-table-column label="录入时间" prop="created_at" width="160" align="center">
+          <template #default="s">{{ formatTime(s.row.created_at) }}</template>
+        </el-table-column>
+
         <el-table-column label="操作" width="210" align="center" fixed="right">
           <template #default="s">
             <template v-if="userStore.canEdit">
@@ -114,8 +118,15 @@
     >
       <div class="row g-3">
         <div class="col-6">
-          <label class="small">需求ID</label>
-          <el-input v-model="form.request_id" clearable />
+          <label class="small">
+            需求ID <span v-if="!editingId" style="font-weight:400;color:#10B981;font-size:12px;margin-left:6px;">（保存时自动生成）</span>
+          </label>
+          <el-input
+            v-model="form.request_id"
+            :disabled="!editingId"
+            clearable
+            :placeholder="editingId ? '请输入需求编号' : '保存时自动生成随机5位编号'"
+          />
         </div>
         <div class="col-6">
           <label class="small">标题</label>
@@ -242,6 +253,8 @@ const filterFields = computed(() => [
 ])
 
 const cleanField = (v) => (v == null ? '' : String(v).replace(/^\s*\|*\s*/, '').replace(/\s*\|*\s*$/, '').trim())
+// 录入时间：后端 created_at 为 ISO 字符串（UTC、无时区后缀），直接截到分钟展示，避免 new Date() 触发本地时区偏移
+const formatTime = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : '-')
 
 const getStatusClass = (s) => {
   const map = { '紧急': 'severe', '高': 'severe', '中': 'info', '低': 'muted', '收集': 'info', '评估': 'purple', '开发中': 'progress', '测试': 'warn', '上线': 'normal' }
@@ -316,8 +329,8 @@ const closeModal = () => {
 }
 
 const handleSave = async () => {
-  if (!form.value.request_id) {
-    ElMessage.warning('请填写需求ID')
+  if (!form.value.title || !String(form.value.title).trim()) {
+    ElMessage.warning('请输入需求标题')
     return
   }
   saving.value = true

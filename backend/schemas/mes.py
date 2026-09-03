@@ -99,7 +99,7 @@ class BugOut(BugBase):
 # 二次开发需求
 # ============================================================
 class DevRequestBase(BaseModel):
-    request_id: str
+    request_id: Optional[str] = None   # 新增时可省略，后端自动生成随机5位编号；编辑时若不填则保持原值
     title: str
     source: Optional[str] = None
     priority: str = "中"

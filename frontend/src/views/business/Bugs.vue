@@ -66,6 +66,10 @@
           <template #default="{ row }">{{ row.deadline ? row.deadline.slice(0, 10) : '-' }}</template>
         </el-table-column>
 
+        <el-table-column prop="created_at" label="录入时间" width="160" align="center">
+          <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
+        </el-table-column>
+
         <el-table-column label="操作" width="210" align="center" fixed="right">
           <template #default="{ row }">
             <template v-if="userStore.canEdit">
@@ -113,7 +117,7 @@
             v-model="form.bug_id"
             :disabled="!editingId"
             clearable
-            :placeholder="editingId ? '请输入BUG编号' : '保存时按 BG-YYYYMMDD-001 自动编号'"
+            :placeholder="editingId ? '请输入BUG编号' : '保存时自动生成随机5位编号'"
           />
         </div>
         <div class="col-6">
@@ -252,6 +256,8 @@ const filterFields = [
 ]
 
 const cleanStatus = (v) => (v == null ? '' : String(v).replace(/^\s*\|*\s*/, '').replace(/\s*\|*\s*$/, '').trim())
+// 录入时间：后端 created_at 为 ISO 字符串（UTC、无时区后缀），直接截到分钟展示，避免 new Date() 触发本地时区偏移
+const formatTime = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : '-')
 
 const getStatusClass = (s) => {
   const map = { '致命': 'severe', '严重': 'severe', '一般': 'muted', '建议': 'muted', '新建': 'fault', '确认': 'severe', '修复中': 'progress', '已解决': 'normal', '关闭': 'normal' }

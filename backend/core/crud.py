@@ -2,6 +2,7 @@
 智能工厂工作任务管理平台 - CRUD 数据库操作封装
 提供各业务模块的标准增删改查函数
 """
+import random
 from typing import Optional, List, Tuple
 from datetime import date, datetime, timedelta
 from sqlalchemy import func, and_, or_, text, desc, case, Date as DateType
@@ -67,6 +68,19 @@ def _clean_dev_request_fields(data: dict) -> dict:
         if field in data and data[field] is not None:
             data[field] = str(data[field]).strip().lstrip("|").rstrip("|").strip()
     return data
+
+
+def _gen_unique_5digit_id(db: Session, model, column) -> str:
+    """生成随机 5 位数字编号（10000-99999），保证在指定表的指定列内不重复。
+
+    随机取值 + 存在性校验重试；5 位数共 9 万个可用值，远超本系统 BUG / 需求的量级，
+    正常情况下几次即可命中空号。连续多次撞号（几乎不可能）时抛出异常提示重试。
+    """
+    for _ in range(1000):
+        candidate = str(random.randint(10000, 99999))
+        if not db.query(model).filter(column == candidate).first():
+            return candidate
+    raise ValueError("无法生成唯一的 5 位编号，请稍后重试")
 
 
 def create_aoi_device(db: Session, data: dict) -> AoiAiDevice:
@@ -795,35 +809,10 @@ def get_bugs_paginated(
 
 
 def create_bug(db: Session, data: dict) -> Bug:
-    # bug_id 自增生成规则：BG-YYYYMMDD-N，每天从 001 开始递增
-    # 若调用方显式传入 bug_id 则保持不变（兼容手工指定）
+    # bug_id 自动生成规则：随机 5 位数字（10000-99999），保证不重复
+    # 若调用方显式传入 bug_id 则保持不变（兼容手工指定 / 编辑）
     if not data.get("bug_id"):
-        today = date.today().strftime("%Y%m%d")
-        prefix = f"BG-{today}-"
-        # 在事务内加行锁级查询，避免并发冲突
-        latest = (
-            db.query(Bug.bug_id)
-            .with_for_update()
-            .filter(Bug.bug_id.like(prefix + "%"))
-            .order_by(Bug.id.desc())
-            .first()
-        )
-        next_seq = 1
-        if latest and latest[0]:
-            m = __import__("re").match(rf"^{prefix}(\d+)$", latest[0])
-            if m:
-                try:
-                    next_seq = int(m.group(1)) + 1
-                except (TypeError, ValueError):
-                    next_seq = 1
-        # 避免最终值重复：若当日同序号已被插入（手工/并发），循环递增
-        while True:
-            candidate = f"{prefix}{next_seq:03d}"
-            exists = db.query(Bug.id).filter(Bug.bug_id == candidate).first()
-            if not exists:
-                break
-            next_seq += 1
-        data["bug_id"] = candidate
+        data["bug_id"] = _gen_unique_5digit_id(db, Bug, Bug.bug_id)
     data = _clean_dev_request_fields(data)
     bug = Bug(**data)
     db.add(bug)
@@ -911,6 +900,10 @@ def get_dev_requests_paginated(
 
 
 def create_dev_request(db: Session, data: dict) -> DevRequest:
+    # request_id 自动生成规则：随机 5 位数字（10000-99999），保证不重复
+    # 若调用方显式传入 request_id 则保持不变（兼容手工指定 / 编辑）
+    if not data.get("request_id"):
+        data["request_id"] = _gen_unique_5digit_id(db, DevRequest, DevRequest.request_id)
     data = _clean_dev_request_fields(data)
     req = DevRequest(**data)
     db.add(req)
