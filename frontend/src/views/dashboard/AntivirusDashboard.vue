@@ -72,7 +72,7 @@
             <span v-else style="color:#ef4444;font-weight:500;">{{ s.row.overdue }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="进度" min-width="320" align="left">
+        <el-table-column label="进度" min-width="320" align="center">
           <template #default="s">
             <div class="anti-progress-bar" :class="'bar-' + s.row.level">
               <div class="anti-progress-inner" :style="{ width: s.row.progress + '%' }"></div>
@@ -209,7 +209,17 @@ const loadData = async () => {
       pending_count: res.data?.pending_count ?? 0,
       overdue_count: res.data?.overdue_count ?? 0,
     }
-    distribution.value = res.data?.distribution || []
+    // 根据进度设置 level，供样式使用：
+    // - >= 90% => success (绿色)
+    // - 60-89% => muted   (中性/深色文本)
+    // - < 60%  => danger  (红色)
+    distribution.value = (res.data?.distribution || []).map(item => {
+      const progress = Number(item.progress) || 0
+      let level = 'muted'
+      if (progress >= 90) level = 'success'
+      else if (progress < 60) level = 'danger'
+      return { ...item, progress, level }
+    })
   } catch (e) {
     ElMessage.error(e.response?.data?.message || '加载杀毒看板数据失败')
     console.error(e)
@@ -260,6 +270,7 @@ const exportPPT = async () => {
   font-weight: 600;
   color: var(--c-text);
   padding: 14px 0 14px 4px;
+  text-align: center;
 }
 .table-scroll {
   flex: 1;
@@ -269,11 +280,14 @@ const exportPPT = async () => {
 /* ---------- 进度条（百分比内嵌在进度条上方，模仿截图） ---------- */
 .anti-progress-bar {
   width: 100%;
+  max-width: 520px;
   height: 22px;
   background: #E5E7EB;
   border-radius: 999px;
   overflow: visible;
   position: relative;
+  display: block;
+  margin: 0 auto; /* 居中 */
 }
 .anti-progress-inner {
   height: 100%;
