@@ -1537,6 +1537,15 @@ button { font-family: inherit; }
   position: relative;
   z-index: 1;
 }
+/* ID / 编号类列（服务器ID、BUG ID、需求ID、料号）：内容常比列宽长，需恢复截断——
+   用省略号收尾并保持居中，避免溢出盖住相邻列 / 撑破表格；同时让 show-overflow-tooltip
+   重新生效（悬停看完整编号）。仅作用于显式标了 class-name="cell-clip" 的列，
+   覆盖上面 .cell 的 overflow:visible，不影响其它表格 / badge 的防遮挡行为。 */
+.el-table td.cell-clip .cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* el-table 固定列（fixed=right）：保证操作列在最上层，不被直通率 badge / 色块 span 叠压 */
 .el-table .el-table__fixed-right-patch,
 .el-table .el-table__fixed,

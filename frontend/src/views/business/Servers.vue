@@ -23,7 +23,7 @@
     <div class="page-content">
     <el-table ref="tableRef" v-loading="loading" :data="items" stripe border height="100%" style="width: 100%;" empty-text="暂无数据">
 
-      <el-table-column label="服务器ID" prop="server_id" width="120" align="center" show-overflow-tooltip>
+      <el-table-column label="服务器ID" prop="server_id" width="150" align="center" class-name="cell-clip" show-overflow-tooltip>
         <template #default="{ row }">
           <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">{{ row.server_id }}</code>
         </template>

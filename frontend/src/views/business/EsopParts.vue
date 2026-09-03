@@ -32,7 +32,7 @@
 
         <el-table-column prop="process_name" label="工序" min-width="150" align="center" show-overflow-tooltip />
 
-        <el-table-column prop="part_number" label="料号" width="120" align="center" show-overflow-tooltip />
+        <el-table-column prop="part_number" label="料号" width="150" align="center" class-name="cell-clip" show-overflow-tooltip />
 
         <el-table-column prop="file_name" label="ESOP文件" min-width="150" align="center" show-overflow-tooltip>
           <template #default="{ row }">
