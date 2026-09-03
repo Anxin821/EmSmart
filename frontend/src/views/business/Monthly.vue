@@ -49,6 +49,12 @@
         </template>
       </el-table-column>
 
+      <el-table-column prop="updated_at" label="录入时间" width="160" align="center">
+        <template #default="{ row }">
+          {{ formatTime(row.updated_at) }}
+        </template>
+      </el-table-column>
+
       <el-table-column label="操作" width="180" align="center" fixed="right">
         <template #default="{ row }">
           <template v-if="userStore.canEdit">
@@ -126,6 +132,8 @@ import CommonModal      from '@/components/common/CommonModal.vue'
 import StatCard         from '@/components/common/StatCard.vue'
 const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
+// 录入时间：后端 updated_at 为 ISO 字符串（UTC、无时区后缀），直接截到分钟展示，避免 new Date() 触发本地时区偏移
+const formatTime = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : '-')
 const tableRef = ref(null)
 const tableData = ref([])
 const projects = ref([])

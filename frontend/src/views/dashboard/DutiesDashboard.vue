@@ -55,7 +55,7 @@
                     </div>
                   </el-tooltip>
                   <div
-                    v-if="userStore.canEdit && isRowActive(duty.id, idx)"
+                    v-if="userStore.isAdmin && isRowActive(duty.id, idx)"
                     class="duty-item-actions duty-item-actions-visible"
                   >
                     <el-button link type="primary" size="small" @click.stop="openItemEditModal(duty, idx, item)">编辑</el-button>
@@ -71,7 +71,7 @@
             </div>
           </el-scrollbar>
 
-          <template #footer v-if="userStore.canEdit">
+          <template #footer v-if="userStore.isAdmin">
             <div class="duty-footer-actions">
               <el-button class="duty-edit-btn" @click="openDutyEditModal(duty)">
                 <span class="bi bi-pencil-square" style="margin-right:5px;"></span>编辑
