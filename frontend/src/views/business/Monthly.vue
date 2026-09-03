@@ -142,11 +142,22 @@ const total = ref(0)
 const projectOptions = computed(() =>
   (projects.value || []).map(p => ({ label: p.project_name, value: p.project_code }))
 )
+// 年/月改为下拉：值是有限集合（年=近6年、月=1~12），下拉可杜绝非法输入、点选即筛选
+// 选项降序排列：「全部」在首位，其后最大（最新）的年/月排在最上面
+const currentYear = new Date().getFullYear()
+const yearOptions = [
+  { label: '全部', value: '' },
+  ...Array.from({ length: 6 }, (_, i) => String(currentYear - i)).map(y => ({ label: y, value: y }))
+]
+const monthOptions = [
+  { label: '全部', value: '' },
+  ...Array.from({ length: 12 }, (_, i) => String(12 - i)).map(m => ({ label: m, value: m }))
+]
 const filterFields = computed(() => [
-  { type: 'input', key: 'year', label: '年', placeholder: '全部', autoSearch: false, clearable: true, width: 90 },
-  { type: 'input', key: 'month', label: '月', placeholder: '全部', autoSearch: false, clearable: true, width: 90 },
-  { type: 'select', key: 'project', label: '项目', placeholder: '全部', autoSearch: false, clearable: true,
-    options: projectOptions.value }
+  { type: 'select', key: 'year', label: '年', placeholder: '全部', autoSearch: true, clearable: true, width: 90, options: yearOptions },
+  { type: 'select', key: 'month', label: '月', placeholder: '全部', autoSearch: true, clearable: true, width: 90, options: monthOptions },
+  { type: 'select', key: 'project', label: '项目', placeholder: '全部', autoSearch: true, clearable: true,
+    options: [{ label: '全部', value: '' }, ...projectOptions.value] }
 ])
 const defaultForm = () => ({
   year: new Date().getFullYear(),

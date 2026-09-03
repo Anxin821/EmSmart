@@ -181,12 +181,39 @@ const uploadRef = ref(null)
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
-const filterFields = [
-  { type: 'input', key: 'year', label: '年', placeholder: '全部', autoSearch: false, clearable: true, width: 90 },
-  { type: 'input', key: 'week', label: '周', placeholder: '全部', autoSearch: false, clearable: true, width: 90 },
-  { type: 'select', key: 'line', label: '产线', placeholder: '全部', autoSearch: false, clearable: true, width: 90,
-    options: lines.map(l => ({ label: l, value: l })) }
+// 年/周改为下拉：值是有限集合，下拉可杜绝非法输入、点选即筛选，与产线风格统一
+// 选项降序排列：「全部」在首位，其后最大（最新）的年/周排在最上面
+const currentYear = new Date().getFullYear()
+const yearOptions = [
+  { label: '全部', value: '' },
+  ...Array.from({ length: 6 }, (_, i) => String(currentYear - i)).map(y => ({ label: y, value: y }))
 ]
+// 周上限跟随“当前数据最大的周”：列表按 year DESC、week_number DESC 排序，取第一条即该范围最大周
+const maxWeek = ref(53)
+const weekOptions = computed(() => [
+  { label: '全部', value: '' },
+  ...Array.from({ length: maxWeek.value }, (_, i) => String(maxWeek.value - i)).map(w => ({ label: w, value: w }))
+])
+const filterFields = computed(() => [
+  { type: 'select', key: 'year', label: '年', placeholder: '全部', autoSearch: true, clearable: true, width: 90, options: yearOptions },
+  { type: 'select', key: 'week', label: '周', placeholder: '全部', autoSearch: true, clearable: true, width: 90, options: weekOptions.value },
+  { type: 'select', key: 'line', label: '产线', placeholder: '全部', autoSearch: true, clearable: true, width: 90,
+    options: [{ label: '全部', value: '' }, ...lines.map(l => ({ label: l, value: l }))] }
+])
+// 拉取当前范围（按所选年份）的最大周，用于收敛周下拉选项
+const loadMaxWeek = async () => {
+  try {
+    const params = { page: 1, page_size: 1 }
+    if (filters.value.year) params.year = filters.value.year
+    const res = await productionApi.weekly(params)
+    const first = res.data?.items?.[0]
+    maxWeek.value = first?.week_number ? Number(first.week_number) : 53
+    // 若已选周超出新的上限，重置为“全部”避免出现无效筛选
+    if (filters.value.week && Number(filters.value.week) > maxWeek.value) filters.value.week = ''
+  } catch (e) {
+    console.error(e)
+  }
+}
 const defaultForm = () => ({
   year: new Date().getFullYear(),
   week_number: Math.ceil((new Date().getMonth() + 1) / 4),
@@ -288,6 +315,8 @@ const handleImport = async () => {
 watch([page, pageSize], () => {
   loadData()
 })
+// 年份变化时重新计算“当前数据最大的周”，收敛周下拉选项上限
+watch(() => filters.value.year, () => { loadMaxWeek() })
 // 窗口尺寸变化时重算表格布局，避免固定列与主体错位
 const handleResize = () => tableRef.value?.doLayout()
 onMounted(async () => {
@@ -295,6 +324,7 @@ onMounted(async () => {
   const projRes = await optionsApi.projects()
   projects.value = projRes.data || []
   loadData()
+  loadMaxWeek()
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
