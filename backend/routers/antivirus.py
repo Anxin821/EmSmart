@@ -188,28 +188,35 @@ def import_records(
 
 @router.get("/overdue-records")
 def list_overdue_records(
+    status: Optional[str] = Query(None, pattern="^(overdue|pending)$"),
     production_line: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """查询超时未杀毒记录（按线体筛选）。
-    按 (device_id, production_line) 线内查重：每台设备在本线只取最新一条记录，仅当该记录已超时才计入，
-    口径与看板 overdue 一致，避免同一设备多条历史记录重复出现、数字对不上。"""
+    """查询杀毒状态记录（按线体筛选）。
+    status: overdue -> 超时未杀毒, pending -> 应杀毒截止前24小时内
+    按 (device_id, production_line) 线内查重：每台设备在本线只取最新一条记录，
+    口径与看板状态一致，避免同一设备多条历史记录重复出现、数字对不上。"""
     now = datetime.utcnow()
-    # 线内去重后再筛超时，保证“超时未杀毒”KPI/分布数字与本弹窗列表条数一致
     latest = _dedupe_latest_by_device_line(db.query(AntivirusRecord).all())
-    overdue = [
-        r for r in latest
-        if r.next_antivirus_time and r.next_antivirus_time <= now
-        and (not production_line or r.production_line == production_line)
-    ]
-    overdue.sort(key=lambda r: (r.next_antivirus_time, r.id))
-    total = len(overdue)
+
+    def _matches(r: AntivirusRecord) -> bool:
+        tag = _classify_antivirus_status(r.next_antivirus_time, now)
+        if status == "pending":
+            return tag == "pending" and (not production_line or r.production_line == production_line)
+        if status == "overdue":
+            return tag == "overdue" and (not production_line or r.production_line == production_line)
+        # 未传 status 时，兼容旧调用：返回超时记录
+        return tag == "overdue" and (not production_line or r.production_line == production_line)
+
+    records = [r for r in latest if _matches(r)]
+    records.sort(key=lambda r: (r.next_antivirus_time or datetime.min, r.id))
+    total = len(records)
     start = (page - 1) * page_size
-    records = overdue[start:start + page_size]
-    return {"code": 200, "data": PaginatedData(total=total, page=page, page_size=page_size, items=[_record_to_dict(r) for r in records])}
+    page_records = records[start:start + page_size]
+    return {"code": 200, "data": PaginatedData(total=total, page=page, page_size=page_size, items=[_record_to_dict(r) for r in page_records])}
 
 
 @router.get("/dashboard")

@@ -12,7 +12,15 @@
     <div class="stat-grid kpi-row">
       <StatCard centered color="blue" icon="bi bi-pc-display" :num="stats.total_devices" label="设备总数" />
       <StatCard centered color="green" icon="bi bi-check-circle-fill" :num="stats.done_count" label="已杀毒" />
-      <StatCard centered color="yellow" icon="bi bi-clock-history" :num="stats.pending_count" label="待杀毒" />
+      <StatCard
+        centered
+        color="yellow"
+        icon="bi bi-clock-history"
+        :num="stats.pending_count"
+        label="待杀毒"
+        clickable
+        @click="showPendingModal(null)"
+      />
       <StatCard
         centered
         color="red"
@@ -50,7 +58,12 @@
         </el-table-column>
         <el-table-column label="待杀毒" prop="pending" min-width="100" align="center">
           <template #default="s">
-            <span style="color:#f59e0b;font-weight:500;">{{ s.row.pending }}</span>
+            <span
+              v-if="s.row.pending > 0"
+              style="color:#f59e0b;font-weight:500;cursor:pointer;text-decoration:underline;"
+              @click="showPendingModal(s.row.line)"
+            >{{ s.row.pending }}</span>
+            <span v-else style="color:#f59e0b;font-weight:500;">{{ s.row.pending }}</span>
           </template>
         </el-table-column>
         <el-table-column label="超时未杀毒" prop="overdue" min-width="120" align="center">
@@ -103,6 +116,33 @@
         <span style="position:absolute;right:0;color:var(--c-text-3);font-size:13px;">共 {{ overdueTotal }} 条记录</span>
       </div>
     </el-dialog>
+
+    <el-dialog
+      v-model="pendingModalVisible"
+      :title="pendingLine ? pendingLine + ' - 待杀毒记录' : '全部待杀毒记录'"
+      width="900px"
+      align-center
+      destroy-on-close
+    >
+      <el-table :data="pendingRecords" stripe border style="width:100%;" max-height="420" empty-text="暂无待杀毒记录">
+        <el-table-column prop="device_id" label="设备ID" min-width="140" align="center" show-overflow-tooltip />
+        <el-table-column prop="production_line" label="线体" width="90" align="center" />
+        <el-table-column prop="cycle" label="周期" width="80" align="center" />
+        <el-table-column label="上次杀毒时间" min-width="170" align="center">
+          <template #default="s">{{ (s.row.antivirus_time || '').slice(0, 19).replace('T', ' ') }}</template>
+        </el-table-column>
+        <el-table-column label="应杀毒时间" min-width="170" align="center">
+          <template #default="s">{{ (s.row.next_antivirus_time || '').slice(0, 19).replace('T', ' ') }}</template>
+        </el-table-column>
+        <el-table-column prop="operator" label="操作人" width="100" align="center">
+          <template #default="s">{{ s.row.operator || '-' }}</template>
+        </el-table-column>
+      </el-table>
+      <div style="margin-top:12px;display:flex;align-items:center;justify-content:center;position:relative;">
+        <el-button @click="pendingModalVisible = false">关闭</el-button>
+        <span style="position:absolute;right:0;color:var(--c-text-3);font-size:13px;">共 {{ pendingTotal }} 条记录</span>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -117,11 +157,16 @@ const stats = ref({ total_devices: 0, done_count: 0, pending_count: 0, overdue_c
 const distribution = ref([])
 const exporting = ref(false)
 
-// 超时记录弹窗
+// 超时/待杀毒记录弹窗
 const overdueModalVisible = ref(false)
 const overdueLine = ref(null)
 const overdueRecords = ref([])
 const overdueTotal = ref(0)
+
+const pendingModalVisible = ref(false)
+const pendingLine = ref(null)
+const pendingRecords = ref([])
+const pendingTotal = ref(0)
 
 const showOverdueModal = async (line) => {
   overdueLine.value = line
@@ -129,13 +174,29 @@ const showOverdueModal = async (line) => {
   overdueRecords.value = []
   overdueTotal.value = 0
   try {
-    const params = { page: 1, page_size: 200 }
+    const params = { page: 1, page_size: 200, status: 'overdue' }
     if (line) params.production_line = line
     const res = await antivirusApi.overdueRecords(params)
     overdueRecords.value = res.data?.items || []
     overdueTotal.value = res.data?.total || 0
   } catch (e) {
     ElMessage.error(e.response?.data?.message || '加载超时记录失败')
+  }
+}
+
+const showPendingModal = async (line) => {
+  pendingLine.value = line
+  pendingModalVisible.value = true
+  pendingRecords.value = []
+  pendingTotal.value = 0
+  try {
+    const params = { page: 1, page_size: 200, status: 'pending' }
+    if (line) params.production_line = line
+    const res = await antivirusApi.overdueRecords(params)
+    pendingRecords.value = res.data?.items || []
+    pendingTotal.value = res.data?.total || 0
+  } catch (e) {
+    ElMessage.error(e.response?.data?.message || '加载待杀毒记录失败')
   }
 }
 
