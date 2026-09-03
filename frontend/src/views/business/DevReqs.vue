@@ -35,9 +35,9 @@
         :height="'calc(100vh - 210px)'"
       >
 
-        <el-table-column label="需求ID" prop="request_id" width="160" align="center" class-name="cell-clip" show-overflow-tooltip>
+        <el-table-column label="需求ID" prop="request_id" width="68" align="center" class-name="cell-clip" show-overflow-tooltip>
           <template #default="s">
-            <code style="background: var(--primary-50); padding: 1px 6px; border-radius: 4px;">{{ s.row.request_id }}</code>
+            <code style="display: inline-block; max-width: 100%; background: var(--primary-50); padding: 1px 5px; border-radius: 4px; font-size: 12px; line-height: 1.6; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;">{{ s.row.request_id }}</code>
           </template>
         </el-table-column>
 
