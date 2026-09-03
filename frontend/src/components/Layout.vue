@@ -43,9 +43,6 @@
       <button type="button" class="nav-link" :class="{ active: $route.name === 'Wifi' }" @click="go('/wifi')">
         <span class="bi bi-wifi" aria-hidden="true"></span>WiFi AP管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Orders' }" @click="go('/orders')">
-        <span class="bi bi-journal-text" aria-hidden="true"></span>MES工单管理
-      </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'Bugs' }" @click="go('/bugs')">
         <span class="bi bi-bug-fill" aria-hidden="true"></span>MES BUG管理
       </button>
@@ -121,7 +118,6 @@ const NAME_MAP = {
   Servers:      ['业务管理', '服务器管理'],
   AgingRacks:   ['业务管理', '老化架管理'],
   Wifi:         ['业务管理', 'WiFi AP 管理'],
-  Orders:       ['业务管理', 'MES 工单管理'],
   Bugs:         ['业务管理', 'MES BUG 管理'],
   DevReqs:      ['业务管理', 'MES 需求管理'],
   Antivirus:    ['业务管理', '设备杀毒记录'],
