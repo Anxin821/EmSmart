@@ -11,7 +11,7 @@
             <el-icon><RefreshRight /></el-icon>重置
           </el-button>
           <template v-if="userStore.canEdit"><el-button type="success" @click="showModal()"><el-icon><Plus /></el-icon>录入</el-button></template>
-          <template v-if="userStore.isAdmin"><el-button type="warning" @click="handleGenerate"><el-icon><DataAnalysis /></el-icon>汇总月报</el-button></template>
+          <template v-if="userStore.isAdmin"><el-button type="warning" @click="openProjectManager"><el-icon><DataAnalysis /></el-icon>项目管理</el-button></template>
         </template>
       </CommonFilterBar>
     </div>
@@ -117,11 +117,47 @@
         </div>
       </template>
     </CommonModal>
+
+    <CommonModal
+      v-model:visible="projectManagerVisible"
+      title="项目管理"
+      width="700px"
+      :show-footer="false"
+      :body-style="{ padding: '0 12px 12px', overflow: 'hidden' }"
+    >
+      <div class="project-manager-wrap">
+        <el-table v-loading="projectManagerLoading" :data="projectManagerItems" stripe border class="project-manager-table" style="width: 100%;" height="420" :fit="true">
+          <el-table-column label="项目编码" width="120" align="center" show-overflow-tooltip>
+            <template #default="{ row }">
+              <el-input v-model="row.project_code" :disabled="!!row.id" size="small" placeholder="如: A01" clearable />
+            </template>
+          </el-table-column>
+          <el-table-column label="项目名称" min-width="220" align="center" show-overflow-tooltip>
+            <template #default="{ row }">
+              <el-input v-model="row.project_name" size="small" placeholder="请输入项目名称" clearable />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button type="primary" link size="small" @click="saveProjectRow(row)">保存</el-button>
+              <el-button v-if="row.id" type="danger" link size="small" @click="deleteProjectRow(row)">删除</el-button>
+              <el-button v-else type="danger" link size="small" @click="removeProjectDraft(row)">取消</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <template #footer>
+        <div class="cm-footer">
+          <el-button @click="projectManagerVisible = false">关闭</el-button>
+          <el-button type="primary" @click="addProjectRow">新增项目</el-button>
+        </div>
+      </template>
+    </CommonModal>
   </div>
 </template>
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { productionApi, optionsApi } from '@/api'
+import { productionApi, optionsApi, projectsApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, RefreshRight, Plus, DataAnalysis } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
@@ -162,6 +198,9 @@ const total = ref(0)
 const projectOptions = computed(() =>
 normalizeProjects(projects.value).map(p => ({ label: p.project_name, value: p.project_code }))
 )
+const projectManagerVisible = ref(false)
+const projectManagerLoading = ref(false)
+const projectManagerItems = ref([])
 // 总直通率按阈值动态着色：≥95% 绿 / ≥85% 黄 / <85% 红（预警），让 KPI 好坏一眼可辨
 const yieldColor = computed(() => {
   const r = Number(stats.value.yield_rate) || 0
@@ -259,17 +298,77 @@ const handleDelete = async (id) => {
     toast.error(e.response?.data?.message || '删除失败')
   }
 }
-const handleGenerate = async () => {
-  const year = prompt('请输入年份：', new Date().getFullYear())
-  const month = prompt('请输入月份：', new Date().getMonth() + 1)
-  if (!year || !month) return
-  try {
-    await productionApi.generateMonthly(parseInt(year), parseInt(month))
-    toast.success('生成成功')
-    loadData()
-  } catch (e) {
-    toast.error('生成失败')
+const openProjectManager = async () => {
+projectManagerVisible.value = true
+await loadProjectManager()
+}
+const loadProjectManager = async () => {
+projectManagerLoading.value = true
+try {
+  const res = await projectsApi.list()
+  projectManagerItems.value = (res.data || []).map(item => ({
+    ...item,
+    project_code: item.project_code || '',
+    project_name: item.project_name || ''
+  }))
+} catch (e) {
+  toast.error(e.response?.data?.message || '加载项目列表失败')
+} finally {
+  projectManagerLoading.value = false
+}
+}
+const addProjectRow = () => {
+projectManagerItems.value.unshift({
+  id: null,
+  project_code: '',
+  project_name: '',
+  is_active: true
+})
+}
+const removeProjectDraft = (row) => {
+projectManagerItems.value = projectManagerItems.value.filter(item => item !== row)
+}
+const saveProjectRow = async (row) => {
+const code = String(row.project_code || '').trim()
+const name = String(row.project_name || '').trim()
+if (!name) {
+  toast.error('项目名称不能为空')
+  return
+}
+if (!row.id && !code) {
+  toast.error('新项目编码不能为空')
+  return
+}
+try {
+  if (row.id) {
+    await projectsApi.update(row.id, { project_name: name })
+  } else {
+    await projectsApi.create({
+      project_code: code,
+      project_name: name
+    })
   }
+  const projRes = await optionsApi.projects()
+  projects.value = normalizeProjects(projRes.data)
+  await loadProjectManager()
+  toast.success(row.id ? '项目已更新' : '项目已新增')
+} catch (e) {
+  toast.error(e.response?.data?.message || e.response?.data?.detail || '保存项目失败')
+}
+}
+const deleteProjectRow = async (row) => {
+if (!row.id) return
+const ok = await confirmDelete(`项目 ${row.project_code || row.project_name}`, '删除后将无法继续用于月报筛选和导入')
+if (!ok) return
+try {
+  await projectsApi.delete(row.id)
+  await loadProjectManager()
+  const projRes = await optionsApi.projects()
+  projects.value = normalizeProjects(projRes.data)
+  toast.success('项目已删除')
+} catch (e) {
+  toast.error(e.response?.data?.message || '删除项目失败')
+}
 }
 watch([page, pageSize], () => {
   loadData()
@@ -301,6 +400,14 @@ onBeforeUnmount(() => {
 /* 底部为 position:fixed 的分页条预留空间；表格改用 height="100%" 填满剩余区域，
    末尾正好停在分页条上方，表头固定、仅数据区垂直滚动。 */
 .page-content { padding-bottom: 20px; }
+.project-manager-wrap {
+   width: 100%;
+   overflow: visible;
+}
+.project-manager-table {
+   width: 100%;
+   overflow: visible;
+}
 /* 收紧筛选栏与汇总卡、汇总卡与表格之间的间距 */
 .stats-summary-row {
   margin-top: -18px;    /* 越负越靠近上方筛选栏 */
