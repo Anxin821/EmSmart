@@ -11,7 +11,7 @@
             <el-icon><RefreshRight /></el-icon>重置
           </el-button>
           <template v-if="userStore.canEdit"><el-button type="success" @click="showModal()"><el-icon><Plus /></el-icon>录入</el-button></template>
-          <template v-if="userStore.isAdmin"><el-button type="warning" @click="openProjectManager"><el-icon><DataAnalysis /></el-icon>项目管理</el-button></template>
+          <template v-if="userStore.canManageProjects"><el-button type="warning" @click="openProjectManager"><el-icon><DataAnalysis /></el-icon>项目管理</el-button></template>
         </template>
       </CommonFilterBar>
     </div>

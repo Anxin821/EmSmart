@@ -7,6 +7,8 @@ export const useUserStore = defineStore('user', () => {
   
   const isLoggedIn = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
+  const isEngineer = computed(() => user.value?.role === 'engineer')
+  const canManageProjects = computed(() => ['admin', 'engineer'].includes(user.value?.role))
   const isViewer = computed(() => user.value?.role === 'viewer')
   const canEdit = computed(() => user.value?.role !== 'viewer')
 
@@ -32,6 +34,8 @@ export const useUserStore = defineStore('user', () => {
     user,
     isLoggedIn,
     isAdmin,
+    isEngineer,
+    canManageProjects,
     isViewer,
     canEdit,
     setToken,
