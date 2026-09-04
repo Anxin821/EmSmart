@@ -116,10 +116,12 @@
           <template #default="s">{{ formatTime(s.row.created_at) }}</template>
         </el-table-column>
       </el-table>
-      <div style="margin-top:12px;display:flex;align-items:center;justify-content:center;position:relative;">
-        <el-button @click="openBugModalVisible = false">关闭</el-button>
-        <span style="position:absolute;right:0;color:var(--c-text-3);font-size:13px;">共 {{ openBugTotal }} 条记录</span>
-      </div>
+      <template #footer>
+        <div class="dialog-footer-bar">
+          <el-button class="dialog-close-btn" @click="openBugModalVisible = false">关闭</el-button>
+          <span class="dialog-total">共 {{ openBugTotal }} 条记录</span>
+        </div>
+      </template>
     </el-dialog>
 
     <!-- 延期需求 弹窗 -->
@@ -142,10 +144,12 @@
           <template #default="s">{{ formatTime(s.row.created_at) }}</template>
         </el-table-column>
       </el-table>
-      <div style="margin-top:12px;display:flex;align-items:center;justify-content:center;position:relative;">
-        <el-button @click="overdueReqModalVisible = false">关闭</el-button>
-        <span style="position:absolute;right:0;color:var(--c-text-3);font-size:13px;">共 {{ overdueReqTotal }} 条记录</span>
-      </div>
+      <template #footer>
+        <div class="dialog-footer-bar">
+          <el-button class="dialog-close-btn" @click="overdueReqModalVisible = false">关闭</el-button>
+          <span class="dialog-total">共 {{ overdueReqTotal }} 条记录</span>
+        </div>
+      </template>
     </el-dialog>
 
   </div>
@@ -625,6 +629,25 @@ onBeforeUnmount(() => {
 }
 .ms-list::-webkit-scrollbar-thumb { background: #D8DEEA; border-radius: 4px; }
 .ms-list::-webkit-scrollbar      { width: 6px; }
+
+.dialog-footer-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 38px;
+}
+.dialog-close-btn {
+  margin: 0 auto;
+}
+.dialog-total {
+  position: absolute;
+  right: 0;
+  color: var(--c-text-3);
+  font-size: 13px;
+  white-space: nowrap;
+}
 
 /* 卡尺寸统一：图表随容器高度自适应 */
 .chart-container {
