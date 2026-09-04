@@ -74,8 +74,14 @@
         </el-table-column>
         <el-table-column label="进度" min-width="320" align="center">
           <template #default="s">
-            <div class="anti-progress-bar" :class="'bar-' + s.row.level">
-              <div class="anti-progress-inner" :style="{ width: s.row.progress + '%' }"></div>
+            <div
+              class="anti-progress-bar"
+              :class="['bar-' + s.row.level, { 'bar-zero': s.row.progress <= 5 }]"
+            >
+              <div
+                class="anti-progress-inner"
+                :style="{ width: (s.row.progress <= 5 ? 100 : s.row.progress) + '%' }"
+              ></div>
               <div class="anti-progress-text" :class="'txt-' + s.row.level">{{ s.row.progress }}%</div>
             </div>
           </template>
@@ -216,8 +222,9 @@ const loadData = async () => {
     // - 60-89% => muted   (中性/深色文本)
     // - < 60%  => danger  (红色)
     distribution.value = (res.data?.distribution || []).map(item => {
-      const progress = Number(item.progress) || 0
-      let level = 'muted'
+      const progressValue = Number(item.progress)
+      const progress = Number.isFinite(progressValue) ? Math.min(Math.max(progressValue, 0), 100) : 0
+      let level = 'warn'
       if (progress >= 90) level = 'success'
       else if (progress < 60) level = 'danger'
       return { ...item, progress, level }
@@ -286,21 +293,33 @@ const exportPPT = async () => {
   height: 22px;
   background: linear-gradient(180deg, #edf2f7 0%, #dfe7ee 100%);
   border-radius: 999px;
-  overflow: visible;
+  overflow: hidden;
   position: relative;
   display: block;
   margin: 0 auto;
-  box-shadow: inset 0 1px 2px rgba(15,23,42,.12), 0 0 0 1px rgba(15,23,42,.04);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  box-shadow: inset 0 1px 2px rgba(15,23,42,.12), 0 0 0 1px rgba(15,23,42,.02);
 }
 .anti-progress-inner {
   height: 100%;
+  min-width: 12px;
   border-radius: 999px;
   transition: width .3s ease;
-  box-shadow: inset 0 -1px 0 rgba(255,255,255,.18);
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,.18), 0 0 10px rgba(15,23,42,.12);
 }
-.bar-muted   .anti-progress-inner { background: linear-gradient(90deg, #a8b8c8 0%, #64748b 100%); }
-.bar-danger  .anti-progress-inner { background: linear-gradient(90deg, #ff4d4f 0%, #d92d20 100%); }
-.bar-success .anti-progress-inner { background: linear-gradient(90deg, #34d399 0%, #16a34a 100%); }
+.bar-muted   .anti-progress-inner,
+.bar-warn    .anti-progress-inner {
+  background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,.2), 0 0 12px rgba(245,158,11,.32);
+}
+.bar-danger  .anti-progress-inner {
+  background: linear-gradient(90deg, #ff7b7b 0%, #ef4444 42%, #d92d20 100%);
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,.2), 0 0 12px rgba(239,68,68,.35);
+}
+.bar-success .anti-progress-inner {
+  background: linear-gradient(90deg, #4ade80 0%, #22c55e 50%, #16a34a 100%);
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,.2), 0 0 12px rgba(34,197,94,.28);
+}
 
 .anti-progress-text {
   position: absolute;
@@ -315,9 +334,24 @@ const exportPPT = async () => {
   pointer-events: none;
   text-shadow: 0 1px 1px rgba(15,23,42,.18);
 }
-.txt-muted   { color: #f8fafc; }
+.txt-muted   { color: #fffaf0; }
+.txt-warn    { color: #fffaf0; }
 .txt-danger  { color: #fff7f7; }
 .txt-success { color: #f0fdf4; }
+
+.bar-zero {
+  background: linear-gradient(180deg, #fee2e2 0%, #fecaca 100%);
+  border-color: rgba(239, 68, 68, 0.45);
+}
+.bar-zero .anti-progress-inner {
+  background: linear-gradient(90deg, #ef4444 0%, #dc2626 60%, #991b1b 100%);
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,.2), 0 0 14px rgba(239,68,68,.4);
+}
+.bar-muted .anti-progress-text,
+.bar-warn .anti-progress-text { color: #fffaf0; }
+.bar-danger .anti-progress-text { color: #fff; }
+.bar-success .anti-progress-text { color: #f0fdf4; }
+.bar-zero .anti-progress-text { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.2); }
 
 .dialog-footer-bar {
   display: flex;
