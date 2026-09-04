@@ -237,9 +237,19 @@ const loadMaxWeek = async () => {
     console.error(e)
   }
 }
+const getCurrentWeekNumber = () => {
+  const now = new Date()
+  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
+  const dayNum = (d.getUTCDay() + 6) % 7
+  d.setUTCDate(d.getUTCDate() - dayNum + 3)
+  const firstThursday = new Date(Date.UTC(d.getUTCFullYear(), 0, 4))
+  const week = 1 + Math.round(((d - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7)
+  return Math.max(1, Math.min(53, week))
+}
+
 const defaultForm = () => ({
   year: new Date().getFullYear(),
-  week_number: Math.ceil((new Date().getMonth() + 1) / 4),
+  week_number: getCurrentWeekNumber(),
   production_line: '1线',
   project: projects.value[0]?.project_code || '',
   total_output: 0,
