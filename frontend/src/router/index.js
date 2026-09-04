@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import Login from '../views/Login.vue'
 import Layout from '../components/Layout.vue'
-import { authApi } from '../api'
+import { useUserStore } from '@/stores/user'
 
 const routes = [
   {
@@ -126,16 +127,29 @@ const router = createRouter({
 
 // 路由守卫
 router.beforeEach(async (to, from, next) => {
+  const userStore = useUserStore()
   const token = localStorage.getItem('worktask_token')
-  
+
+  const isTokenExpired = (value) => {
+    if (!value) return true
+    try {
+      const payload = JSON.parse(atob(value.split('.')[1] || ''))
+      return !payload?.exp || Number(payload.exp) * 1000 <= Date.now()
+    } catch (e) {
+      return true
+    }
+  }
+
   if (to.meta.requiresAuth) {
-    if (!token) {
+    if (!token || isTokenExpired(token)) {
+      userStore.logout()
+      ElMessage.warning('登录已过期，请重新登录')
       next('/login')
       return
     }
     next()
   } else {
-    if (to.path === '/login' && token) {
+    if (to.path === '/login' && token && !isTokenExpired(token)) {
       next('/dashboard/aoi')
       return
     }

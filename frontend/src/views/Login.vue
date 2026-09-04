@@ -90,7 +90,8 @@ const handleLogin = async () => {
       errorMsg.value = res.message || '登录失败'
     }
   } catch (err) {
-    errorMsg.value = err.response?.data?.message || '网络错误，请稍后重试'
+    const detail = err.response?.data?.detail || err.response?.data?.message
+    errorMsg.value = detail || '网络错误，请稍后重试'
   } finally {
     loading.value = false
   }

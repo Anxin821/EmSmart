@@ -34,7 +34,9 @@ router = APIRouter()
 @router.post("/login", response_model=ApiResponse)
 def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user_in_db = db.query(User).filter(User.username == body.username).first()
-    if not user_in_db or not verify_password(body.password, user_in_db.password_hash):
+    if not user_in_db:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if not verify_password(body.password, user_in_db.password_hash):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     if not user_in_db.is_active:
         raise HTTPException(status_code=403, detail="账户已停用")
