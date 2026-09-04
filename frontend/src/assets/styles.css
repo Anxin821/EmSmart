@@ -1665,8 +1665,8 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 48px 10px !important;
-  min-height: 46px;
+  padding: 10px 12px 8px !important;
+  min-height: 42px;
   background: linear-gradient(135deg, #f8fbff 0%, #f3f7ff 100%);
   border-bottom: 1px solid var(--c-divider);
 }
@@ -1681,14 +1681,14 @@ button { font-family: inherit; }
 .el-dialog__headerbtn {
   position: absolute !important;
   top: 50% !important;
-  right: 14px !important;
+  right: 8px !important;
   transform: translateY(-50%);
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 30px !important;
-  height: 30px !important;
-  font-size: 25px !important;
+  width: 34px !important;
+  height: 34px !important;
+  font-size: 26px !important;
   line-height: 1 !important;
   border-radius: 8px !important;
 }
@@ -1697,7 +1697,10 @@ button { font-family: inherit; }
   background: #fff;
 }
 .el-dialog__footer {
-  padding: 8px 18px 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 6px 16px 8px !important;
   border-top: 1px solid var(--c-divider) !important;
   background: #fff;
   border-bottom-left-radius: var(--radius-lg);
@@ -1787,45 +1790,64 @@ button { font-family: inherit; }
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
 }
 
-/* CommonModal 自定义 header/body/footer（当 Element Plus 内置 header 被隐藏后，我们补一套与原 modal-card 完全一致的语义） */
+/* CommonModal 自定义 header/body/footer（header 需真正贴到 dialog 右边界，标题居中，关闭按钮固定在最右侧） */
 .cm-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--c-divider);
+  width: 100%;
+  min-height: 32px;
+  padding: 0 2px 0 12px;
+  box-sizing: border-box;
+  border-bottom: none;
 }
 .cm-title {
-  font-weight: 600;
-  color: var(--c-text);
-  font-size: var(--fn-lg);
+  grid-column: 2;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  font-weight: 600;
+  color: var(--c-text);
+  font-size: 15px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
 }
 .cm-close {
+  grid-column: 3;
+  justify-self: end;
+  margin-right: 2px;
   border: 0;
   background: transparent;
   color: var(--c-text-3);
   cursor: pointer;
-  font-size: 14px;
-  padding: 4px 6px;
-  border-radius: var(--radius-sm);
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  padding: 0;
+  border-radius: 8px;
   transition: background .15s ease, color .15s ease;
 }
 .cm-close:hover { background: var(--c-divider); color: var(--c-text); }
 .cm-body {
-  padding: 20px;
+  padding: 10px 14px 12px;
   max-height: 60vh;
   overflow-y: auto;
 }
 .cm-footer {
-  padding: 12px 20px;
-  border-top: 1px solid var(--c-divider);
-  background: #FAFBFD;
+  padding: 6px 12px 8px;
+  border-top: none;
+  background: transparent;
   display: flex;
   justify-content: center;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
 }
 
 /* =========================================================
@@ -1918,21 +1940,6 @@ button { font-family: inherit; }
   color: inherit !important;
 }
 
-/* 🔵 确保 CommonModal cm-close 颜色（标题条可能浅/深两种场景都可读） */
-.cm-close {
-  border: 1px solid var(--c-divider);
-  background: transparent;
-  color: var(--c-text-2);
-  width: 28px; height: 28px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background .15s, color .15s;
-  font-size: 13px;
-}
-.cm-close:hover { background: var(--c-divider); color: var(--c-text); }
 
 /* 状态徽标（el-table 里使用，与原 status-badge 保持一致） */
 .el-table .status-badge,
