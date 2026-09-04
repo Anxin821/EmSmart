@@ -123,7 +123,7 @@
       title="项目管理"
       width="700px"
       :show-footer="false"
-      :body-style="{ padding: '0 12px 12px', overflow: 'hidden' }"
+      :body-style="{ padding: '0 8px 0', overflow: 'hidden' }"
     >
       <div class="project-manager-wrap">
         <el-table v-loading="projectManagerLoading" :data="projectManagerItems" stripe border class="project-manager-table" style="width: 100%;" height="420" :fit="true">
@@ -147,9 +147,9 @@
         </el-table>
       </div>
       <template #footer>
-        <div class="cm-footer">
+        <div class="cm-footer project-manager-footer">
           <el-button @click="projectManagerVisible = false">关闭</el-button>
-          <el-button type="primary" @click="addProjectRow">新增项目</el-button>
+          <el-button type="primary" @click="addProjectRow">新增</el-button>
         </div>
       </template>
     </CommonModal>
@@ -403,10 +403,20 @@ onBeforeUnmount(() => {
 .project-manager-wrap {
    width: 100%;
    overflow: visible;
+   margin-top: 0;
 }
 .project-manager-table {
    width: 100%;
    overflow: visible;
+   margin-top: 0;
+   margin-bottom: 0;
+}
+.project-manager-footer {
+   padding-top: 4px !important;
+   padding-bottom: 0 !important;
+   margin-top: 0 !important;
+   border-top: none !important;
+   background: transparent !important;
 }
 /* 收紧筛选栏与汇总卡、汇总卡与表格之间的间距 */
 .stats-summary-row {
