@@ -284,21 +284,23 @@ const exportPPT = async () => {
   width: 100%;
   max-width: 520px;
   height: 22px;
-  background: #E5E7EB;
+  background: linear-gradient(180deg, #edf2f7 0%, #dfe7ee 100%);
   border-radius: 999px;
   overflow: visible;
   position: relative;
   display: block;
-  margin: 0 auto; /* 居中 */
+  margin: 0 auto;
+  box-shadow: inset 0 1px 2px rgba(15,23,42,.12), 0 0 0 1px rgba(15,23,42,.04);
 }
 .anti-progress-inner {
   height: 100%;
   border-radius: 999px;
   transition: width .3s ease;
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,.18);
 }
-.bar-muted   .anti-progress-inner { background: #CBD5E1; }
-.bar-danger  .anti-progress-inner { background: #EF4444; }
-.bar-success .anti-progress-inner { background: #22C55E; }
+.bar-muted   .anti-progress-inner { background: linear-gradient(90deg, #a8b8c8 0%, #64748b 100%); }
+.bar-danger  .anti-progress-inner { background: linear-gradient(90deg, #ff4d4f 0%, #d92d20 100%); }
+.bar-success .anti-progress-inner { background: linear-gradient(90deg, #34d399 0%, #16a34a 100%); }
 
 .anti-progress-text {
   position: absolute;
@@ -306,15 +308,16 @@ const exportPPT = async () => {
   left: 50%;
   transform: translate(-50%, -50%);
   width: auto;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12.5px;
+  font-weight: 800;
   line-height: 1;
   letter-spacing: 0.2px;
   pointer-events: none;
+  text-shadow: 0 1px 1px rgba(15,23,42,.18);
 }
-.txt-muted   { color: #475569; }
-.txt-danger  { color: #ffffff; }
-.txt-success { color: #ffffff; }
+.txt-muted   { color: #f8fafc; }
+.txt-danger  { color: #fff7f7; }
+.txt-success { color: #f0fdf4; }
 
 .dialog-footer-bar {
   display: flex;
