@@ -103,7 +103,7 @@
         <div class="profile-avatar">{{ avatarText }}</div>
         <div class="profile-header-text">
           <div class="profile-name">{{ userStore.user?.full_name || userStore.user?.username || '用户' }}</div>
-          <div class="profile-role">{{ roleLabel || '普通用户' }}</div>
+          <div class="profile-role">{{ userStore.user?.username ? `用户名：${userStore.user.username}` : (roleLabel || '普通用户') }}</div>
         </div>
       </div>
 
@@ -330,6 +330,7 @@ const handleLogout = () => {
   font-size: 12px;
   color: var(--c-text-3);
   margin-top: 2px;
+  letter-spacing: 0.1px;
 }
 
 .profile-form {
