@@ -831,9 +831,9 @@ button { font-family: inherit; }
   justify-content: flex-end;
   align-items: center;
   gap: 10px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--c-divider);
-  background: #FAFBFD;
+  padding: 10px 18px 12px;
+  border-top: none;
+  background: #fff;
 }
 
 /* 职责卡片保持（旧 Bootstrap 卡片形态，向后兼容） */
@@ -1656,9 +1656,9 @@ button { font-family: inherit; }
   padding: 0 !important;
 }
 .el-dialog__footer {
-  padding: 12px 20px !important;
-  border-top: 1px solid var(--c-divider);
-  background: #FAFBFD;
+  padding: 10px 18px 12px !important;
+  border-top: none !important;
+  background: #fff;
   border-bottom-left-radius: var(--radius-lg);
   border-bottom-right-radius: var(--radius-lg);
 }
