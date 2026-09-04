@@ -18,26 +18,27 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 # ---------- 本地模块 ----------
-from core.config import settings
-from core.database import engine, Base, SessionLocal, get_db
-from core.auth import hash_password
-from models import User
+from app.core.config import settings
+from app.core.database import engine, Base, SessionLocal, get_db
+from app.core.auth import hash_password
+from app.models import User
 
-# ---------- 路由模块 ----------
-from routers.auth import router as auth_router
-from routers.devices import router as devices_router
-from routers.production import router as production_router
-from routers.network import router as network_router
-from routers.mes import router as mes_router
-from routers.dashboard import router as dashboard_router
-from routers.projects import router as projects_router
-from routers.antivirus import router as antivirus_router
-from routers.users import router as users_router
-from routers.responsibilities import router as responsibilities_router
-from routers.esop import router as esop_router
+# ---------- 路由模块（使用已迁移的 v1 路由） ----------
+from app.api.v1.routers.auth import router as auth_router
+from app.api.v1.routers.options import router as options_router
+from app.api.v1.routers.devices import router as devices_router
+from app.api.v1.routers.production import router as production_router
+from app.api.v1.routers.network import router as network_router
+from app.api.v1.routers.mes import router as mes_router
+from app.api.v1.routers.dashboard import router as dashboard_router
+from app.api.v1.routers.projects import router as projects_router
+from app.api.v1.routers.antivirus import router as antivirus_router
+from app.api.v1.routers.users import router as users_router
+from app.api.v1.routers.responsibilities import router as responsibilities_router
+from app.api.v1.routers.esop import router as esop_router
 
 # ---------- 定时任务 ----------
-from tasks import check_server_health
+from app.tasks import check_server_health
 
 
 # ============================================================
@@ -155,6 +156,7 @@ if (FRONTEND_DIST / "assets").exists():
 API_PREFIX = "/api/v1"
 
 app.include_router(auth_router, prefix=API_PREFIX)
+app.include_router(options_router, prefix=API_PREFIX)
 app.include_router(devices_router, prefix=API_PREFIX)
 app.include_router(production_router, prefix=API_PREFIX)
 app.include_router(network_router, prefix=API_PREFIX)
