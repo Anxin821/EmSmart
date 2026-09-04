@@ -2,7 +2,7 @@
   <div class="page" style="width:100%; min-width:0; box-sizing:border-box;">
     <!-- 操作按钮通过 Teleport 注入全局顶栏左侧空白区，不占用看板纵向空间 -->
     <Teleport defer to=".topbar-actions">
-      <button v-if="userStore.canEdit" class="btn btn-sm btn-outline-primary" @click="openDutyAddModal">
+      <button v-if="userStore.isAdmin" class="btn btn-sm btn-outline-primary" @click="openDutyAddModal">
         <span class="bi bi-person-plus"></span>新增岗位
       </button>
     </Teleport>
@@ -66,7 +66,7 @@
               <div v-else class="duty-empty">
                 <div class="duty-empty-icon">📭</div>
                 <div class="duty-empty-title">暂无职责条目</div>
-                <div class="duty-empty-hint" v-if="userStore.canEdit">点击下方按钮添加主要/次要职责</div>
+                <div class="duty-empty-hint" v-if="userStore.isAdmin">点击下方按钮添加主要/次要职责</div>
               </div>
             </div>
           </el-scrollbar>
