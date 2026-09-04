@@ -4,9 +4,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from core.database import get_db
-from core.auth import get_current_user, require_role, hash_password, check_module_access
+from core.auth import get_current_user, hash_password, check_module_access
 from models import User, UserPermission
-from schemas import UserOut, UserCreate, UserUpdate, UserWithPermissions, UserPermissionOut, UserPermissionUpdate
+from schemas import UserCreate, UserUpdate, UserWithPermissions, UserPermissionOut, UserPermissionUpdate
 
 router = APIRouter(tags=["用户管理"])
 
@@ -90,6 +90,21 @@ def create_user(data: UserCreate, db: Session = Depends(get_db), current_user: d
         db.add(UserPermission(user_id=u.id, module_key=mod["key"], can_read=True, can_write=False))
     db.commit()
     return {"code": 200, "message": "创建成功", "data": {"id": u.id}}
+
+
+@router.put("/users/me")
+def update_current_user_profile(data: UserUpdate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    user = db.query(User).filter(User.username == current_user["username"]).first()
+    if not user:
+        raise HTTPException(404, "用户不存在")
+    if data.full_name is not None:
+        user.full_name = data.full_name
+    if data.email is not None:
+        user.email = data.email
+    if data.password:
+        user.password_hash = hash_password(data.password)
+    db.commit()
+    return {"code": 200, "message": "个人信息已更新", "data": {"full_name": user.full_name, "email": user.email, "username": user.username}}
 
 
 @router.put("/users/{user_id}")
