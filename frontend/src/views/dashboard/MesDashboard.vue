@@ -118,7 +118,6 @@
       </el-table>
       <template #footer>
         <div class="dialog-footer-bar">
-          <el-button class="dialog-close-btn" @click="openBugModalVisible = false">关闭</el-button>
           <span class="dialog-total">共 {{ openBugTotal }} 条记录</span>
         </div>
       </template>
@@ -146,7 +145,6 @@
       </el-table>
       <template #footer>
         <div class="dialog-footer-bar">
-          <el-button class="dialog-close-btn" @click="overdueReqModalVisible = false">关闭</el-button>
           <span class="dialog-total">共 {{ overdueReqTotal }} 条记录</span>
         </div>
       </template>
@@ -631,22 +629,17 @@ onBeforeUnmount(() => {
 .ms-list::-webkit-scrollbar      { width: 6px; }
 
 .dialog-footer-bar {
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 38px;
-}
-.dialog-close-btn {
-  margin: 0 auto;
+  min-height: 28px;
 }
 .dialog-total {
-  position: absolute;
-  right: 0;
   color: var(--c-text-3);
   font-size: 13px;
   white-space: nowrap;
+  text-align: center;
 }
 
 /* 卡尺寸统一：图表随容器高度自适应 */

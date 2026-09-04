@@ -113,7 +113,6 @@
       </el-table>
       <template #footer>
         <div class="dialog-footer-bar">
-          <el-button class="dialog-close-btn" @click="overdueModalVisible = false">关闭</el-button>
           <span class="dialog-total">共 {{ overdueTotal }} 条记录</span>
         </div>
       </template>
@@ -142,7 +141,6 @@
       </el-table>
       <template #footer>
         <div class="dialog-footer-bar">
-          <el-button class="dialog-close-btn" @click="pendingModalVisible = false">关闭</el-button>
           <span class="dialog-total">共 {{ pendingTotal }} 条记录</span>
         </div>
       </template>
@@ -319,21 +317,16 @@ const exportPPT = async () => {
 .txt-success { color: #ffffff; }
 
 .dialog-footer-bar {
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 38px;
-}
-.dialog-close-btn {
-  margin: 0 auto;
+  min-height: 28px;
 }
 .dialog-total {
-  position: absolute;
-  right: 0;
   color: var(--c-text-3);
   font-size: 13px;
   white-space: nowrap;
+  text-align: center;
 }
 </style>
