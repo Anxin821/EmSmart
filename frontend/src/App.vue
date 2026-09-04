@@ -9,8 +9,9 @@
 
 <style scoped>
 #app-container {
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
+  min-height: 100vh;
   overflow: hidden;
 }
 </style>

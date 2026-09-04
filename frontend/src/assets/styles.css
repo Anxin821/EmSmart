@@ -55,6 +55,7 @@
 html, body, #app, #app-container {
   height: 100%;
   width: 100%;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -66,6 +67,16 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+}
+
+@media (min-width: 1440px) {
+  .content {
+    padding: 18px;
+  }
+  .page-header {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
 }
 
 a { color: inherit; text-decoration: none; }
