@@ -127,12 +127,12 @@
     >
       <div class="project-manager-wrap">
         <el-table v-loading="projectManagerLoading" :data="projectManagerItems" stripe border class="project-manager-table" style="width: 100%;" height="420" :fit="true">
-          <el-table-column label="项目编码" width="120" align="center" show-overflow-tooltip>
+          <el-table-column label="项目编码" width="250" align="center" show-overflow-tooltip>
             <template #default="{ row }">
               <el-input v-model="row.project_code" :disabled="!!row.id" size="small" placeholder="如: A01" clearable />
             </template>
           </el-table-column>
-          <el-table-column label="项目名称" min-width="220" align="center" show-overflow-tooltip>
+          <el-table-column label="项目名称" min-width="180" align="center" show-overflow-tooltip>
             <template #default="{ row }">
               <el-input v-model="row.project_name" size="small" placeholder="请输入项目名称" clearable />
             </template>
