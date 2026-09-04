@@ -175,7 +175,19 @@ const tableRef = ref(null)
 const tableData = ref([])
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线']
 const projects = ref([])
-const filters = ref({ year: '', week: '', line: '' })
+const normalizeProjects = (list = []) => {
+  const seen = new Set()
+  return (list || []).filter(item => {
+    const code = String(item?.project_code ?? '').trim()
+    const name = String(item?.project_name ?? '').trim()
+    if (!code && !name) return false
+    const key = (name || code).trim().toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  }).sort((a, b) => String(a.project_name || a.project_code || '').localeCompare(String(b.project_name || b.project_code || ''), 'zh-CN'))
+}
+const filters = ref({ year: '', week: '', line: '', project: '' })
 const modalVisible = ref(false)
 const editingId = ref(null)
 const form = ref({})
@@ -206,8 +218,11 @@ const filterFields = computed(() => [
   { type: 'select', key: 'year', label: '年', placeholder: '全部', autoSearch: true, clearable: true, width: 90, options: yearOptions },
   { type: 'select', key: 'week', label: '周', placeholder: '全部', autoSearch: true, clearable: true, width: 90, options: weekOptions.value },
   { type: 'select', key: 'line', label: '产线', placeholder: '全部', autoSearch: true, clearable: true, width: 90,
-    options: [{ label: '全部', value: '' }, ...lines.map(l => ({ label: l, value: l }))] }
+    options: [{ label: '全部', value: '' }, ...lines.map(l => ({ label: l, value: l }))] },
+  { type: 'select', key: 'project', label: '项目', placeholder: '全部', autoSearch: true, clearable: true, width: 110,
+    options: [{ label: '全部', value: '' }, ...projectOptions.value] }
 ])
+const projectOptions = computed(() => normalizeProjects(projects.value).map(p => ({ label: p.project_name, value: p.project_code })))
 // 拉取当前范围（按所选年份）的最大周，用于收敛周下拉选项
 const loadMaxWeek = async () => {
   try {
@@ -226,12 +241,12 @@ const defaultForm = () => ({
   year: new Date().getFullYear(),
   week_number: Math.ceil((new Date().getMonth() + 1) / 4),
   production_line: '1线',
-  project: 'A',
+  project: projects.value[0]?.project_code || '',
   total_output: 0,
   qualified_count: 0
 })
 const resetFilters = () => {
-  filters.value = { year: '', week: '', line: '' }
+  filters.value = { year: '', week: '', line: '', project: '' }
   page.value = 1
   loadData()
 }
@@ -246,7 +261,8 @@ const loadData = async () => {
     if (filters.value.year) params.year = filters.value.year
     if (filters.value.week) params.week = filters.value.week
     if (filters.value.line) params.production_line = filters.value.line
-    const res = await productionApi.weekly(params)
+      if (filters.value.project) params.project = filters.value.project
+      const res = await productionApi.weekly(params)
     tableData.value = res.data?.items || []
     total.value = res.data?.total || 0
     // 带 height=100% + fixed="right" 的表格不会自动重算，数据变化后需 doLayout 避免固定“操作”列错位/滑动。
@@ -330,7 +346,10 @@ const handleResize = () => tableRef.value?.doLayout()
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
   const projRes = await optionsApi.projects()
-  projects.value = projRes.data || []
+  projects.value = normalizeProjects(projRes.data)
+  if (!form.value.project && projects.value.length) {
+    form.value.project = projects.value[0].project_code
+  }
   loadData()
   loadMaxWeek()
 })

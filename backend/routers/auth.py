@@ -77,8 +77,22 @@ def option_lines():
 
 @router.get("/options/projects")
 def option_projects(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    rows = db.query(Project).filter(Project.is_active == True).all()
-    return ApiResponse(data=[{"project_code": p.project_code, "project_name": p.project_name} for p in rows])
+    rows = db.query(Project).filter(Project.is_active == True).order_by(Project.project_code.asc()).all()
+    seen = set()
+    data = []
+    for p in rows:
+        code = (p.project_code or '').strip()
+        name = (p.project_name or '').strip()
+        if not code and not name:
+            continue
+        key = (name or code).strip().lower()
+        if not key:
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        data.append({"project_code": code, "project_name": name})
+    return ApiResponse(data=data)
 
 
 @router.get("/options/device-statuses")

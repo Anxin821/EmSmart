@@ -137,6 +137,18 @@ const formatTime = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : '-')
 const tableRef = ref(null)
 const tableData = ref([])
 const projects = ref([])
+const normalizeProjects = (list = []) => {
+  const seen = new Set()
+  return (list || []).filter(item => {
+    const code = String(item?.project_code ?? '').trim()
+    const name = String(item?.project_name ?? '').trim()
+    if (!code && !name) return false
+    const key = (name || code).trim().toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  }).sort((a, b) => String(a.project_name || a.project_code || '').localeCompare(String(b.project_name || b.project_code || ''), 'zh-CN'))
+}
 const filters = ref({ year: '', month: '', project: '' })
 const stats = ref({})
 const modalVisible = ref(false)
@@ -148,7 +160,7 @@ const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const projectOptions = computed(() =>
-  (projects.value || []).map(p => ({ label: p.project_name, value: p.project_code }))
+normalizeProjects(projects.value).map(p => ({ label: p.project_name, value: p.project_code }))
 )
 // 总直通率按阈值动态着色：≥95% 绿 / ≥85% 黄 / <85% 红（预警），让 KPI 好坏一眼可辨
 const yieldColor = computed(() => {
@@ -175,7 +187,7 @@ const filterFields = computed(() => [
 const defaultForm = () => ({
   year: new Date().getFullYear(),
   month: new Date().getMonth() + 1,
-  project: 'A',
+project: projects.value[0]?.project_code || '',
   monthly_total_output: 0,
   monthly_qualified_count: 0
 })
@@ -267,8 +279,14 @@ const handleResize = () => tableRef.value?.doLayout()
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
   const projRes = await optionsApi.projects()
-  projects.value = projRes.data || []
-  loadData()
+projects.value = normalizeProjects(projRes.data)
+if (!filters.value.project && projects.value.length) {
+  filters.value.project = ''
+}
+if (!form.value.project && projects.value.length) {
+  form.value.project = projects.value[0].project_code
+}
+loadData()
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
