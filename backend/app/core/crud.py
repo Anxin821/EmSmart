@@ -919,6 +919,7 @@ def batch_import_devices(db: Session, rows: List[dict]) -> int:
 
 def batch_import_weekly(db: Session, rows: List[dict]) -> int:
     count = 0
+    now = datetime.now()
     for row in rows:
         # 显式计算 defect_count 和 yield_rate（数据库列非 Computed，需手动赋值）
         total = int(row.get("total_output") or 0)
@@ -933,6 +934,10 @@ def batch_import_weekly(db: Session, rows: List[dict]) -> int:
             WeeklyProduction.project == row.get("project"),
         ).first()
         if existing:
+            # 无论字段值是否变化，都显式刷新 updated_at = 当前导入时间。
+            # 仅靠 onupdate=datetime.now 不够：如果导入值与库中完全一致，
+            # SQLAlchemy 不检测到脏字段就不会发 UPDATE，onupdate 不触发。
+            existing.updated_at = now
             for k, v in row.items():
                 if v is not None and k not in ("year", "week_number", "production_line", "project") and hasattr(existing, k):
                     setattr(existing, k, v)

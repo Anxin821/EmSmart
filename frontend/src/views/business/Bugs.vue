@@ -244,8 +244,20 @@ const filterFields = [
 ]
 
 const cleanStatus = (v) => (v == null ? '' : String(v).replace(/^\s*\|*\s*/, '').replace(/\s*\|*\s*$/, '').trim())
-// 录入时间：后端 created_at 为 ISO 字符串（UTC、无时区后缀），直接截到分钟展示，避免 new Date() 触发本地时区偏移
-const formatTime = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : '-')
+// 录入时间：后端 created_at 为 UTC 时间字符串，需要转换为本地时间显示
+const formatTime = (v) => {
+  if (!v) return '-'
+  const utcDate = new Date(v)
+  if (isNaN(utcDate.getTime())) return v
+  return utcDate.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).replace(/\//g, '-')
+}
 
 const getStatusClass = (s) => {
   const map = { '致命': 'severe', '严重': 'severe', '一般': 'muted', '建议': 'muted', '确认新增': 'severe', '修复中': 'progress', '解决关闭': 'normal' }

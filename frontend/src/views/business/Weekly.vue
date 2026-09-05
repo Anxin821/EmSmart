@@ -169,8 +169,26 @@ import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
 const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
-// 录入时间：后端 updated_at 为 ISO 字符串（UTC、无时区后缀），直接截到分钟展示，避免 new Date() 触发本地时区偏移
-const formatTime = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : '-')
+// 录入时间：后端 updated_at 为 UTC 时间字符串，需要转换为本地时间显示
+const formatTime = (v) => {
+  if (!v) return '-'
+  let dateStr = v
+  // 如果字符串没有时区标识，且不是纯数字（毫秒时间戳），则补 Z
+  if (!dateStr.includes('Z') && !dateStr.includes('+') && !/^\d+$/.test(dateStr)) {
+    // 将空格替换为 T（如果有），然后补 Z
+    dateStr = dateStr.replace(' ', 'T') + 'Z'
+  }
+  const utcDate = new Date(dateStr)
+  if (isNaN(utcDate.getTime())) return v
+  return utcDate.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).replace(/\//g, '-')
+}
 const tableRef = ref(null)
 const tableData = ref([])
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线']
