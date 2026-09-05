@@ -1,5 +1,7 @@
 """AOI&AI 设备 ORM 模型。"""
-from .base import Base, Column, Integer, String, Date, DateTime, Text, datetime
+from .base import Base, Column, Integer, String, Date, DateTime, Text
+
+from app.core.timeutil import beijing_now
 
 
 class AoiAiDevice(Base):
@@ -17,8 +19,8 @@ class AoiAiDevice(Base):
     responsible_person = Column(String(50))
     install_date = Column(Date)
     remark = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 __all__ = ["AoiAiDevice"]

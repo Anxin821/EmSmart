@@ -7,6 +7,7 @@ from app.models import (
     AoiAiDevice, WeeklyProduction, MonthlyProduction,
     Server, AgingRack, WifiAp, WorkOrder, Bug, DevRequest, Project
 )
+from app.core.timeutil import beijing_now
 
 
 def device_summary(db: Session) -> Dict[str, Any]:
@@ -350,7 +351,7 @@ def monthly_yield_trend(db: Session, year: Optional[int] = None) -> List[Dict[st
 
 
 def mes_summary(db: Session) -> Dict[str, Any]:
-    now = datetime.utcnow()
+    now = beijing_now()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     order_status = (
@@ -407,7 +408,7 @@ def mes_summary(db: Session) -> Dict[str, Any]:
 
 
 def bug_burndown(db: Session, months: int = 3) -> List[Dict[str, Any]]:
-    now = datetime.utcnow()
+    now = beijing_now()
     data = []
     for i in range(months - 1, -1, -1):
         target = now.replace(day=1) - timedelta(days=i * 31)

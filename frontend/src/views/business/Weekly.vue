@@ -169,18 +169,13 @@ import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
 const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
-// 录入时间：后端 updated_at 为 UTC 时间字符串，需要转换为本地时间显示
+// 录入时间：后端返回北京时间 naive 字符串（无 Z/无偏移）。new Date 按本地解析、
+// toLocaleString 按本地显示，两者抵消 → 页面恒回显同一北京墙钟，无需换算
 const formatTime = (v) => {
   if (!v) return '-'
-  let dateStr = v
-  // 如果字符串没有时区标识，且不是纯数字（毫秒时间戳），则补 Z
-  if (!dateStr.includes('Z') && !dateStr.includes('+') && !/^\d+$/.test(dateStr)) {
-    // 将空格替换为 T（如果有），然后补 Z
-    dateStr = dateStr.replace(' ', 'T') + 'Z'
-  }
-  const utcDate = new Date(dateStr)
-  if (isNaN(utcDate.getTime())) return v
-  return utcDate.toLocaleString('zh-CN', {
+  const date = new Date(v)
+  if (isNaN(date.getTime())) return v
+  return date.toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

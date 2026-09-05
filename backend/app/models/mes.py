@@ -1,5 +1,7 @@
 """MES（工单/BUG/需求）ORM 模型。"""
-from .base import Base, Column, Integer, String, Date, DateTime, Text, Float, datetime
+from .base import Base, Column, Integer, String, Date, DateTime, Text, Float
+
+from app.core.timeutil import beijing_now, beijing_date
 
 
 class WorkOrder(Base):
@@ -18,8 +20,8 @@ class WorkOrder(Base):
     status = Column(String(20), nullable=False, default="待开始")  # 待开始 / 进行中 / 已完成 / 挂起
     responsible_person = Column(String(50))
     description = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 class Bug(Base):
@@ -34,11 +36,11 @@ class Bug(Base):
     status = Column(String(20), nullable=False, default="确认新增")  # 确认新增 / 修复中 / 解决关闭
     discoverer = Column(String(50))
     assignee = Column(String(50))
-    created_date = Column(Date, default=datetime.utcnow)
+    created_date = Column(Date, default=beijing_date)
     deadline = Column(Date)
     solution = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 class DevRequest(Base):
@@ -57,8 +59,8 @@ class DevRequest(Base):
     responsible_person = Column(String(50))  # 保留兼容旧字段
     progress = Column(Float, default=0)
     description = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 __all__ = ["WorkOrder", "Bug", "DevRequest"]

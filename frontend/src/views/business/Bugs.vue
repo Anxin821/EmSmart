@@ -244,12 +244,12 @@ const filterFields = [
 ]
 
 const cleanStatus = (v) => (v == null ? '' : String(v).replace(/^\s*\|*\s*/, '').replace(/\s*\|*\s*$/, '').trim())
-// 录入时间：后端 created_at 为 UTC 时间字符串，需要转换为本地时间显示
+// 录入时间：后端返回北京时间 naive 字符串（无 Z/无偏移），解析+显示互相抵消 → 回显同一北京墙钟
 const formatTime = (v) => {
   if (!v) return '-'
-  const utcDate = new Date(v)
-  if (isNaN(utcDate.getTime())) return v
-  return utcDate.toLocaleString('zh-CN', {
+  const date = new Date(v)
+  if (isNaN(date.getTime())) return v
+  return date.toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

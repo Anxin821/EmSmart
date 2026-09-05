@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.repositories import network_repository as repo
 from app.core.crud import write_operation_log
+from app.core.timeutil import beijing_now
 
 
 def _ping_device(ip: str) -> bool:
@@ -104,7 +105,7 @@ def check_all_servers(db: Session, request, username: str):
         if s.ip_address:
             is_alive = _ping_device(s.ip_address)
             s.status = "在线" if is_alive else "离线"
-            s.last_check_time = datetime.utcnow()
+            s.last_check_time = beijing_now()
             if is_alive:
                 online += 1
             else:

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.models import AntivirusRecord
+from app.core.timeutil import beijing_now
 
 
 def _record_to_dict(r: AntivirusRecord) -> dict:
@@ -130,7 +131,7 @@ def import_records(db: Session, records: List[dict]) -> int:
 # Dashboard / aggregation
 
 def list_overdue_records(db: Session, status: Optional[str] = None, production_line: Optional[str] = None, page: int = 1, page_size: int = 50):
-    now = datetime.utcnow()
+    now = beijing_now()
     latest = _dedupe_latest_by_device_line(db.query(AntivirusRecord).all())
 
     def _matches(r: AntivirusRecord) -> bool:
@@ -150,7 +151,7 @@ def list_overdue_records(db: Session, status: Optional[str] = None, production_l
 
 
 def antivirus_dashboard(db: Session) -> Dict[str, Any]:
-    now = datetime.utcnow()
+    now = beijing_now()
     records = _dedupe_latest_by_device_line(db.query(AntivirusRecord).all())
 
     total_devices = len(records)

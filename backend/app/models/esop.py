@@ -1,5 +1,7 @@
 """ESOP 料号 ORM 模型。"""
-from .base import Base, Column, Integer, String, DateTime, datetime
+from .base import Base, Column, Integer, String, DateTime
+
+from app.core.timeutil import beijing_now
 
 
 class EsopPart(Base):
@@ -11,8 +13,8 @@ class EsopPart(Base):
     process_name = Column(String(100), nullable=False)    # 工序名称
     part_number = Column(String(100), nullable=False)     # 料号
     file_name = Column(String(255))                        # ESOP 文件名称
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 __all__ = ["EsopPart"]

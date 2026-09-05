@@ -1,5 +1,7 @@
 """用户与权限相关 ORM 模型。"""
-from .base import Base, Column, Integer, String, Boolean, DateTime, datetime
+from .base import Base, Column, Integer, String, Boolean, DateTime
+
+from app.core.timeutil import beijing_now
 
 
 class User(Base):
@@ -13,8 +15,8 @@ class User(Base):
     role = Column(String(20), nullable=False, default="viewer")  # admin / engineer / viewer
     email = Column(String(100))
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 class UserPermission(Base):
@@ -27,8 +29,8 @@ class UserPermission(Base):
     can_read = Column(Boolean, default=True)
     can_write = Column(Boolean, default=False)
     can_delete = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 __all__ = ["User", "UserPermission"]

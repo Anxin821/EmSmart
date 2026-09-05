@@ -5,13 +5,14 @@
 import random
 from typing import Optional, List, Tuple
 from datetime import date, datetime, timedelta
-from sqlalchemy import func, and_, or_, text, desc, case, Date as DateType
+from sqlalchemy import func, and_, or_, desc, case, Date as DateType
 from sqlalchemy.orm import Session, joinedload
 from app.models import (
     User, AoiAiDevice, WeeklyProduction, MonthlyProduction,
     Server, AgingRack, WifiAp, WorkOrder, Bug, DevRequest, OperationLog, Project, EsopPart
 )
 from app.core.auth import hash_password, write_operation_log
+from app.core.timeutil import beijing_now
 
 
 # ============================================================
@@ -177,6 +178,7 @@ def update_weekly_production(db: Session, record_id: int, data: dict) -> Optiona
     for key, value in data.items():
         if value is not None and hasattr(record, key):
             setattr(record, key, value)
+    record.updated_at = beijing_now()
     db.commit()
     db.refresh(record)
     return record
@@ -443,6 +445,7 @@ def update_monthly_production(db: Session, record_id: int, data: dict) -> Option
     for key, value in data.items():
         if value is not None and hasattr(record, key):
             setattr(record, key, value)
+    record.updated_at = beijing_now()
     db.commit()
     db.refresh(record)
     return record
@@ -919,7 +922,7 @@ def batch_import_devices(db: Session, rows: List[dict]) -> int:
 
 def batch_import_weekly(db: Session, rows: List[dict]) -> int:
     count = 0
-    now = datetime.now()
+    now = beijing_now()
     for row in rows:
         # 显式计算 defect_count 和 yield_rate（数据库列非 Computed，需手动赋值）
         total = int(row.get("total_output") or 0)
@@ -935,13 +938,13 @@ def batch_import_weekly(db: Session, rows: List[dict]) -> int:
         ).first()
         if existing:
             # 无论字段值是否变化，都显式刷新 updated_at = 当前导入时间。
-            # 仅靠 onupdate=datetime.now 不够：如果导入值与库中完全一致，
-            # SQLAlchemy 不检测到脏字段就不会发 UPDATE，onupdate 不触发。
             existing.updated_at = now
             for k, v in row.items():
                 if v is not None and k not in ("year", "week_number", "production_line", "project") and hasattr(existing, k):
                     setattr(existing, k, v)
         else:
+            # ✅ 新增时也强制设置北京时间
+            row["updated_at"] = now
             db.add(WeeklyProduction(**row))
         count += 1
     db.commit()

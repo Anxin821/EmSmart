@@ -7,8 +7,9 @@ from __future__ import annotations
 import asyncio
 import socket
 import subprocess
-from datetime import datetime
 from typing import TYPE_CHECKING
+
+from app.core.timeutil import beijing_now
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -77,7 +78,7 @@ async def check_server_health(get_session) -> None:
                         s.cpu_usage = cpu
                         s.memory_usage = mem
                         s.disk_usage = disk
-                        s.last_check_time = datetime.utcnow()
+                        s.last_check_time = beijing_now()
                         changed_any = True
                 except Exception:
                     # 单条失败：跳过，不抛错

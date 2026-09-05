@@ -1,5 +1,7 @@
 """网络设施（服务器/老化架/WiFi AP）ORM 模型。"""
-from .base import Base, Column, Integer, String, Float, DateTime, datetime
+from .base import Base, Column, Integer, String, Float, DateTime
+
+from app.core.timeutil import beijing_now
 
 
 class Server(Base):
@@ -20,8 +22,8 @@ class Server(Base):
     disk_usage = Column(Float, default=0)
     responsible_person = Column(String(50))
     last_check_time = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 class AgingRack(Base):
@@ -38,8 +40,8 @@ class AgingRack(Base):
     used_slots = Column(Integer, nullable=False, default=0)
     status = Column(String(20), nullable=False, default="正常")
     responsible_person = Column(String(50))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 class WifiAp(Base):
@@ -56,8 +58,8 @@ class WifiAp(Base):
     connected_devices = Column(Integer, default=0)
     status = Column(String(20), nullable=False, default="在线")
     responsible_person = Column(String(50))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 __all__ = ["Server", "AgingRack", "WifiAp"]

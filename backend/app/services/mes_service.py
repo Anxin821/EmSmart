@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.repositories import mes_repository as repo
 from app.core.crud import write_operation_log
+from app.core.timeutil import beijing_now
 
 
 def mes_dashboard(db: Session) -> Dict[str, Any]:
@@ -72,12 +73,11 @@ def remove_work_order(db: Session, order_number: str, request, username: str):
 
 
 def update_order_status(db: Session, order_number: str, new_status: str, request, username: str):
-    from datetime import datetime
     update_data = {"status": new_status}
     if new_status == "进行中":
-        update_data["actual_start"] = datetime.utcnow()
+        update_data["actual_start"] = beijing_now()
     elif new_status == "已完成":
-        update_data["actual_end"] = datetime.utcnow()
+        update_data["actual_end"] = beijing_now()
     order = repo.update_work_order_repo(db, order_number, update_data)
     if not order:
         return None

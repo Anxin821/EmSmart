@@ -1,5 +1,7 @@
 """系统/杂项表：项目、操作日志、杀毒记录、岗位职责。"""
-from .base import Base, Column, Integer, String, Boolean, Date, DateTime, Text, datetime
+from .base import Base, Column, Integer, String, Boolean, Date, DateTime, Text
+
+from app.core.timeutil import beijing_now
 
 
 class Project(Base):
@@ -11,8 +13,8 @@ class Project(Base):
     project_name = Column(String(100), nullable=False)              # 项目名称
     description = Column(Text)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 class OperationLog(Base):
@@ -26,7 +28,7 @@ class OperationLog(Base):
     target_id = Column(String(50))
     detail = Column(Text)
     ip_address = Column(String(50))
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
 
 
 class AntivirusRecord(Base):
@@ -41,8 +43,8 @@ class AntivirusRecord(Base):
     cycle = Column(String(10), nullable=False, default="每天")  # 每天 / 每周
     next_antivirus_time = Column(DateTime, nullable=False)
     remark = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=beijing_now)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 class JobResponsibility(Base):
@@ -54,7 +56,7 @@ class JobResponsibility(Base):
     title = Column(String(50), nullable=False)          # 岗位名称（工程师/技术员）
     items = Column(Text, default="[]")                  # JSON: [{"content":"职责","is_primary":true}]
     sort_order = Column(Integer, default=0)             # 排序
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
 __all__ = ["Project", "OperationLog", "AntivirusRecord", "JobResponsibility"]
