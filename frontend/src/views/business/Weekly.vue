@@ -12,6 +12,7 @@
           </el-button>
           <template v-if="userStore.canEdit"><el-button type="success" @click="importModalVisible = true"><el-icon><Upload /></el-icon>批量导入</el-button></template>
           <template v-if="userStore.canEdit"><el-button type="success" @click="showModal()"><el-icon><Plus /></el-icon>录入</el-button></template>
+          <template v-if="userStore.canManageProjects"><el-button type="warning" @click="openProjectManager"><el-icon><DataAnalysis /></el-icon>项目管理</el-button></template>
         </template>
       </CommonFilterBar>
     </div>
@@ -155,13 +156,50 @@
         </div>
       </template>
     </CommonModal>
+
+    <!-- 项目管理弹窗 -->
+    <CommonModal
+      v-model:visible="projectManagerVisible"
+      title="项目管理"
+      width="700px"
+      :show-footer="false"
+      :body-style="{ padding: '0 8px 0', overflow: 'hidden' }"
+    >
+      <div class="project-manager-wrap">
+        <el-table v-loading="projectManagerLoading" :data="projectManagerItems" stripe border class="project-manager-table" style="width: 100%;" height="420" :fit="true">
+          <el-table-column label="项目编码" width="250" align="center" show-overflow-tooltip>
+            <template #default="{ row }">
+              <el-input v-model="row.project_code" :disabled="!!row.id" size="small" placeholder="如: A01" clearable />
+            </template>
+          </el-table-column>
+          <el-table-column label="项目名称" min-width="180" align="center" show-overflow-tooltip>
+            <template #default="{ row }">
+              <el-input v-model="row.project_name" size="small" placeholder="请输入项目名称" clearable />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button type="primary" link size="small" @click="saveProjectRow(row)">保存</el-button>
+              <el-button v-if="row.id" type="danger" link size="small" @click="deleteProjectRow(row)">删除</el-button>
+              <el-button v-else type="danger" link size="small" @click="removeProjectDraft(row)">取消</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <template #footer>
+        <div class="cm-footer project-manager-footer">
+          <el-button @click="projectManagerVisible = false">关闭</el-button>
+          <el-button type="primary" @click="addProjectRow">新增</el-button>
+        </div>
+      </template>
+    </CommonModal>
   </div>
 </template>
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { productionApi, optionsApi } from '@/api'
+import { productionApi, optionsApi, projectsApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, UploadFilled, RefreshRight, Plus, Upload } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, UploadFilled, RefreshRight, Plus, Upload, DataAnalysis } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
 import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
@@ -359,6 +397,83 @@ const handleImport = async () => {
     importing.value = false
   }
 }
+// ---------- 项目管理（原月报页迁移） ----------
+const projectManagerVisible = ref(false)
+const projectManagerLoading = ref(false)
+const projectManagerItems = ref([])
+const openProjectManager = async () => {
+  projectManagerVisible.value = true
+  await loadProjectManager()
+}
+const loadProjectManager = async () => {
+  projectManagerLoading.value = true
+  try {
+    const res = await projectsApi.list()
+    projectManagerItems.value = (res.data || []).map(item => ({
+      ...item,
+      project_code: item.project_code || '',
+      project_name: item.project_name || ''
+    }))
+  } catch (e) {
+    toast.error(e.response?.data?.message || '加载项目列表失败')
+  } finally {
+    projectManagerLoading.value = false
+  }
+}
+const addProjectRow = () => {
+  projectManagerItems.value.unshift({
+    id: null,
+    project_code: '',
+    project_name: '',
+    is_active: true
+  })
+}
+const removeProjectDraft = (row) => {
+  projectManagerItems.value = projectManagerItems.value.filter(item => item !== row)
+}
+const saveProjectRow = async (row) => {
+  const code = String(row.project_code || '').trim()
+  const name = String(row.project_name || '').trim()
+  if (!name) {
+    toast.error('项目名称不能为空')
+    return
+  }
+  if (!row.id && !code) {
+    toast.error('新项目编码不能为空')
+    return
+  }
+  try {
+    if (row.id) {
+      await projectsApi.update(row.id, { project_name: name })
+    } else {
+      await projectsApi.create({
+        project_code: code,
+        project_name: name
+      })
+    }
+    const projRes = await optionsApi.projects()
+    projects.value = normalizeProjects(projRes.data)
+    await loadProjectManager()
+    toast.success(row.id ? '项目已更新' : '项目已新增')
+  } catch (e) {
+    toast.error(e.response?.data?.message || e.response?.data?.detail || '保存项目失败')
+  }
+}
+const deleteProjectRow = async (row) => {
+  if (!row.id) return
+  const ok = await confirmDelete(`项目 ${row.project_code || row.project_name}`, '删除后将无法继续用于周报筛选和导入')
+  if (!ok) return
+  try {
+    await projectsApi.delete(row.id)
+    await loadProjectManager()
+    const projRes = await optionsApi.projects()
+    projects.value = normalizeProjects(projRes.data)
+    toast.success('项目已删除')
+  } catch (e) {
+    toast.error(e.response?.data?.message || '删除项目失败')
+  }
+}
+
 watch([page, pageSize], () => {
   loadData()
 })
@@ -380,3 +495,28 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
 })
 </script>
+
+<style scoped>
+/* .page 精确撑满父容器 .content，底部为 position:fixed 分页条预留空间 */
+.page { height: 100%; }
+.page-content { padding-bottom: 20px; }
+/* 项目管理弹窗：表格填满弹窗、底部按钮条紧贴表格 */
+.project-manager-wrap {
+  width: 100%;
+  overflow: visible;
+  margin-top: 0;
+}
+.project-manager-table {
+  width: 100%;
+  overflow: visible;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.project-manager-footer {
+  padding-top: 4px !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  border-top: none !important;
+  background: transparent !important;
+}
+</style>

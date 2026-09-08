@@ -67,7 +67,7 @@ const props = defineProps({
   cancelText: { type: String, default: '取消' },
   showFooter: { type: Boolean, default: true },
   okLoading: { type: Boolean, default: false },
-  closeOnClickModal: { type: Boolean, default: true },
+  closeOnClickModal: { type: Boolean, default: false },
   closeOnPressEscape: { type: Boolean, default: true },
   headerStyle: { type: Object, default: () => ({}) },
   bodyStyle: { type: Object, default: () => ({}) }

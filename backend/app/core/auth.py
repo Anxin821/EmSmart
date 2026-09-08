@@ -175,7 +175,6 @@ def write_operation_log(
 PERMISSION_MODULES = [
     {"key": "devices", "label": "设备管理"},
     {"key": "weekly", "label": "生产周报"},
-    {"key": "monthly", "label": "生产月报"},
     {"key": "servers", "label": "服务器管理"},
     {"key": "agingracks", "label": "老化架管理"},
     {"key": "wifi", "label": "WiFi AP 管理"},
@@ -183,6 +182,8 @@ PERMISSION_MODULES = [
     {"key": "bugs", "label": "MES BUG 管理"},
     {"key": "devreqs", "label": "MES 需求管理"},
     {"key": "antivirus", "label": "设备杀毒记录"},
+    {"key": "esopparts", "label": "ESOP料号管理"},
+    {"key": "exception", "label": "异常履历管理"},
     {"key": "users", "label": "用户管理"},
 ]
 

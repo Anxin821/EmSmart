@@ -12,11 +12,11 @@ def authenticate_user(db: Session, username: str, password: str, request: Reques
     """
     user = get_user_by_username(db, username)
     if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
+        raise HTTPException(status_code=404, detail="账号不存在，请确认用户名是否正确")
     if not verify_password(password, user.password_hash):
-        raise HTTPException(status_code=401, detail="用户名或密码错误")
+        raise HTTPException(status_code=401, detail="密码错误，请重新输入")
     if not user.is_active:
-        raise HTTPException(status_code=403, detail="账户已停用")
+        raise HTTPException(status_code=403, detail="该账户已停用，请联系管理员")
 
     token = create_access_token({
         "sub": user.username,

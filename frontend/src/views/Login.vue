@@ -44,6 +44,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { authApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 
@@ -73,9 +74,18 @@ onMounted(() => {
 })
 
 const handleLogin = async () => {
+  // 前端先做非空校验，给出即时提示
+  if (!form.value.username.trim()) {
+    errorMsg.value = '请输入用户名'
+    return
+  }
+  if (!form.value.password) {
+    errorMsg.value = '请输入密码'
+    return
+  }
   loading.value = true
   errorMsg.value = ''
-  
+
   try {
     const res = await authApi.login(form.value)
     if (res.code === 200 && res.data.access_token) {
@@ -85,9 +95,10 @@ const handleLogin = async () => {
         role: res.data.role,
         full_name: res.data.full_name
       })
+      ElMessage.success(`登录成功，欢迎回来${res.data.full_name ? '，' + res.data.full_name : ''}`)
       router.push('/dashboard/aoi')
     } else {
-      errorMsg.value = res.message || '登录失败'
+      errorMsg.value = res.message || '登录失败，请稍后重试'
     }
   } catch (err) {
     const detail = err.response?.data?.detail || err.response?.data?.message

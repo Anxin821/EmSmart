@@ -31,9 +31,6 @@
       <button type="button" class="nav-link" :class="{ active: $route.name === 'Weekly' }" @click="go('/weekly')">
         <span class="bi bi-graph-up-arrow" aria-hidden="true"></span>生产周报管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Monthly' }" @click="go('/monthly')">
-        <span class="bi bi-bar-chart-line-fill" aria-hidden="true"></span>生产月报管理
-      </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'Servers' }" @click="go('/servers')">
         <span class="bi bi-server" aria-hidden="true"></span>服务器管理
       </button>
@@ -98,6 +95,7 @@
     title="个人信息"
     width="500px"
     destroy-on-close
+    :close-on-click-modal="false"
     class="profile-dialog"
     center
   >
@@ -167,7 +165,6 @@ const NAME_MAP = {
   // 业务管理
   Devices:      ['业务管理', 'AOI&AI 设备管理'],
   Weekly:       ['业务管理', '生产周报管理'],
-  Monthly:      ['业务管理', '生产月报管理'],
   Servers:      ['业务管理', '服务器管理'],
   AgingRacks:   ['业务管理', '老化架管理'],
   Wifi:         ['业务管理', 'WiFi AP 管理'],

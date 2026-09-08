@@ -21,11 +21,36 @@ def _record_to_dict(r: AntivirusRecord) -> dict:
     }
 
 
+def _to_dt(v):
+    """将前端传入的时间字符串/None/datetime 统一转为 datetime。
+
+    前端 el-date-picker 使用 value-format 后提交的是字符串
+    （如 '2026-09-08T10:00:00' 或 '2026-09-08 10:00:00'），
+    直接做 timedelta 运算会报 TypeError，需先解析。
+    """
+    if v is None or isinstance(v, datetime):
+        return v
+    if isinstance(v, str):
+        s = v.strip().replace("Z", "")
+        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S",
+                    "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(s, fmt)
+            except ValueError:
+                continue
+        try:
+            return datetime.fromisoformat(s)
+        except ValueError:
+            return v
+    return v
+
+
 def _calc_next_time(antivirus_time: datetime, cycle: str) -> datetime:
+    av_time = _to_dt(antivirus_time)
     if cycle == "每天":
-        return antivirus_time + timedelta(days=1)
+        return av_time + timedelta(days=1)
     else:
-        return antivirus_time + timedelta(days=7)
+        return av_time + timedelta(days=7)
 
 
 def _dedupe_latest_by_device_line(records: List[AntivirusRecord]) -> List[AntivirusRecord]:
@@ -68,10 +93,11 @@ def get_record(db: Session, record_id: int):
 
 
 def create_record(db: Session, body_data: dict):
-    next_time = _calc_next_time(body_data["antivirus_time"], body_data["cycle"])
+    av_time = _to_dt(body_data["antivirus_time"])
+    next_time = _calc_next_time(av_time, body_data["cycle"])
     r = AntivirusRecord(
         device_id=body_data["device_id"],
-        antivirus_time=body_data["antivirus_time"],
+        antivirus_time=av_time,
         production_line=body_data.get("production_line"),
         operator=body_data.get("operator"),
         cycle=body_data.get("cycle"),
@@ -88,6 +114,9 @@ def update_record(db: Session, record_id: int, update_data: dict):
     r = db.query(AntivirusRecord).filter(AntivirusRecord.id == record_id).first()
     if not r:
         return None
+    # 统一把时间字符串转为 datetime
+    if "antivirus_time" in update_data:
+        update_data["antivirus_time"] = _to_dt(update_data["antivirus_time"])
     if "antivirus_time" in update_data or "cycle" in update_data:
         av_time = update_data.get("antivirus_time", r.antivirus_time)
         cycle = update_data.get("cycle", r.cycle)
@@ -112,10 +141,11 @@ def delete_record(db: Session, record_id: int) -> bool:
 def import_records(db: Session, records: List[dict]) -> int:
     created = []
     for body in records:
-        next_time = _calc_next_time(body["antivirus_time"], body["cycle"])
+        av_time = _to_dt(body["antivirus_time"])
+        next_time = _calc_next_time(av_time, body["cycle"])
         r = AntivirusRecord(
             device_id=body["device_id"],
-            antivirus_time=body["antivirus_time"],
+            antivirus_time=av_time,
             production_line=body.get("production_line"),
             operator=body.get("operator"),
             cycle=body.get("cycle"),

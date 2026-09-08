@@ -25,12 +25,11 @@
     <div class="page-content">
     <el-table :data="listFiltered" stripe border :height="'calc(100vh - 210px)'" style="width: 100%;" empty-text="暂无数据">
 
-        <el-table-column prop="username" label="用户名" width="130" align="center" show-overflow-tooltip>
-          <template #default="{ row }"><b>{{ row.username }}</b></template>
-        </el-table-column>
-
-        <el-table-column prop="full_name" label="姓名" min-width="110" align="center" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.full_name || '-' }}</template>
+        <el-table-column prop="username" label="用户名" width="150" align="center" show-overflow-tooltip>
+          <template #default="{ row }">
+            <b>{{ row.username }}</b>
+            <div v-if="row.full_name && row.full_name !== row.username" style="font-size:12px;color:var(--c-text-mute,#94a3b8);font-weight:normal;">{{ row.full_name }}</div>
+          </template>
         </el-table-column>
 
         <el-table-column prop="role" label="角色" width="110" align="center">
@@ -132,24 +131,52 @@
     <CommonModal
       v-model:visible="permModalVisible"
       :title="'权限设置 - ' + (currentUser?.username || '')"
-      width="720px"
+      width="820px"
       :ok-loading="permSaving"
       @ok="handlePermSave"
     >
-      <el-row :gutter="16">
-        <el-col v-for="m in modules" :key="m" :span="8" style="margin-bottom: 16px;">
-          <div class="mod-perm-card">
+      <!-- admin 提示：admin 角色默认拥有全部权限，细项授权不生效 -->
+      <el-alert
+        v-if="currentUser?.role === 'admin'"
+        type="info" :closable="false" show-icon
+        title="该用户为 admin 角色，默认拥有全部模块的读写权限，此处授权仅对 engineer / viewer 角色生效。"
+        style="margin-bottom: 12px;"
+      />
+      <!-- 快捷操作 + 授权统计 -->
+      <div class="perm-toolbar">
+        <div class="perm-quick">
+          <el-button size="small" type="primary" plain @click="setAllPerms('write')">全部读写</el-button>
+          <el-button size="small" plain @click="setAllPerms('read')">全部只读</el-button>
+          <el-button size="small" plain @click="setAllPerms('none')">全部清空</el-button>
+        </div>
+        <div class="perm-summary">
+          可访问 <b>{{ permStats.readable }}</b> / {{ permModules.length }} 个模块，
+          可写入 <b>{{ permStats.writable }}</b> 个
+        </div>
+      </div>
+
+      <el-row :gutter="12">
+        <el-col v-for="m in permModules" :key="m.key" :span="8" style="margin-bottom: 12px;">
+          <div class="mod-perm-card" :class="{ 'perm-on': perms[m.key]?.can_read }">
             <div class="mod-title">
-              <span class="bi bi-folder2" style="color: var(--primary); margin-right: 6px;"></span>
-              {{ moduleLabel(m) }}
+              <span :class="['bi', m.icon]" style="color: var(--primary); margin-right: 6px;"></span>
+              {{ m.label }}
             </div>
-            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-left: 4px;">
-              <el-checkbox v-model="perms[m].can_read">可读取</el-checkbox>
-              <el-checkbox v-model="perms[m].can_write">可写入</el-checkbox>
+            <div class="perm-checks">
+              <el-checkbox v-model="perms[m.key].can_read" @change="onReadChange(m.key)">
+                <span style="font-size: 13px;">可读取</span>
+              </el-checkbox>
+              <el-checkbox v-model="perms[m.key].can_write" @change="onWriteChange(m.key)">
+                <span style="font-size: 13px;">可写入</span>
+              </el-checkbox>
             </div>
           </div>
         </el-col>
       </el-row>
+      <div class="perm-tip">
+        <span class="bi bi-info-circle"></span>
+        联动规则：勾选「可写入」自动授予「可读取」；取消「可读取」自动收回「可写入」。
+      </div>
       <template #footer="f">
         <div class="cm-footer">
           <el-button @click="f.cancel">取消</el-button>
@@ -190,12 +217,22 @@ const filterFields = [
     ] }
 ]
 
-const moduleLabel = (k) => ({
-  devices: '设备管理', weekly: '周报', monthly: '月报',
-  servers: '服务器', agingracks: '老化架', wifi: 'WiFi AP',
-  orders: '工单', bugs: 'BUG', devreqs: '需求',
-  antivirus: '杀毒记录', users: '用户管理'
-}[k] || k)
+// 权限模块清单（与后端 app.core.auth.PERMISSION_MODULES 一一对应）
+const permModules = [
+  { key: 'devices',    label: '设备管理',     icon: 'bi-cpu' },
+  { key: 'weekly',     label: '生产周报',     icon: 'bi-graph-up-arrow' },
+  { key: 'servers',    label: '服务器管理',   icon: 'bi-server' },
+  { key: 'agingracks', label: '老化架管理',   icon: 'bi-box-seam' },
+  { key: 'wifi',       label: 'WiFi AP 管理', icon: 'bi-wifi' },
+  { key: 'orders',     label: 'MES 工单',     icon: 'bi-clipboard-data' },
+  { key: 'bugs',       label: 'MES BUG',      icon: 'bi-bug' },
+  { key: 'devreqs',    label: 'MES 需求',     icon: 'bi-lightbulb' },
+  { key: 'antivirus',  label: '设备杀毒记录', icon: 'bi-shield-check' },
+  { key: 'esopparts',  label: 'ESOP料号管理', icon: 'bi-file-earmark-text' },
+  { key: 'exception',  label: '异常履历管理', icon: 'bi-exclamation-triangle' },
+  { key: 'users',      label: '用户管理',     icon: 'bi-people' },
+]
+const modules = permModules.map(m => m.key)
 
 // 客户端筛选 + 分页：filteredData 全量过滤结果，listFiltered 当前页切片
 const filteredData = computed(() => {
@@ -225,7 +262,6 @@ const editingId = ref(null)
 const currentUser = ref(null)
 const saving = ref(false)
 const permSaving = ref(false)
-const modules = ['devices', 'weekly', 'monthly', 'servers', 'agingracks', 'wifi', 'orders', 'bugs', 'devreqs', 'antivirus', 'users']
 const perms = ref({})
 const form = ref({})
 
@@ -312,6 +348,34 @@ const showPermModal = (u) => {
   permModalVisible.value = true
 }
 
+// 权限联动：勾选「可写入」自动授予「可读取」；取消「可读取」自动收回「可写入」
+const onWriteChange = (key) => {
+  if (perms.value[key]?.can_write) perms.value[key].can_read = true
+}
+const onReadChange = (key) => {
+  if (!perms.value[key]?.can_read) perms.value[key].can_write = false
+}
+
+// 快捷授权
+const setAllPerms = (mode) => {
+  modules.forEach(m => {
+    perms.value[m] = {
+      can_read: mode !== 'none',
+      can_write: mode === 'write'
+    }
+  })
+}
+
+// 授权统计
+const permStats = computed(() => {
+  let readable = 0, writable = 0
+  modules.forEach(m => {
+    if (perms.value[m]?.can_read) readable++
+    if (perms.value[m]?.can_write) writable++
+  })
+  return { readable, writable }
+})
+
 const handlePermSave = async () => {
   permSaving.value = true
   try {
@@ -356,6 +420,13 @@ onUnmounted(() => {
   border-radius: 10px;
   padding: 12px 14px;
   background: var(--card-bg);
+  transition: border-color .15s, box-shadow .15s, background .15s;
+}
+/* 已授权读取的模块卡片高亮，未授权置灰 */
+.mod-perm-card.perm-on {
+  border-color: var(--primary, #2c5ce8);
+  background: rgba(44, 92, 232, .05);
+  box-shadow: 0 2px 8px rgba(44, 92, 232, .08);
 }
 .mod-title {
   font-size: 13.5px;
@@ -363,5 +434,34 @@ onUnmounted(() => {
   color: var(--c-text);
   padding-bottom: 8px;
   border-bottom: 1px dashed var(--border-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.perm-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding-left: 4px;
+}
+.perm-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: var(--c-fill, #f8fafc);
+  border-radius: 8px;
+}
+.perm-summary { font-size: 12.5px; color: var(--c-text-mute, #64748b); }
+.perm-summary b { color: var(--primary, #2c5ce8); font-size: 14px; margin: 0 2px; }
+.perm-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--c-text-mute, #94a3b8);
+}
+.perm-tip .bi { margin-right: 4px; }
 </style>

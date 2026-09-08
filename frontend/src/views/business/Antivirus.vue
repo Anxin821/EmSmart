@@ -81,6 +81,7 @@
       :title="formMode === 'create' ? '新增杀毒记录' : '编辑杀毒记录'"
       width="680px"
       :ok-loading="saving"
+      :close-on-click-modal="false"
       @ok="submitForm"
     >
       <el-form :model="form" label-width="96px" label-position="right">

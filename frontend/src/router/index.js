@@ -61,12 +61,6 @@ const routes = [
         meta: { requiresAuth: true }
       },
       {
-        path: '/monthly',
-        name: 'Monthly',
-        component: () => import('../views/business/Monthly.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
         path: '/servers',
         name: 'Servers',
         component: () => import('../views/business/Servers.vue'),
