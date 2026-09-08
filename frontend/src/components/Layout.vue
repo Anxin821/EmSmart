@@ -49,14 +49,14 @@
       <button type="button" class="nav-link" :class="{ active: $route.name === 'DevReqs' }" @click="go('/devreqs')">
         <span class="bi bi-lightbulb-fill" aria-hidden="true"></span>MES 需求管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Antivirus' }" @click="go('/antivirus')">
-        <span class="bi bi-shield-shaded" aria-hidden="true"></span>设备杀毒记录
+      <button type="button" class="nav-link" :class="{ active: $route.name === 'Exception' }" @click="go('/exception')">
+        <span class="bi bi-exclamation-triangle-fill" aria-hidden="true"></span>异常履历管理
       </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'EsopParts' }" @click="go('/esop-parts')">
         <span class="bi bi-file-earmark-text-fill" aria-hidden="true"></span>ESOP料号管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Exception' }" @click="go('/exception')">
-        <span class="bi bi-exclamation-triangle-fill" aria-hidden="true"></span>异常履历管理
+      <button type="button" class="nav-link" :class="{ active: $route.name === 'Antivirus' }" @click="go('/antivirus')">
+        <span class="bi bi-shield-shaded" aria-hidden="true"></span>设备杀毒记录
       </button>
       <button type="button" class="nav-link" :class="{ active: $route.name === 'Users' }" @click="go('/users')">
         <span class="bi bi-people-fill" aria-hidden="true"></span>用户管理
