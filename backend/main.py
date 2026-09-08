@@ -11,6 +11,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import app
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -36,7 +37,7 @@ from app.api.v1.routers.antivirus import router as antivirus_router
 from app.api.v1.routers.users import router as users_router
 from app.api.v1.routers.responsibilities import router as responsibilities_router
 from app.api.v1.routers.esop import router as esop_router
-
+from app.api.v1.routers.exception import router as exception_router
 # ---------- 定时任务 ----------
 from app.tasks import check_server_health
 
@@ -167,6 +168,7 @@ app.include_router(antivirus_router, prefix=API_PREFIX)
 app.include_router(users_router, prefix=API_PREFIX)
 app.include_router(responsibilities_router, prefix=API_PREFIX)
 app.include_router(esop_router, prefix=API_PREFIX)
+app.include_router(exception_router, prefix=API_PREFIX)
 
 
 # ============================================================

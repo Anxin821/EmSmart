@@ -113,6 +113,12 @@ const routes = [
         name: 'EsopParts',
         component: () => import('../views/business/EsopParts.vue'),
         meta: { requiresAuth: true }
+      },
+      {
+        path: '/exception',
+        name: 'Exception',
+        component: () => import('../views/business/exception.vue'),
+        meta: { requiresAuth: true }
       }
     ]
   }

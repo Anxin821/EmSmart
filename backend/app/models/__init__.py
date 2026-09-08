@@ -15,6 +15,7 @@ from .network import Server, AgingRack, WifiAp
 from .mes import WorkOrder, Bug, DevRequest
 from .system import Project, OperationLog, AntivirusRecord, JobResponsibility
 from .esop import EsopPart
+from .exception import ExceptionRecord
 
 __all__ = [
     "Base",
@@ -34,4 +35,5 @@ __all__ = [
     "AntivirusRecord",
     "JobResponsibility",
     "EsopPart",
+    "ExceptionRecord",
 ]
