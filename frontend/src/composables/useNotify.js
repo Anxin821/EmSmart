@@ -21,16 +21,87 @@ export const toast = {
 /** 从 axios 错误对象里拿出后端给的错误消息 */
 const errMsg = (e, fallback = '操作失败') => e?.response?.data?.message || e?.message || fallback
 
+// ============================================================
+// 【修改】删除确认弹窗：按模板格式显示
+// 模板：确认删除异常 EXC-20260908-001（质量异常 - 测试）？删除后不可恢复。
+// ============================================================
 /**
  * 删除确认弹窗：居中 + 警告色 + 危险红色"确认删除"按钮
- * 用法：
- *   const confirmed = await confirmDelete('设备ID：ABC-01')
- *   if (!confirmed) return
+ *
+ * 用法1（字符串，兼容旧用法）：
+ *   const ok = await confirmDelete('设备ID：ABC-01')
+ *
+ * 用法2（对象，推荐）：
+ *   const ok = await confirmDelete({
+ *     name: 'EXC-20260908-001',    // 编号/名称
+ *     type: '质量异常',             // 类型
+ *     desc: '测试',                 // 描述/现象
+ *     prefix: '异常'                // 前缀（可选，如：异常/BUG/工单）
+ *   })
  */
-export async function confirmDelete(itemLabel = '', extra = '') {
+export async function confirmDelete(item, extra = '') {
+  let name = ''
+  let type = ''
+  let desc = ''
+  let prefix = ''
+  let extraMsg = extra || '删除后不可恢复'
+
+  // 判断参数类型：如果是对象，提取字段
+  if (typeof item === 'object' && item !== null) {
+    // 提取名称
+    name = item.name || item.label || item.title || item.id || item.exception_no ||
+           item.bug_id || item.request_id || item.order_number || item.device_id ||
+           item.rack_id || item.ap_id || item.server_id || item.username || ''
+
+    // 提取类型
+    type = item.type || item.category || item.exception_type || item.severity ||
+           item.priority || item.order_type || item.device_type || item.role || ''
+
+    // 提取描述
+    desc = item.desc || item.description || item.content || item.phenomenon_desc ||
+           item.title || item.full_name || item.product_name || item.ssid ||
+           item.name || ''
+
+    // 提取前缀（如：异常 / BUG / 工单）
+    prefix = item.prefix || ''
+
+    // 提取额外提示
+    if (item.extra) extraMsg = item.extra
+    if (item.extraMsg) extraMsg = item.extraMsg
+  } else {
+    // 兼容旧用法：直接传字符串
+    name = String(item || '该条目')
+  }
+
+  // ============================================================
+  // 【核心修改】按照模板构建消息
+  // 模板：确认删除异常 EXC-20260908-001（质量异常 - 测试）？删除后不可恢复。
+  // ============================================================
+  let message = ''
+
+  // 构建名称部分：前缀 + 编号
+  let fullName = name
+  if (prefix) {
+    fullName = `${prefix} ${name}`
+  }
+
+  // 构建类型+描述部分
+  let detail = ''
+  if (type && desc) {
+    detail = `（${type} - ${desc}）`
+  } else if (type) {
+    detail = `（${type}）`
+  } else if (desc) {
+    const shortDesc = desc.length > 30 ? desc.slice(0, 30) + '…' : desc
+    detail = `（${shortDesc}）`
+  }
+
+  // 组装最终消息
+  message = `确认删除${fullName}${detail}？${extraMsg}。`
+
   try {
     await ElMessageBox.confirm(
-      `确定删除${itemLabel ? `「${itemLabel}」` : '该条目'}？${extra || '删除后数据不可恢复'}，是否继续？`,
+      message,
       '删除确认',
       {
         confirmButtonText: '确认删除',
