@@ -63,7 +63,7 @@
                 <b>{{ r.label }}</b>：{{ r.value }} {{ r.unit }}
                 <template v-if="r.items && r.items.length">
                   <span v-if="r.items.length" class="risk-detail">
-                    ({{ r.items.join('、') }})
+                    ({{ r.items.join('、') }}{{ r.value > r.items.length ? ' 等' : '' }})
                   </span>
                 </template>
                 <span v-else class="risk-detail muted">（暂无）</span>
@@ -85,7 +85,7 @@
               <b>{{ data.milestones?.label }}</b>：{{ data.milestones?.count }} 个需求
             </div>
             <div class="ms-list">
-              ({{ data.milestones?.items?.join('、') || '' }})
+              ({{ data.milestones?.items?.join('、') || '' }}{{ (data.milestones?.count || 0) > (data.milestones?.items?.length || 0) ? ' 等' : '' }})
             </div>
           </div>
         </div>

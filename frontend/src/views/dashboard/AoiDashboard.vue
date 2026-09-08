@@ -6,15 +6,12 @@
         <span class="bi" :class="exporting ? 'bi-hourglass-split' : 'bi-file-earmark-ppt'"></span>
         {{ exporting ? '导出中...' : '导出PPT' }}
       </button>
-      <router-link class="btn btn-sm btn-primary" to="/devices">
-        <span class="bi bi-arrow-right"></span>进入管理
-      </router-link>
     </Teleport>
 
     <div class="cockpit">
     <!-- KPI 指标：设备总数 / 可用率 / 本月产量 / 本月直通率 -->
     <div class="stat-grid">
-      <StatCard centered color="blue" icon="bi bi-display-fill" :num="stats.total" label="设备总数" />
+      <StatCard centered color="blue" icon="bi bi-display-fill" :num="stats.total" label="设备总数" clickable @click="goDevices" />
       <StatCard centered color="green" icon="bi bi-check-circle-fill" :num="`${availability}%`">
         <template #label>设备可用率（正常 {{ stats.normal }} / 故障 {{ stats.fault }}）</template>
       </StatCard>
@@ -59,10 +56,15 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, nextTick, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { devicesApi, productionApi } from '@/api'
 import StatCard from '@/components/common/StatCard.vue'
 import { createPresentation, addFullImageSlide, savePresentation, captureElement } from '@/utils/pptExport'
+
+const router = useRouter()
+// 点击「设备总数」卡片跳转设备管理页（替代原顶栏“进入管理”按钮）
+const goDevices = () => router.push('/devices')
 
 const summary = ref({ total_output: 0, total_qualified: 0, yield_rate: 0, months: 0 })
 const trend   = ref([])

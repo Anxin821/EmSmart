@@ -363,14 +363,14 @@ def get_mes_dashboard(db: Session) -> dict:
             **req_month_grouped[k],
         })
 
-    # -------- 风险 TOP（至少 2 块：高危 BUG + 延期需求；每块最多列 3 条样例标题） --------
+    # -------- 风险 TOP（至少 2 块：高危 BUG + 延期需求；每块 value 为真实总数，items 取前 3 条样例） --------
     def severity_rank(sev: str):
         return {"致命": 0, "P0": 0, "严重": 1, "P1": 1, "一般": 2, "P2": 2, "建议": 3, "P3": 3}.get((sev or "").strip(), 9)
-    high_bugs = sorted(
+    high_bugs_all = sorted(
         [b for b in bugs_all if severity_rank(b.severity) <= 1],
         key=lambda b: (severity_rank(b.severity), -b.id)
-    )[:3]
-    overdue = []
+    )
+    overdue_all = []
     for r in reqs_all:
         status_val = _REQ_STATUS_MAP.get((r.status or "").strip())
         if status_val == "上线":
@@ -381,27 +381,29 @@ def get_mes_dashboard(db: Session) -> dict:
         if hasattr(exp, "date"):
             exp = exp.date()
         if exp < today:
-            overdue.append(r)
+            overdue_all.append(r)
     # 先高优、再逾期更早
     pri_rank = {"紧急": 0, "高": 1, "中": 2, "普通": 3, "低": 4}
-    overdue.sort(key=lambda r: (pri_rank.get((r.priority or "").strip(), 5),
-                                r.expected_date or today))
-    overdue = overdue[:3]
+    overdue_all.sort(key=lambda r: (pri_rank.get((r.priority or "").strip(), 5),
+                                     r.expected_date or today))
+    # 展示样例取前 3 条，value 保持真实总数（与 KPI 卡一致）
+    high_bugs_items = [b.title or b.bug_id for b in high_bugs_all[:3]]
+    overdue_items = [r.title or r.request_id for r in overdue_all[:3]]
 
     risks = [
         {
             "icon":  "p0_bug",
             "label": "P0级BUG",
             "unit":  "个",
-            "value": len(high_bugs),
-            "items": [b.title or b.bug_id for b in high_bugs] if high_bugs else [],
+            "value": len(high_bugs_all),
+            "items": high_bugs_items,
         },
         {
             "icon":  "overdue_req",
             "label": "延期需求",
             "unit":  "个",
-            "value": len(overdue),
-            "items": [r.title or r.request_id for r in overdue] if overdue else [],
+            "value": len(overdue_all),
+            "items": overdue_items,
         },
     ]
 

@@ -24,8 +24,10 @@ def list_exceptions(
     keyword: Optional[str] = None,
     type: Optional[str] = None,
     status: Optional[str] = None,
+    level: Optional[str] = None,
+    stopped: Optional[str] = None,
 ):
-    items, total = ExceptionService.get_list(db, page, page_size, keyword, type, status)
+    items, total = ExceptionService.get_list(db, page, page_size, keyword, type, status, level, stopped)
     return ApiResponse(data=PaginatedData(total=total, page=page, page_size=page_size, items=items))
 
 

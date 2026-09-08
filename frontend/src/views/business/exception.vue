@@ -28,7 +28,7 @@
           <span class="s-label">已解决</span>
         </div>
         <div class="exc-divider"></div>
-        <div class="exc-stat clickable" :class="{ active: filters.status === 'resolved' }" @click="setStat('status', 'resolved')">
+        <div class="exc-stat">
           <span class="s-num s-green">{{ dashboard.resolution_rate ?? 0 }}<small>%</small></span>
           <span class="s-label">解决率</span>
         </div>
@@ -111,24 +111,24 @@
     <div class="page-content exc-list">
       <div class="table-wrap">
         <el-table v-loading="loading" :data="items" stripe border height="100%" style="width:100%" @row-click="openDetail" row-class-name="row-clickable">
-          <el-table-column prop="exception_no" label="编号" width="150" />
-          <el-table-column prop="occurred_time" label="发生时间" width="155">
+          <el-table-column prop="exception_no" label="编号" width="150" align="center" header-align="center" show-overflow-tooltip />
+          <el-table-column prop="occurred_time" label="发生时间" width="155" align="center" header-align="center" show-overflow-tooltip>
             <template #default="{ row }">{{ formatTime(row.occurred_time) }}</template>
           </el-table-column>
-          <el-table-column prop="exception_type" label="类型" width="95">
+          <el-table-column prop="exception_type" label="类型" width="95" align="center" header-align="center">
             <template #default="{ row }"><span class="status-badge">{{ row.exception_type }}</span></template>
           </el-table-column>
-          <el-table-column prop="phenomenon_desc" label="现象描述" min-width="220" show-overflow-tooltip />
-          <el-table-column prop="responsible_person" label="责任人" width="85" />
-          <el-table-column prop="status" label="状态" width="90">
+          <el-table-column prop="phenomenon_desc" label="现象描述" min-width="220" align="center" header-align="center" show-overflow-tooltip />
+          <el-table-column prop="responsible_person" label="责任人" width="85" align="center" header-align="center" show-overflow-tooltip />
+          <el-table-column prop="status" label="状态" width="90" align="center" header-align="center">
             <template #default="{ row }">
               <span :class="'status-badge ' + statusClass(row.status)">{{ statusLabel(row.status) }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="updated_at" label="更新时间" width="155">
+          <el-table-column prop="updated_at" label="更新时间" width="155" align="center" header-align="center" show-overflow-tooltip>
             <template #default="{ row }">{{ formatTime(row.updated_at) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right">
+          <el-table-column label="操作" width="120" align="center" header-align="center" fixed="right">
             <template #default="{ row }">
               <el-button type="primary" link size="small" @click.stop="openEdit(row)">编辑</el-button>
               <el-button type="danger" link size="small" @click.stop="handleDelete(row)">删除</el-button>
@@ -341,11 +341,9 @@ const setStat = (kind, val) => {
   loadData()
 }
 
-// 点击「总异常」：清除所有看板维度筛选
+// 点击「总异常」：清除所有筛选条件（含类型），顶部筛选栏同步重置显示
 const clearStatFilters = () => {
-  filters.value.status = ''
-  filters.value.level = ''
-  filters.value.stopped = ''
+  filters.value = { keyword: '', type: '', status: '', level: '', stopped: '' }
   page.value = 1
   loadData()
 }
@@ -647,6 +645,13 @@ onMounted(() => {
 }
 :deep(.row-clickable:hover) > td {
   background-color: var(--c-hover, #f5f7fa) !important;
+}
+/* 表格内容不换行：长文本由 show-overflow-tooltip 截断，徽标保持单行 */
+:deep(.el-table .cell) {
+  white-space: nowrap;
+}
+:deep(.el-table th .cell) {
+  white-space: nowrap;
 }
 
 /* 详情弹窗描述项标签列宽对齐 */

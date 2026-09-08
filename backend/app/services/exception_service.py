@@ -39,8 +39,11 @@ def _to_dict(r: ExceptionRecord) -> dict:
 class ExceptionService:
 
     @staticmethod
-    def get_list(db: Session, page: int, page_size: int, keyword: str = None, type: str = None, status: str = None):
-        items, total = ExceptionRepository.get_list(db, page, page_size, keyword, type, status)
+    def get_list(db: Session, page: int, page_size: int, keyword: str = None, type: str = None,
+                 status: str = None, level: str = None, stopped: str = None):
+        items, total = ExceptionRepository.get_list(
+            db, page, page_size, keyword, type, status, level, stopped
+        )
         return ([_to_dict(r) for r in items], total)
 
     @staticmethod
