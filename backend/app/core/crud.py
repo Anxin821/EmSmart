@@ -5,6 +5,8 @@
 import random
 from typing import Optional, List, Tuple
 from datetime import date, datetime, timedelta
+
+import recorder
 from sqlalchemy import func, and_, or_, desc, case, Date as DateType
 from sqlalchemy.orm import Session, joinedload
 from app.models import (
@@ -920,7 +922,7 @@ def batch_import_devices(db: Session, rows: List[dict]) -> int:
     return count
 
 
-def batch_import_weekly(db: Session, rows: List[dict]) -> int:
+def batch_import_weekly(db: Session, rows: List[dict], username: str) -> int:
     count = 0
     now = beijing_now()
     for row in rows:
@@ -942,13 +944,16 @@ def batch_import_weekly(db: Session, rows: List[dict]) -> int:
             for k, v in row.items():
                 if v is not None and k not in ("year", "week_number", "production_line", "project") and hasattr(existing, k):
                     setattr(existing, k, v)
+            existing.recorder = username  # ✅ 更新时也强制覆盖录入人
         else:
             # ✅ 新增时也强制设置北京时间
             row["updated_at"] = now
+            row["recorder"] = username  # ✅ 新增时强制使用当前登录人
             db.add(WeeklyProduction(**row))
         count += 1
     db.commit()
     return count
+
 
 
 # ============================================================

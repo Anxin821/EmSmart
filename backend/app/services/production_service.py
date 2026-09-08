@@ -2,6 +2,7 @@ from datetime import datetime
 from io import BytesIO
 from typing import Optional
 
+import username
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
@@ -102,10 +103,10 @@ def import_weekly_excel(db: Session, file: UploadFile):
         if row_dict.get("year"):
             rows_data.append(row_dict)
     wb.close()
-    return batch_import_weekly(db, rows_data)
+    return batch_import_weekly(db, rows_data, username)  # ✅ 传入 username
 
 
-def import_weekly_raw_excel(db: Session, file: UploadFile):
+def import_weekly_raw_excel(db: Session, file: UploadFile, username: str):
     from openpyxl import load_workbook
 
     if not file.filename.endswith((".xlsx", ".xls")):
@@ -164,9 +165,9 @@ def import_weekly_raw_excel(db: Session, file: UploadFile):
         "project": project,
         "total_output": counts["total"],
         "qualified_count": counts["ok"],
-        "recorder": "system",
+        "recorder": username,  # ✅ 将 "system" 替换为 username
     } for (year, week, line, project), counts in grouped.items()]
-    return batch_import_weekly(db, rows_data)
+    return batch_import_weekly(db, rows_data, username)  # ✅ 传入 username
 
 
 def list_monthly(db: Session, page: int, page_size: int, year: Optional[int] = None, month: Optional[int] = None, project: Optional[str] = None):

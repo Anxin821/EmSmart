@@ -101,7 +101,7 @@ def import_weekly_records(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("admin", "engineer")),
 ):
-    result = import_weekly_excel(db, file)
+    result = import_weekly_excel(db, file, current_user["username"])  # ✅ 传入 username
     return ApiResponse(data={"imported": result}, message="导入成功")
 
 
@@ -111,7 +111,7 @@ def import_weekly_raw_records(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("admin", "engineer")),
 ):
-    result = import_weekly_raw_excel(db, file)
+    result = import_weekly_raw_excel(db, file, current_user["username"])  # ✅ 传入 username
     return ApiResponse(data={"imported": result}, message="导入成功")
 
 
