@@ -97,6 +97,7 @@ class WifiApBase(BaseModel):
     ssid: str
     production_line: str
     ip_address: Optional[str] = None
+    mac_address: Optional[str] = None
     location: Optional[str] = None
     channel: Optional[int] = 0
     connected_devices: Optional[int] = 0
@@ -113,6 +114,7 @@ class WifiApUpdate(BaseModel):
     ssid: Optional[str] = None
     production_line: Optional[str] = None
     ip_address: Optional[str] = None
+    mac_address: Optional[str] = None
     location: Optional[str] = None
     channel: Optional[int] = None
     connected_devices: Optional[int] = None
@@ -129,8 +131,39 @@ class WifiApOut(WifiApBase):
         from_attributes = True
 
 
+# ============================================================
+# 网络监控设置（钉钉机器人 / Ping 间隔，迁移自 wifi-monitor）
+# ============================================================
+class NetworkSettings(BaseModel):
+    dingtalk_webhook: Optional[str] = ""
+    dingtalk_secret: Optional[str] = ""
+    ping_interval: Optional[int] = 60
+
+
+# ============================================================
+# 网络告警
+# ============================================================
+class NetworkAlertOut(BaseModel):
+    id: int
+    device_type: str
+    device_name: str
+    device_key: Optional[str] = None
+    production_line: Optional[str] = None
+    ip_address: Optional[str] = None
+    alert_type: Optional[str] = None
+    level: Optional[str] = None
+    message: Optional[str] = None
+    status: str = "未处理"
+    created_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 __all__ = [
     "ServerBase", "ServerCreate", "ServerUpdate", "ServerOut",
     "AgingRackBase", "AgingRackCreate", "AgingRackUpdate", "AgingRackOut",
     "WifiApBase", "WifiApCreate", "WifiApUpdate", "WifiApOut",
+    "NetworkSettings", "NetworkAlertOut",
 ]

@@ -1,7 +1,7 @@
 import platform
 import subprocess
 from io import BytesIO
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 from openpyxl import Workbook, load_workbook
 from fastapi import HTTPException
@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from app.repositories import network_repository as repo
 from app.core.crud import write_operation_log
 from app.core.timeutil import beijing_now
+from app.core.dingtalk import send_dingtalk
+from app.models import Server, AgingRack, WifiAp, NetworkAlert, Setting
 
 
 def _ping_device(ip: str) -> bool:
@@ -60,6 +62,7 @@ def _ap_to_dict(d) -> Dict[str, Any]:
     return {
         "id": d.id, "ap_id": d.ap_id, "ssid": d.ssid,
         "production_line": d.production_line, "ip_address": d.ip_address,
+        "mac_address": d.mac_address,
         "location": d.location, "channel": d.channel,
         "connected_devices": d.connected_devices, "status": d.status,
         "responsible_person": d.responsible_person,
@@ -97,22 +100,51 @@ def remove_server(db: Session, server_id: str, request, username: str):
     return True
 
 
-def check_all_servers(db: Session, request, username: str):
-    from app.models import Server
-    servers = db.query(Server).all()
-    online = offline = 0
-    for s in servers:
-        if s.ip_address:
-            is_alive = _ping_device(s.ip_address)
-            s.status = "在线" if is_alive else "离线"
-            s.last_check_time = beijing_now()
-            if is_alive:
-                online += 1
-            else:
-                offline += 1
+def _ping_and_update_all(db: Session) -> Dict[str, int]:
+    """对登记了 IP 的服务器 / 老化架 / AP 全部执行 Ping 并回写状态（一键检测使用）。"""
+    stats = {"servers_online": 0, "servers_offline": 0,
+             "racks_online": 0, "racks_offline": 0,
+             "aps_online": 0, "aps_offline": 0}
+    for s in db.query(Server).all():
+        if not s.ip_address:
+            continue
+        alive = _ping_device(s.ip_address)
+        s.status = "在线" if alive else "离线"
+        s.last_check_time = beijing_now()
+        stats["servers_online" if alive else "servers_offline"] += 1
+    for r in db.query(AgingRack).all():
+        if not r.ip_address:
+            continue
+        alive = _ping_device(r.ip_address)
+        r.status = "正常" if alive else "故障"
+        stats["racks_online" if alive else "racks_offline"] += 1
+    for ap in db.query(WifiAp).all():
+        if not ap.ip_address:
+            continue
+        alive = _ping_device(ap.ip_address)
+        ap.status = "在线" if alive else "离线"
+        stats["aps_online" if alive else "aps_offline"] += 1
     db.commit()
-    write_operation_log(db, username, "UPDATE", "server", None, f"心跳检测: {online}在线 {offline}离线", request)
-    return {"online": online, "offline": offline}
+    return stats
+
+
+def check_all_servers(db: Session, request, username: str):
+    """一键检测：服务器 + 老化架 + AP 全量 Ping，并自动对账告警/钉钉通知。
+
+    函数名保持兼容（路由 /network/servers/check-all 与前端 networkApi.checkAll 均调用它）。
+    """
+    stats = _ping_and_update_all(db)
+    sync = sync_alerts(db, notify=True)
+    online = stats["servers_online"] + stats["racks_online"] + stats["aps_online"]
+    offline = stats["servers_offline"] + stats["racks_offline"] + stats["aps_offline"]
+    write_operation_log(
+        db, username, "UPDATE", "network", None,
+        f"一键检测: 在线{online} 离线{offline} 新增告警{sync['new_alerts']}", request,
+    )
+    return {
+        "online": online, "offline": offline, **stats,
+        "new_alerts": sync["new_alerts"], "resolved_alerts": sync["resolved_alerts"],
+    }
 
 
 def import_servers(db: Session, rows: List[dict], request, username: str):
@@ -203,8 +235,197 @@ def remove_wifi_ap(db: Session, ap_id: str, request, username: str):
 
 def export_wifi_aps_rows(db: Session, items):
     wb = Workbook(); ws = wb.active; ws.title = "WiFi AP"
-    ws.append(["AP_ID","SSID","产线","IP","位置","信道","连接设备","状态","负责人"])
+    ws.append(["AP_ID","SSID","产线","IP","MAC","位置","信道","连接设备","状态","负责人"])
     for d in items:
-        ws.append([d.get("ap_id"), d.get("ssid"), d.get("production_line"), d.get("ip_address"), d.get("location"), d.get("channel"), d.get("connected_devices"), d.get("status"), d.get("responsible_person")])
+        ws.append([d.get("ap_id"), d.get("ssid"), d.get("production_line"), d.get("ip_address"), d.get("mac_address"), d.get("location"), d.get("channel"), d.get("connected_devices"), d.get("status"), d.get("responsible_person")])
     output = BytesIO(); wb.save(output); output.seek(0)
     return output
+
+
+# ============================================================
+# 网络监控设置（钉钉机器人 / Ping 间隔，迁移自 wifi-monitor）
+# ============================================================
+DEFAULT_SETTINGS = {
+    "dingtalk_webhook": "",
+    "dingtalk_secret": "",
+    "ping_interval": "60",
+}
+
+
+def ensure_default_settings(db: Session) -> None:
+    """启动时补齐默认设置项（幂等）。"""
+    existing = {s.key for s in db.query(Setting).all()}
+    missing = [Setting(key=k, value=v) for k, v in DEFAULT_SETTINGS.items() if k not in existing]
+    if missing:
+        db.add_all(missing)
+        db.commit()
+
+
+def get_settings(db: Session) -> Dict[str, Any]:
+    ensure_default_settings(db)
+    m = {s.key: s.value for s in db.query(Setting).all()}
+    try:
+        interval = int(m.get("ping_interval") or 60)
+    except (TypeError, ValueError):
+        interval = 60
+    return {
+        "dingtalk_webhook": m.get("dingtalk_webhook") or "",
+        "dingtalk_secret": m.get("dingtalk_secret") or "",
+        "ping_interval": interval,
+    }
+
+
+def update_settings(db: Session, data: dict, request, username: str) -> Dict[str, Any]:
+    for k in ("dingtalk_webhook", "dingtalk_secret", "ping_interval"):
+        if k not in data or data[k] is None:
+            continue
+        val = str(data[k]).strip()
+        obj = db.query(Setting).filter(Setting.key == k).first()
+        if obj:
+            obj.value = val
+        else:
+            db.add(Setting(key=k, value=val))
+    db.commit()
+    write_operation_log(db, username, "UPDATE", "setting", None, "更新网络监控设置（钉钉/Ping间隔）", request)
+    return get_settings(db)
+
+
+def test_dingtalk(db: Session) -> Tuple[bool, str]:
+    cfg = get_settings(db)
+    text = "【EmSmart 车间网络监控】钉钉机器人测试消息：通知配置成功！"
+    return send_dingtalk(cfg["dingtalk_webhook"], cfg["dingtalk_secret"], text)
+
+
+# ============================================================
+# 网络告警（离线检测落表 + 钉钉通知 + 恢复自动关闭）
+# ============================================================
+def _alert_to_dict(a: NetworkAlert) -> Dict[str, Any]:
+    return {
+        "id": a.id, "device_type": a.device_type, "device_name": a.device_name,
+        "device_key": a.device_key, "production_line": a.production_line,
+        "ip_address": a.ip_address, "alert_type": a.alert_type, "level": a.level,
+        "message": a.message, "status": a.status,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+        "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
+    }
+
+
+def list_alerts(db: Session, page: int = 1, page_size: int = 20, status: Optional[str] = None):
+    q = db.query(NetworkAlert)
+    if status:
+        q = q.filter(NetworkAlert.status == status)
+    total = q.count()
+    rows = (q.order_by(NetworkAlert.id.desc())
+             .offset((page - 1) * page_size).limit(page_size).all())
+    return [_alert_to_dict(a) for a in rows], total
+
+
+def open_alert_count(db: Session) -> int:
+    return db.query(NetworkAlert).filter(NetworkAlert.status == "未处理").count()
+
+
+def resolve_alert(db: Session, alert_id: int, request, username: str) -> bool:
+    a = db.query(NetworkAlert).filter(NetworkAlert.id == alert_id).first()
+    if not a:
+        return False
+    if a.status != "已处理":
+        a.status = "已处理"
+        a.resolved_at = beijing_now()
+        db.commit()
+        write_operation_log(db, username, "UPDATE", "network_alert", str(alert_id), "处理网络告警", request)
+    return True
+
+
+def resolve_all_alerts(db: Session, request, username: str) -> int:
+    rows = db.query(NetworkAlert).filter(NetworkAlert.status == "未处理").all()
+    now = beijing_now()
+    for a in rows:
+        a.status = "已处理"
+        a.resolved_at = now
+    db.commit()
+    if rows:
+        write_operation_log(db, username, "UPDATE", "network_alert", None, f"批量处理 {len(rows)} 条网络告警", request)
+    return len(rows)
+
+
+def _network_device_states(db: Session):
+    """当前全部网络设备监控状态：(设备类型, 去重键, 名称, 产线, IP, 是否离线)。"""
+    states = []
+    for s in db.query(Server).all():
+        states.append(("服务器", f"服务器:{s.server_id}", s.name, s.production_line, s.ip_address, s.status == "离线"))
+    for r in db.query(AgingRack).all():
+        states.append(("老化架", f"老化架:{r.rack_id}", r.name, r.production_line, r.ip_address, r.status != "正常"))
+    for ap in db.query(WifiAp).all():
+        states.append(("WiFi AP", f"WiFi AP:{ap.ap_id}", ap.ssid, ap.production_line, ap.ip_address, ap.status == "离线"))
+    return states
+
+
+def _build_alert_text(device_type: str, name: str, line: str, ip: str, ts: str) -> str:
+    """按设备类型拼装钉钉报警文案（对齐 wifi-monitor/syslog_listener 的前缀风格）。"""
+    if device_type == "WiFi AP":
+        prefix = f"{line} WiFi异常报警！！！" if line else "WiFi异常报警！！！"
+    elif device_type == "老化架":
+        prefix = f"{line} 老化架异常报警！！！" if line else "老化架异常报警！！！"
+    else:
+        prefix = f"{line} 服务器异常报警！！！" if line else "服务器异常报警！！！"
+    return (
+        f"⚠️ {prefix}\n"
+        f"时间：{ts}\n"
+        f"设备：{name}\n"
+        f"来源IP：{ip or 'N/A'}\n"
+        f"事件：设备离线（Ping 不可达）"
+    )
+
+
+def sync_alerts(db: Session, notify: bool = True) -> Dict[str, int]:
+    """按设备当前状态对账告警表：
+
+    - 新离线且无未处理告警 → 落库一条 critical 告警，并按设置推送钉钉（同设备去重，不重复轰炸）；
+    - 恢复在线且存在未处理告警 → 自动标记已处理；
+    - 未登记 IP 的设备不参与监控告警。
+    """
+    cfg = get_settings(db) if notify else None
+    open_map = {
+        a.device_key: a
+        for a in db.query(NetworkAlert).filter(NetworkAlert.status == "未处理").all()
+    }
+    new_count = resolved_count = 0
+    now = beijing_now()
+    ts = now.strftime("%Y-%m-%d %H:%M:%S")
+    for device_type, key, name, line, ip, offline in _network_device_states(db):
+        if not ip:
+            continue
+        if offline:
+            if key not in open_map:
+                db.add(NetworkAlert(
+                    device_type=device_type, device_name=name, device_key=key,
+                    production_line=line, ip_address=ip,
+                    alert_type="离线告警", level="critical",
+                    message=f"{device_type} [{name}] Ping 不可达，判定离线（IP：{ip}）",
+                ))
+                new_count += 1
+                if cfg and cfg.get("dingtalk_webhook"):
+                    send_dingtalk(cfg["dingtalk_webhook"], cfg["dingtalk_secret"],
+                                  _build_alert_text(device_type, name, line, ip, ts))
+        elif key in open_map:
+            open_map[key].status = "已处理"
+            open_map[key].resolved_at = now
+            resolved_count += 1
+    if new_count or resolved_count:
+        db.commit()
+    return {"new_alerts": new_count, "resolved_alerts": resolved_count}
+
+
+def monitor_tick(db: Session) -> int:
+    """后台定时任务每轮调用：Ping 老化架/AP（服务器由 server_health 守护任务检测），
+    对账告警并推送钉钉，返回设置中的下一轮检测间隔（秒）。
+    """
+    for r in db.query(AgingRack).all():
+        if r.ip_address:
+            r.status = "正常" if _ping_device(r.ip_address) else "故障"
+    for ap in db.query(WifiAp).all():
+        if ap.ip_address:
+            ap.status = "在线" if _ping_device(ap.ip_address) else "离线"
+    db.commit()
+    sync_alerts(db, notify=True)
+    return get_settings(db)["ping_interval"]

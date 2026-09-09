@@ -8,7 +8,8 @@ from app.core.database import get_db
 from app.core.auth import get_current_user, require_role
 from app.schemas import (
     ServerCreate, ServerUpdate, AgingRackCreate, AgingRackUpdate,
-    WifiApCreate, WifiApUpdate, ApiResponse, PaginatedData,
+    WifiApCreate, WifiApUpdate, NetworkSettings,
+    ApiResponse, PaginatedData,
 )
 from app.services import network_service as service
 
@@ -214,3 +215,78 @@ def export_wifi_aps(
     items, _ = service.list_wifi_aps(db, 1, 10000, keyword, production_line, status)
     output = service.export_wifi_aps_rows(db, items)
     return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": "attachment; filename=wifi_aps.xlsx"})
+
+
+# ============================================================
+# 网络监控设置（钉钉机器人 / Ping 间隔）
+# ============================================================
+@router.get("/settings")
+def get_network_settings(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "engineer")),
+):
+    return ApiResponse(data=service.get_settings(db))
+
+
+@router.put("/settings")
+def update_network_settings(
+    data: NetworkSettings,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "engineer")),
+):
+    result = service.update_settings(db, data.model_dump(exclude_unset=True), request, current_user["username"])
+    return ApiResponse(data=result, message="设置已保存")
+
+
+@router.post("/settings/test")
+def test_dingtalk(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "engineer")),
+):
+    ok, msg = service.test_dingtalk(db)
+    if not ok:
+        raise HTTPException(status_code=400, detail=f"钉钉发送失败：{msg}")
+    return ApiResponse(message="测试消息已发送")
+
+
+# ============================================================
+# 网络告警
+# ============================================================
+@router.get("/alerts")
+def list_alerts(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    items, total = service.list_alerts(db, page=page, page_size=page_size, status=status)
+    open_count = service.open_alert_count(db)
+    return ApiResponse(data=PaginatedData(
+        total=total, page=page, page_size=page_size, items=items,
+        extra={"open_count": open_count},
+    ))
+
+
+@router.post("/alerts/resolve-all")
+def resolve_all_alerts(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "engineer")),
+):
+    count = service.resolve_all_alerts(db, request, current_user["username"])
+    return ApiResponse(data={"resolved": count}, message=f"已处理 {count} 条告警")
+
+
+@router.post("/alerts/{alert_id}/resolve")
+def resolve_alert(
+    alert_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "engineer")),
+):
+    ok = service.resolve_alert(db, alert_id, request, current_user["username"])
+    if not ok:
+        raise HTTPException(status_code=404, detail="告警不存在")
+    return ApiResponse(message="告警已处理")

@@ -22,6 +22,7 @@ from .network import (
     ServerBase, ServerCreate, ServerUpdate, ServerOut,
     AgingRackBase, AgingRackCreate, AgingRackUpdate, AgingRackOut,
     WifiApBase, WifiApCreate, WifiApUpdate, WifiApOut,
+    NetworkSettings, NetworkAlertOut,
 )
 from .mes import (
     WorkOrderBase, WorkOrderCreate, WorkOrderUpdate, WorkOrderOut,
@@ -50,6 +51,7 @@ __all__ = [
     "ServerBase", "ServerCreate", "ServerUpdate", "ServerOut",
     "AgingRackBase", "AgingRackCreate", "AgingRackUpdate", "AgingRackOut",
     "WifiApBase", "WifiApCreate", "WifiApUpdate", "WifiApOut",
+    "NetworkSettings", "NetworkAlertOut",
     # mes
     "WorkOrderBase", "WorkOrderCreate", "WorkOrderUpdate", "WorkOrderOut", "StatusUpdateRequest",
     "BugBase", "BugCreate", "BugUpdate", "BugOut",

@@ -39,12 +39,15 @@ def _tcp_open(host: str, port: int = 22, timeout: float = 0.8) -> bool:
 
 async def check_server_health(get_session) -> None:
     """
-    循环：每 60 秒扫描 servers 表全部在线设备，更新状态、资源使用率、最后检查时间。
+    循环：按「Ping 间隔」设置扫描网络设备，更新状态、资源使用率、最后检查时间，
+    并对账离线告警（落库 network_alerts + 钉钉推送）。
 
     设计：
-    - 主循环在 event loop 中用 asyncio.sleep 实现等待；
+    - 主循环在 event loop 中用 asyncio.sleep 实现等待，间隔读取 settings 表（默认 60s）；
     - DB 操作与同步网络调用 (socket/subprocess) 放到 loop.run_in_executor 中避免阻塞事件循环；
-    - 任何单条 server 报错不影响整体循环（try/except 包裹每条记录）。
+    - 任何单条 server 报错不影响整体循环（try/except 包裹每条记录）；
+    - 服务器由本任务检测（含资源采样）；老化架/WiFi AP 的 Ping 与全量告警对账
+      复用 network_service.monitor_tick（迁移自 wifi-monitor 的 ping_task）。
     """
     from app.models import Server as ServerModel
 
@@ -91,14 +94,27 @@ async def check_server_health(get_session) -> None:
         finally:
             db.close()
 
+    def _monitor_tick() -> int:
+        """老化架/AP Ping + 全设备告警对账；返回下一轮间隔秒数（异常回退 60s）。"""
+        db: Session = get_session()
+        try:
+            from app.services import network_service
+            return int(network_service.monitor_tick(db) or 60)
+        except Exception:
+            return 60
+        finally:
+            db.close()
+
     loop = asyncio.get_event_loop()
     while True:
+        interval = 60
         try:
             await loop.run_in_executor(None, _tick)
+            interval = await loop.run_in_executor(None, _monitor_tick)
         except Exception:
             # 本轮任何异常都吞掉，继续下一轮
             pass
-        await asyncio.sleep(60)
+        await asyncio.sleep(max(10, interval))
 
 
 __all__ = ["check_server_health"]

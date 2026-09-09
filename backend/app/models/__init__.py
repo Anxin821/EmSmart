@@ -11,9 +11,9 @@ from .base import Base
 from .users import User, UserPermission
 from .device import AoiAiDevice
 from .production import WeeklyProduction, MonthlyProduction
-from .network import Server, AgingRack, WifiAp
+from .network import Server, AgingRack, WifiAp, NetworkAlert
 from .mes import WorkOrder, Bug, DevRequest
-from .system import Project, OperationLog, AntivirusRecord, JobResponsibility
+from .system import Project, OperationLog, AntivirusRecord, JobResponsibility, Setting
 from .esop import EsopPart
 from .exception import ExceptionRecord
 
@@ -27,6 +27,7 @@ __all__ = [
     "Server",
     "AgingRack",
     "WifiAp",
+    "NetworkAlert",
     "WorkOrder",
     "Bug",
     "DevRequest",
@@ -34,6 +35,7 @@ __all__ = [
     "OperationLog",
     "AntivirusRecord",
     "JobResponsibility",
+    "Setting",
     "EsopPart",
     "ExceptionRecord",
 ]

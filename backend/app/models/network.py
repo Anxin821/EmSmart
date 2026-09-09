@@ -53,6 +53,7 @@ class WifiAp(Base):
     ssid = Column(String(100), nullable=False)
     production_line = Column(String(10), nullable=False)
     ip_address = Column(String(50))
+    mac_address = Column(String(20))   # AP 的 MAC 地址（wifi-monitor 迁移字段）
     location = Column(String(100))
     channel = Column(Integer, default=0)
     connected_devices = Column(Integer, default=0)
@@ -62,4 +63,22 @@ class WifiAp(Base):
     updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
-__all__ = ["Server", "AgingRack", "WifiAp"]
+class NetworkAlert(Base):
+    """网络告警记录表（离线检测 / Syslog 告警统一落表，供看板 KPI 与告警追溯）"""
+    __tablename__ = "network_alerts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_type = Column(String(20), nullable=False)     # 服务器 / 老化架 / WiFi AP
+    device_name = Column(String(100), nullable=False)
+    device_key = Column(String(80))                      # 类型+业务ID，用于未处理告警去重
+    production_line = Column(String(10))
+    ip_address = Column(String(50))
+    alert_type = Column(String(30), default="离线告警")   # 离线告警 / 日志告警
+    level = Column(String(20), default="warning")        # warning / critical
+    message = Column(String(500))
+    status = Column(String(20), nullable=False, default="未处理")  # 未处理 / 已处理
+    created_at = Column(DateTime, default=beijing_now)
+    resolved_at = Column(DateTime)
+
+
+__all__ = ["Server", "AgingRack", "WifiAp", "NetworkAlert"]

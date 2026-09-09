@@ -666,7 +666,11 @@ def get_wifi_aps_paginated(
     query = db.query(WifiAp)
     if keyword:
         kw = f"%{keyword}%"
-        query = query.filter(or_(WifiAp.ssid.like(kw), WifiAp.ap_id.like(kw)))
+        query = query.filter(or_(
+            WifiAp.ssid.like(kw), WifiAp.ap_id.like(kw),
+            WifiAp.ip_address.like(kw), WifiAp.mac_address.like(kw),
+            WifiAp.responsible_person.like(kw),
+        ))
     if production_line:
         query = query.filter(WifiAp.production_line == production_line)
     if status:

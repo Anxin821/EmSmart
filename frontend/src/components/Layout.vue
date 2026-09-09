@@ -171,9 +171,9 @@ const NAME_MAP = {
   Bugs:         ['业务管理', 'MES BUG 管理'],
   DevReqs:      ['业务管理', 'MES 需求管理'],
   Antivirus:    ['业务管理', '设备杀毒记录'],
-  EsopParts:    ['业务管理', 'ESOP料号管理'],
-  Exception:    ['业务管理', '异常履历管理'],
-  Users:        ['业务管理', '用户管理']
+  EsopParts:   ['业务管理', 'ESOP料号管理'],
+  Exception:   ['业务管理', '异常履历管理'],
+  Users:       ['业务管理', '用户管理']
 }
 
 // 面包屑可点击路径：首页 = 数据看板默认页

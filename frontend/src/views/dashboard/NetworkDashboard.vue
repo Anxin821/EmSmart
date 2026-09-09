@@ -2,8 +2,11 @@
   <div id="page-container" class="page">
     <!-- 操作按钮通过 Teleport 注入全局顶栏左侧空白区，不占用看板纵向空间 -->
     <Teleport defer to=".topbar-actions">
-      <button class="btn btn-sm btn-outline-warning" @click="handleCheckAll">
-        <span class="bi bi-lightning-charge"></span>一键检测
+      <button class="btn btn-sm btn-outline-warning" :disabled="checking" @click="handleCheckAll">
+        <span :class="checking ? 'bi bi-arrow-repeat spin' : 'bi bi-lightning-charge'"></span>{{ checking ? '检测中…' : '一键检测' }}
+      </button>
+      <button v-if="userStore.canEdit" class="btn btn-sm btn-outline-gear" @click="openSettings">
+        <span class="bi bi-gear-fill"></span>告警设置
       </button>
     </Teleport>
 
@@ -25,6 +28,16 @@
           icon="bi bi-wifi-off"
           :num="data?.offline_devices ?? 0"
           label="全局离线设备"
+        />
+        <StatCard
+          centered
+          clickable
+          class="net-stat net-alert"
+          color="yellow"
+          icon="bi bi-bell-fill"
+          :num="data?.alert_count ?? 0"
+          label="未处理告警"
+          @click="openAlertsDrawer"
         />
       </div>
       <div class="gauge-wrapper">
@@ -48,10 +61,6 @@
           >
             <div class="lh-top">
               <span class="lh-name">{{ ls.line }}</span>
-              <!-- 正常时不再冗余显示“全部正常”（绿色 100% + 进度条已表达）；仅异常时提醒 -->
-              <span v-if="ls.level !== 'ok'" class="lh-pill">
-                <span class="bi bi-exclamation-triangle-fill"></span>异常 {{ ls.offline }} 台
-              </span>
             </div>
 
             <div class="lh-metric">
@@ -105,17 +114,157 @@
         </div>
       </section>
     </div>
+
+    <!-- 告警记录抽屉：点击「未处理告警」KPI 打开 -->
+    <el-drawer
+      v-model="alertsDrawer"
+      direction="rtl"
+      size="480px"
+      destroy-on-close
+      class="alerts-drawer"
+      :with-header="false"
+    >
+      <div class="ad-wrap">
+        <header class="ad-header">
+          <div class="ad-title">
+            <span class="bi bi-bell-fill ad-title-icon"></span>
+            <span>网络告警记录</span>
+          </div>
+          <button class="ad-close" @click="alertsDrawer = false">
+            <span class="bi bi-x-lg"></span>
+          </button>
+        </header>
+
+        <div class="ad-toolbar">
+          <div class="ad-stat">
+            <span class="ad-stat-num" :class="{ zero: !openAlertCount }">{{ openAlertCount }}</span>
+            <span class="ad-stat-label">条未处理</span>
+          </div>
+          <button
+            v-if="userStore.canEdit"
+            class="ad-resolve-all"
+            :disabled="!openAlertCount"
+            @click="handleResolveAll"
+          >
+            <span class="bi bi-check2-all"></span>全部标记已处理
+          </button>
+        </div>
+
+        <div v-loading="alertsLoading" class="ad-body">
+          <div v-if="!alertsLoading && !alerts.length" class="ad-empty">
+            <span class="bi bi-bell-slash ad-empty-icon"></span>
+            <span class="ad-empty-text">暂无告警记录</span>
+            <span class="ad-empty-sub">设备离线时将自动记录并推送钉钉</span>
+          </div>
+
+          <div
+            v-for="a in alerts"
+            :key="a.id"
+            class="ad-card"
+            :class="a.status === '未处理' ? 'is-open' : 'is-done'"
+          >
+            <span class="ad-card-bar"></span>
+            <div class="ad-card-main">
+              <div class="ad-card-head">
+                <span class="offline-type" :class="typeClass(a.device_type)">{{ a.device_type }}</span>
+                <span class="ad-card-name">{{ a.device_name }}</span>
+                <span class="ad-card-status" :class="a.status === '未处理' ? 'st-open' : 'st-done'">
+                  <span :class="a.status === '未处理' ? 'bi bi-exclamation-circle-fill' : 'bi bi-check-circle-fill'"></span>
+                  {{ a.status }}
+                </span>
+              </div>
+              <div class="ad-card-meta">
+                <span><span class="bi bi-geo-alt"></span>{{ a.production_line || '-' }}</span>
+                <span><span class="bi bi-hdd-network"></span>{{ a.ip_address || '-' }}</span>
+                <span><span class="bi bi-clock"></span>{{ fmtTime(a.created_at) }}</span>
+              </div>
+              <div class="ad-card-msg">{{ a.message || a.alert_type }}</div>
+              <div v-if="a.status === '未处理' && userStore.canEdit" class="ad-card-actions">
+                <button class="ad-resolve-one" @click="handleResolve(a.id)">
+                  <span class="bi bi-check-lg"></span>标记已处理
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
+
+    <!-- 告警通知设置弹窗（顶栏「告警设置」按钮打开） -->
+    <el-dialog
+      v-model="settingsDialog"
+      title="告警通知设置"
+      width="560px"
+      destroy-on-close
+      class="net-settings-dialog"
+    >
+      <div v-loading="settingsLoading" class="ns-body">
+        <el-form :model="settingsForm" label-width="110px" label-position="right">
+          <el-form-item label="钉钉 Webhook">
+            <el-input
+              v-model="settingsForm.dingtalk_webhook"
+              clearable
+              placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxxx"
+            />
+          </el-form-item>
+          <el-form-item label="加签 Secret">
+            <el-input
+              v-model="settingsForm.dingtalk_secret"
+              type="password"
+              show-password
+              clearable
+              placeholder="机器人安全设置选择「加签」后生成的 SEC"
+            />
+          </el-form-item>
+          <el-form-item label=" ">
+            <el-button :loading="settingsTesting" @click="handleTestSettings">
+              <span class="bi bi-send" style="margin-right:4px;"></span>发送测试消息
+            </el-button>
+            <span class="ns-test-hint">将先保存当前配置，再向钉钉群发送一条测试消息</span>
+          </el-form-item>
+          <el-form-item label="Ping 间隔">
+            <el-input-number v-model="settingsForm.ping_interval" :min="10" :max="3600" :step="10" controls-position="right" />
+            <span class="ns-hint">秒（后台自动巡检间隔）</span>
+          </el-form-item>
+        </el-form>
+        <div class="ns-tip">
+          <span class="bi bi-info-circle"></span>
+          设备离线时自动记录告警并推送钉钉；同一设备离线期间只推送一次，恢复在线后告警自动关闭。
+        </div>
+      </div>
+      <template #footer>
+        <div class="ns-footer">
+          <el-button @click="settingsDialog = false">取消</el-button>
+          <el-button type="primary" :loading="settingsSaving" @click="handleSaveSettings">保存设置</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
+import { ElMessage } from 'element-plus'
 import { dashboardApi, networkApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import StatCard from '@/components/common/StatCard.vue'
 
+const userStore = useUserStore()
 const data = ref(null)
 let gaugeChart = null
+
+// 一键检测 / 告警抽屉状态
+const checking = ref(false)
+const alertsDrawer = ref(false)
+const alertsLoading = ref(false)
+const alerts = ref([])
+const openAlertCount = computed(() => data.value?.alert_count ?? 0)
+
+const fmtTime = (iso) => {
+  if (!iso) return '-'
+  return iso.replace('T', ' ').slice(0, 19)
+}
 
 // 每条线体的健康概览：在线/总数、健康率、状态级别、三类设备各自离线数
 // —— 汇报视角：弱化单个设备名，突出“哪条线体有问题、异常几台”（离线明细仍在右侧列表可查）
@@ -214,11 +363,141 @@ const renderGauge = () => {
 }
 
 const handleCheckAll = async () => {
+  checking.value = true
   try {
-    await networkApi.checkAll()
+    const res = await networkApi.checkAll()
+    const d = res.data || {}
+    const msg = `检测完成：在线 ${d.online ?? 0} 台，离线 ${d.offline ?? 0} 台` +
+      (d.new_alerts ? `，新增告警 ${d.new_alerts} 条（已推送钉钉）` : '')
+    ElMessage.success(msg)
     loadData()
   } catch (e) {
     console.error(e)
+    ElMessage.error('一键检测失败，请稍后重试')
+  } finally {
+    checking.value = false
+  }
+}
+
+// ---------- 告警抽屉 ----------
+const openAlertsDrawer = async () => {
+  alertsDrawer.value = true
+  loadAlerts()
+}
+
+const loadAlerts = async () => {
+  alertsLoading.value = true
+  try {
+    const res = await networkApi.alerts({ page: 1, page_size: 50 })
+    alerts.value = res.data?.items || []
+  } catch (e) {
+    console.error(e)
+  } finally {
+    alertsLoading.value = false
+  }
+}
+
+const handleResolve = async (id) => {
+  try {
+    await networkApi.resolveAlert(id)
+    ElMessage.success('告警已处理')
+    await loadAlerts()
+    loadData()
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('操作失败')
+  }
+}
+
+const handleResolveAll = async () => {
+  try {
+    const res = await networkApi.resolveAllAlerts()
+    ElMessage.success(res.message || '全部告警已处理')
+    await loadAlerts()
+    loadData()
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('操作失败')
+  }
+}
+
+// ---------- 告警通知设置弹窗 ----------
+const settingsDialog = ref(false)
+const settingsLoading = ref(false)
+const settingsSaving = ref(false)
+const settingsTesting = ref(false)
+const settingsForm = ref({
+  dingtalk_webhook: '',
+  dingtalk_secret: '',
+  ping_interval: 60
+})
+
+const openSettings = async () => {
+  settingsDialog.value = true
+  settingsLoading.value = true
+  try {
+    const res = await networkApi.getSettings()
+    settingsForm.value = {
+      dingtalk_webhook: res.data?.dingtalk_webhook || '',
+      dingtalk_secret: res.data?.dingtalk_secret || '',
+      ping_interval: res.data?.ping_interval || 60
+    }
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('设置加载失败')
+  } finally {
+    settingsLoading.value = false
+  }
+}
+
+const handleSaveSettings = async () => {
+  const webhook = (settingsForm.value.dingtalk_webhook || '').trim()
+  if (webhook && !/^https?:\/\//.test(webhook)) {
+    ElMessage.warning('Webhook 地址需以 http(s):// 开头')
+    return
+  }
+  if (!settingsForm.value.ping_interval || settingsForm.value.ping_interval < 10) {
+    ElMessage.warning('Ping 间隔不能小于 10 秒')
+    return
+  }
+  settingsSaving.value = true
+  try {
+    await networkApi.saveSettings({
+      dingtalk_webhook: webhook,
+      dingtalk_secret: (settingsForm.value.dingtalk_secret || '').trim(),
+      ping_interval: settingsForm.value.ping_interval
+    })
+    ElMessage.success('设置已保存')
+    settingsDialog.value = false
+  } catch (e) {
+    console.error(e)
+    ElMessage.error(e.response?.data?.detail || '保存失败')
+  } finally {
+    settingsSaving.value = false
+  }
+}
+
+const handleTestSettings = async () => {
+  // 先保存再测试，保证测试使用的是弹窗中当前填写的配置
+  const webhook = (settingsForm.value.dingtalk_webhook || '').trim()
+  if (!webhook) {
+    ElMessage.warning('请先填写钉钉 Webhook 地址')
+    return
+  }
+  settingsTesting.value = true
+  try {
+    await networkApi.saveSettings({
+      dingtalk_webhook: webhook,
+      dingtalk_secret: (settingsForm.value.dingtalk_secret || '').trim(),
+      ping_interval: settingsForm.value.ping_interval || 60
+    })
+    await networkApi.testDingtalk()
+    ElMessage.success('测试消息已发送，请查看钉钉群')
+  } catch (e) {
+    console.error(e)
+    ElMessage.error(e.response?.data?.detail || '测试发送失败，请检查 Webhook / Secret')
+  } finally {
+    settingsTesting.value = false
   }
 }
 
@@ -309,6 +588,240 @@ onBeforeUnmount(() => {
 .net-online  :deep(.num) { color: #059669; font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
 .net-offline :deep(.num) { color: #DC2626; font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
 .stat-pair .net-stat :deep(.label) { font-size: 15px; font-weight: 600; color: var(--c-text-2); letter-spacing: .3px; }
+/* 未处理告警卡：黄色主题，数值为 0 时弱化，有告警时醒目 */
+.stat-pair .net-alert {
+  background: linear-gradient(135deg, #FFFBEB 0%, #FFFFFF 62%) !important;
+  border-color: var(--c-divider) !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, .03) !important;
+}
+.stat-pair .net-alert :deep(.icon-box) { background: linear-gradient(135deg, #F59E0B, #D97706); box-shadow: 0 8px 18px -6px rgba(245, 158, 11, .6); }
+.net-alert :deep(.num) { color: #D97706; font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
+
+/* 顶栏按钮 loading 旋转 */
+.spin { display: inline-block; animation: net-spin 1s linear infinite; }
+@keyframes net-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* 顶栏「告警设置」按钮（Teleport 内容仍带 scoped 属性，样式生效） */
+.btn-outline-gear {
+  color: #64748B;
+  background: #fff;
+  border: 1px solid #CBD5E1;
+}
+.btn-outline-gear:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-50, #EEF4FF);
+}
+
+/* ---- 告警抽屉（美化版） ---- */
+/* 固定头 + 滚动体：body 裁掉自身滚动，ad-wrap 占满，ad-body 用 min-height:0 获得内部滚动 */
+.alerts-drawer :deep(.el-drawer__body) {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ad-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ad-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 20px;
+  background: linear-gradient(135deg, #F7FAFF 0%, #EEF4FF 100%);
+  border-bottom: 1px solid var(--c-divider);
+}
+.ad-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--c-text);
+}
+.ad-title-icon { color: var(--primary); font-size: 18px; }
+.ad-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px; height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--c-text-3);
+  cursor: pointer;
+  transition: all .15s;
+}
+.ad-close:hover { background: #E2E8F0; color: var(--c-text); }
+
+.ad-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--c-divider);
+}
+.ad-stat { display: flex; align-items: baseline; gap: 6px; }
+.ad-stat-num { font-size: 24px; font-weight: 800; line-height: 1; color: #DC2626; }
+.ad-stat-num.zero { color: #059669; }
+.ad-stat-label { font-size: 13px; color: var(--c-text-3); }
+
+/* 「全部标记已处理」：自定义按钮，明确蓝底白字 hover，避免 plain 按钮文字色被全局样式覆盖 */
+.ad-resolve-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #2563EB;
+  background: #fff;
+  border: 1px solid #93C5FD;
+  transition: all .15s;
+}
+.ad-resolve-all:hover:not(:disabled) {
+  background: #2563EB;
+  border-color: #2563EB;
+  color: #fff;
+}
+.ad-resolve-all:disabled {
+  color: #94A3B8;
+  border-color: #E2E8F0;
+  background: #F8FAFC;
+  cursor: not-allowed;
+}
+
+.ad-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ad-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 70px 0;
+}
+.ad-empty-icon { font-size: 38px; color: #CBD5E1; }
+.ad-empty-text { font-size: 14px; font-weight: 600; color: var(--c-text-2); }
+.ad-empty-sub { font-size: 12px; color: var(--c-text-mute); }
+
+.ad-card {
+  display: flex;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #FECACA;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
+}
+.ad-card.is-done { border-color: var(--c-divider); opacity: .75; }
+.ad-card-bar { width: 4px; flex-shrink: 0; background: #EF4444; }
+.ad-card.is-done .ad-card-bar { background: #CBD5E1; }
+.ad-card-main {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ad-card-head { display: flex; align-items: center; gap: 8px; }
+.ad-card-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--c-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ad-card-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ad-card-status.st-open { color: #DC2626; }
+.ad-card-status.st-done { color: #059669; }
+.ad-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--c-text-3);
+}
+.ad-card-meta > span { display: inline-flex; align-items: center; gap: 4px; }
+.ad-card-meta .bi { font-size: 12px; }
+.ad-card-msg {
+  font-size: 12.5px;
+  line-height: 1.55;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #F8FAFC;
+  color: var(--c-text-2);
+}
+.ad-card.is-open .ad-card-msg { background: #FEF2F2; color: #991B1B; }
+.ad-card-actions { display: flex; justify-content: flex-end; }
+.ad-resolve-one {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2563EB;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.ad-resolve-one:hover { background: #EFF6FF; }
+
+/* ---- 告警通知设置弹窗 ---- */
+.ns-hint { margin-left: 12px; font-size: 12px; color: var(--c-text-3); }
+.ns-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: #F0F7FF;
+  border: 1px solid #DBEAFE;
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #1E40AF;
+}
+.ns-tip .bi { margin-top: 3px; }
+.ns-test-hint {
+  margin-left: 12px;
+  font-size: 12px;
+  color: var(--c-text-mute);
+}
+.ns-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
 
 .gauge-wrapper {
   width: 320px;
@@ -444,20 +957,6 @@ onBeforeUnmount(() => {
   color: var(--c-text);
   letter-spacing: .3px;
 }
-.lh-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-.lv-ok .lh-pill     { background: var(--ok-bg);   color: #059669; }
-.lv-warn .lh-pill   { background: var(--warn-bg); color: #B45309; }
-.lv-danger .lh-pill { background: var(--err-bg);  color: #DC2626; }
-
 .lh-metric {
   display: flex;
   flex-direction: column;

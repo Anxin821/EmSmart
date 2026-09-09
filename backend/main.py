@@ -67,10 +67,13 @@ def _serve_spa_index():
 # 启动生命周期：建表 + 启动健康检查 + seed 默认 admin
 # ============================================================
 def _ensure_tables_and_seed():
-    # 1. 建表（models/__init__.py 已把 15 个子类全部注册到 Base.metadata）
+    # 1. 建表（models/__init__.py 已把全部子类注册到 Base.metadata）
     Base.metadata.create_all(bind=engine)
 
-    # 2. 默认 admin / engineer / viewer
+    # 2. 既有表补列（SQL Server 下 create_all 不会 ALTER 已存在的表）
+    _ensure_extra_columns()
+
+    # 3. 默认 admin / engineer / viewer
     db: Session = SessionLocal()
     try:
         defaults = [
@@ -91,10 +94,30 @@ def _ensure_tables_and_seed():
                 any_created = True
         if any_created:
             db.commit()
+
+        # 4. 网络监控默认设置（钉钉 Webhook/Secret、Ping 间隔）
+        from app.services import network_service
+        network_service.ensure_default_settings(db)
     except Exception:
         db.rollback()
     finally:
         db.close()
+
+
+def _ensure_extra_columns():
+    """轻量列迁移：给旧库的 wifi_aps 补 mac_address 列（幂等）。"""
+    from sqlalchemy import inspect, text
+    try:
+        insp = inspect(engine)
+        existing_tables = set(insp.get_table_names())
+        if "wifi_aps" in existing_tables:
+            cols = {c["name"] for c in insp.get_columns("wifi_aps")}
+            if "mac_address" not in cols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE wifi_aps ADD mac_address VARCHAR(20) NULL"))
+                print("[Startup] 已为 wifi_aps 补充 mac_address 列")
+    except Exception as e:
+        print(f"[Startup] 列迁移检查失败（不影响启动）: {e}")
 
 
 @asynccontextmanager

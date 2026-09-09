@@ -59,4 +59,14 @@ class JobResponsibility(Base):
     updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 
 
-__all__ = ["Project", "OperationLog", "AntivirusRecord", "JobResponsibility"]
+class Setting(Base):
+    """系统设置键值表（钉钉机器人、Ping 间隔等，迁移自 wifi-monitor 的 Setting）"""
+    __tablename__ = "settings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key = Column(String(50), unique=True, nullable=False)
+    value = Column(Text)
+    updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
+
+
+__all__ = ["Project", "OperationLog", "AntivirusRecord", "JobResponsibility", "Setting"]
