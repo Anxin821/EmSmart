@@ -366,8 +366,11 @@ def get_mes_dashboard(db: Session) -> dict:
     # -------- 风险 TOP（至少 2 块：高危 BUG + 延期需求；每块 value 为真实总数，items 取前 3 条样例） --------
     def severity_rank(sev: str):
         return {"致命": 0, "P0": 0, "严重": 1, "P1": 1, "一般": 2, "P2": 2, "建议": 3, "P3": 3}.get((sev or "").strip(), 9)
+    # 高危 BUG 仅统计「未关闭」的 P0/P1（status != 解决关闭），保证 P0级BUG 是未关闭 BUG 的子集
     high_bugs_all = sorted(
-        [b for b in bugs_all if severity_rank(b.severity) <= 1],
+        [b for b in bugs_all
+         if severity_rank(b.severity) <= 1
+         and _BUG_STATUS_MAP.get((b.status or "").strip()) != "解决关闭"],
         key=lambda b: (severity_rank(b.severity), -b.id)
     )
     overdue_all = []
@@ -424,6 +427,7 @@ def get_mes_dashboard(db: Session) -> dict:
         "fix_rate":        fix_rate,
         "delivery_rate":   delivery_rate,
         "bug_fixed":       bug_fixed,
+        "unclosed_bugs":   bug_total - bug_fixed,
         "req_online":      req_online,
         "bug_monthly":     bug_monthly,
         "req_monthly":     req_monthly,

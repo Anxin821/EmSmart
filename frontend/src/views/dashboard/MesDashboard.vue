@@ -336,16 +336,8 @@ const loadData = async () => {
     const res = await mesApi.dashboard()
     data.value = res.data || null
 
-    // 先同步未关闭 BUG 数：与弹窗使用同一份真实数据源（mesApi.bugs）
-    try {
-      const bugRes = await mesApi.bugs({ page: 1, page_size: 100 })
-      const items = bugRes.data?.items || []
-      const openList = items.filter(i => (i.status || '') !== '解决关闭')
-      openBugCount.value = openList.length
-    } catch (err) {
-      console.warn('计算未关闭 BUG 数时拉取 bugs 失败：', err)
-      openBugCount.value = Math.max((data.value?.bug_count ?? 0) - (data.value?.bug_fixed ?? 0), 0)
-    }
+    // 未关闭 BUG 数：以看板聚合数据为准（与 P0级BUG 同源），保证 KPI 与风险块一致
+    openBugCount.value = data.value?.unclosed_bugs ?? 0
 
     // 同步计算延期需求数：以 devreqs 接口为准，按期望日期且非上线视为延期
     try {
