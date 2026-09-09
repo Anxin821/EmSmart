@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     AoiAiDevice, WeeklyProduction, MonthlyProduction,
-    Server, AgingRack, WifiAp, WorkOrder, Bug, DevRequest, Project, NetworkAlert
+    Server, AgingRack, WifiAp, WorkOrder, Bug, DevRequest, Project, NetworkAlert, Setting
 )
 from app.core.timeutil import beijing_now
 
@@ -514,12 +514,17 @@ def network_dashboard(db: Session) -> Dict[str, Any]:
     # 未处理网络告警数（离线检测/钉钉告警落表数据），供看板 KPI 使用
     alert_count = db.query(NetworkAlert).filter(NetworkAlert.status == "未处理").count()
 
+    # 最后巡检时间：后台每轮 Ping 巡检都会写入 last_monitor_tick（服务器/老化架/AP 同一轮）
+    tick_row = db.query(Setting).filter(Setting.key == "last_monitor_tick").first()
+    last_check_time = tick_row.value if tick_row else None
+
     return {
         "online_devices": online_total,
         "offline_devices": offline_total,
         "total_devices": total_devices,
         "online_rate": online_rate,
         "alert_count": alert_count,
+        "last_check_time": last_check_time,
         "lines": list(line_map.values()),
         "offline_list": offline_list,
     }

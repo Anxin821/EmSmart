@@ -112,6 +112,14 @@
             </div>
           </div>
         </div>
+        <!-- 自动巡检脚注：不占布局，仅展示巡检节奏与下次刷新倒计时 -->
+        <footer class="monitor-foot">
+          <span class="mf-dot"></span>自动巡检
+          <span class="mf-sep">·</span>{{ refreshInterval }}s/次
+          <span class="mf-sep">·</span>上次 {{ data?.last_check_time ? data.last_check_time.slice(11) : '—' }}
+          <span class="mf-spacer"></span>
+          <span :class="refreshing ? 'bi bi-arrow-repeat spin' : ''"></span>{{ refreshing ? '刷新中' : `${countdown}s 后刷新` }}
+        </footer>
       </section>
     </div>
 
@@ -190,6 +198,85 @@
       </div>
     </el-drawer>
 
+    <!-- 一键检测结果抽屉：检测完成后自动弹出，实时展示每台设备 Ping 结果 -->
+    <el-drawer
+      v-model="resultDrawer"
+      direction="rtl"
+      size="500px"
+      destroy-on-close
+      class="alerts-drawer"
+      :with-header="false"
+    >
+      <div class="ad-wrap" v-if="checkResult">
+        <header class="ad-header">
+          <div class="ad-title">
+            <span class="bi bi-lightning-charge-fill ad-title-icon" style="color:#D97706;"></span>
+            <span>一键检测结果</span>
+          </div>
+          <button class="ad-close" @click="resultDrawer = false">
+            <span class="bi bi-x-lg"></span>
+          </button>
+        </header>
+
+        <div class="cr-summary">
+          <div class="cr-sum-item">
+            <span class="cr-sum-num ok">{{ checkResult.online ?? 0 }}</span>
+            <span class="cr-sum-label">在线</span>
+          </div>
+          <div class="cr-sum-item">
+            <span class="cr-sum-num bad">{{ checkResult.offline ?? 0 }}</span>
+            <span class="cr-sum-label">离线 / 故障</span>
+          </div>
+          <div class="cr-sum-item">
+            <span class="cr-sum-num warn">{{ checkResult.new_alerts ?? 0 }}</span>
+            <span class="cr-sum-label">新增告警</span>
+          </div>
+          <div class="cr-sum-time">
+            <span class="bi bi-clock-history"></span>{{ checkResult.checked_at }}
+          </div>
+        </div>
+
+        <div class="ad-body">
+          <!-- 离线设备 -->
+          <template v-if="offlineResults.length">
+            <div class="cr-section-title bad">
+              <span class="bi bi-x-octagon-fill"></span>离线 / 故障设备（{{ offlineResults.length }}）
+            </div>
+            <div v-for="(r, i) in offlineResults" :key="'off-' + i" class="cr-card is-off">
+              <span class="cr-card-bar"></span>
+              <div class="cr-card-main">
+                <div class="cr-card-head">
+                  <span class="offline-type" :class="typeClass(r.device_type)">{{ r.device_type }}</span>
+                  <span class="cr-card-name">{{ r.device_name }}</span>
+                  <span class="cr-card-state bad">{{ r.status }}</span>
+                </div>
+                <div class="cr-card-meta">
+                  <span><span class="bi bi-geo-alt"></span>{{ r.production_line || '-' }}</span>
+                  <span><span class="bi bi-hdd-network"></span>{{ r.ip_address }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- 在线设备 -->
+          <template v-if="onlineResults.length">
+            <div class="cr-section-title ok">
+              <span class="bi bi-check-circle-fill"></span>在线设备（{{ onlineResults.length }}）
+            </div>
+            <div class="cr-ok-list">
+              <div v-for="(r, i) in onlineResults" :key="'on-' + i" class="cr-ok-row">
+                <span class="bi bi-check-circle-fill cr-dot"></span>
+                <span class="offline-type" :class="typeClass(r.device_type)">{{ r.device_type }}</span>
+                <span class="cr-ok-name">{{ r.device_name }}</span>
+                <span class="cr-ok-ip">{{ r.ip_address }}</span>
+                <span class="cr-ok-line">{{ r.production_line || '-' }}</span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </el-drawer>
+
     <!-- 告警通知设置弹窗（顶栏「告警设置」按钮打开） -->
     <el-dialog
       v-model="settingsDialog"
@@ -245,7 +332,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import { dashboardApi, networkApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import StatCard from '@/components/common/StatCard.vue'
@@ -300,15 +387,61 @@ const typeClass = (type) => {
   return ''
 }
 
-const loadData = async () => {
+// 自动轮询：与后台 Ping 间隔保持一致，让后台巡检结果实时反映到看板
+const refreshInterval = ref(30)
+const countdown = ref(30)
+const refreshing = ref(false)
+let tickTimer = null
+let lastOpenCount = null   // 上一次刷新时的未处理告警数，用于识别"新告警"
+
+const loadData = async (silent = false) => {
+  if (silent) refreshing.value = true
   try {
     const res = await dashboardApi.network()
-    data.value = res.data || null
+    const d = res.data || null
+    data.value = d
+    // 自动巡检发现新的未处理告警：右上角通知（不阻塞操作），点击打开告警抽屉
+    const openCount = d?.alert_count ?? 0
+    if (silent && lastOpenCount !== null && openCount > lastOpenCount) {
+      ElNotification({
+        title: '网络巡检告警',
+        message: `后台 Ping 巡检发现 ${openCount - lastOpenCount} 条新的离线告警，点击查看`,
+        type: 'warning',
+        duration: 10000,
+        onClick: () => openAlertsDrawer(),
+      })
+    }
+    lastOpenCount = openCount
     await nextTick()
     renderGauge()
   } catch (e) {
     console.error(e)
+  } finally {
+    if (silent) refreshing.value = false
   }
+}
+
+const startAutoRefresh = async () => {
+  // 读取设置中的 Ping 间隔作为看板自动刷新间隔
+  try {
+    const res = await networkApi.getSettings()
+    const sec = Number(res.data?.ping_interval)
+    if (sec >= 10) {
+      refreshInterval.value = sec
+      countdown.value = sec
+    }
+  } catch (e) {
+    console.error(e)
+  }
+  tickTimer = setInterval(() => {
+    countdown.value -= 1
+    if (countdown.value <= 0) {
+      countdown.value = refreshInterval.value
+      loadData(true)
+      // 告警抽屉打开时连带刷新告警列表
+      if (alertsDrawer.value) loadAlerts()
+    }
+  }, 1000)
 }
 
 const renderGauge = () => {
@@ -362,15 +495,27 @@ const renderGauge = () => {
   })
 }
 
+// 一键检测结果抽屉
+const resultDrawer = ref(false)
+const checkResult = ref(null)
+const offlineResults = computed(() => (checkResult.value?.results || []).filter(r => !r.alive))
+const onlineResults = computed(() => (checkResult.value?.results || []).filter(r => r.alive))
+
 const handleCheckAll = async () => {
   checking.value = true
   try {
     const res = await networkApi.checkAll()
     const d = res.data || {}
-    const msg = `检测完成：在线 ${d.online ?? 0} 台，离线 ${d.offline ?? 0} 台` +
-      (d.new_alerts ? `，新增告警 ${d.new_alerts} 条（已推送钉钉）` : '')
-    ElMessage.success(msg)
+    checkResult.value = d
+    // 看板 KPI / 线体健康 / 仪表盘立即刷新为最新状态
     loadData()
+    // 检测结果明细实时展示在抽屉中
+    resultDrawer.value = true
+    if (d.new_alerts) {
+      ElMessage.warning(`检测完成：离线 ${d.offline ?? 0} 台，新增告警 ${d.new_alerts} 条（已推送钉钉）`)
+    } else {
+      ElMessage.success(`检测完成：在线 ${d.online ?? 0} 台，离线 ${d.offline ?? 0} 台`)
+    }
   } catch (e) {
     console.error(e)
     ElMessage.error('一键检测失败，请稍后重试')
@@ -507,10 +652,12 @@ const resize = () => {
 
 onMounted(() => {
   loadData()
+  startAutoRefresh()
   window.addEventListener('resize', resize)
 })
 
 onBeforeUnmount(() => {
+  if (tickTimer) clearInterval(tickTimer)
   window.removeEventListener('resize', resize)
   gaugeChart && gaugeChart.dispose()
 })
@@ -795,6 +942,117 @@ onBeforeUnmount(() => {
 }
 .ad-resolve-one:hover { background: #EFF6FF; }
 
+/* ---- 一键检测结果抽屉 ---- */
+.cr-summary {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--c-divider);
+  background: #F8FAFC;
+}
+.cr-sum-item { display: flex; align-items: baseline; gap: 5px; }
+.cr-sum-num { font-size: 26px; font-weight: 800; line-height: 1; }
+.cr-sum-num.ok { color: #059669; }
+.cr-sum-num.bad { color: #DC2626; }
+.cr-sum-num.warn { color: #D97706; }
+.cr-sum-label { font-size: 12.5px; color: var(--c-text-3); }
+.cr-sum-time {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--c-text-mute);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.cr-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  margin: 4px 0 2px;
+}
+.cr-section-title.bad { color: #DC2626; }
+.cr-section-title.ok { color: #059669; }
+
+.cr-card {
+  display: flex;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #FECACA;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .05);
+}
+.cr-card-bar { width: 4px; flex-shrink: 0; background: #EF4444; }
+.cr-card-main {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cr-card-head { display: flex; align-items: center; gap: 8px; }
+.cr-card-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--c-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cr-card-state {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cr-card-state.bad { color: #DC2626; }
+.cr-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--c-text-3);
+}
+.cr-card-meta > span { display: inline-flex; align-items: center; gap: 4px; }
+
+.cr-ok-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.cr-ok-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #F6FEF9;
+  font-size: 12.5px;
+}
+.cr-ok-row:hover { background: #ECFDF5; }
+.cr-dot { color: #10B981; font-size: 13px; flex-shrink: 0; }
+.cr-ok-name {
+  font-weight: 600;
+  color: var(--c-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+.cr-ok-ip {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--c-text-3);
+}
+.cr-ok-line { margin-left: auto; font-size: 12px; color: var(--c-text-mute); white-space: nowrap; }
+
 /* ---- 告警通知设置弹窗 ---- */
 .ns-hint { margin-left: 12px; font-size: 12px; color: var(--c-text-3); }
 .ns-tip {
@@ -930,20 +1188,10 @@ onBeforeUnmount(() => {
   transform: translateY(-2px);
   box-shadow: 0 10px 24px -12px rgba(15, 23, 42, .28);
 }
-/* 左侧状态色条 */
-.line-health::before {
-  content: "";
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 4px;
-}
-/* 三档状态配色：绿=全部正常 / 黄=轻度异常 / 红=严重异常 */
-.lv-ok::before     { background: transparent; }   /* 去掉绿边：正常线体不显示左侧绿条 */
-.lv-warn::before   { background: #F59E0B; }
-.lv-danger::before { background: #EF4444; }
-.lv-ok     { background: linear-gradient(135deg, #F0FDF4 0%, #fff 55%); border-color: var(--c-divider); }   /* 去掉绿边：改中性描边 */
-.lv-warn   { background: linear-gradient(135deg, #FFFBEB 0%, #fff 55%); border-color: rgba(245, 158, 11, .3); }
-.lv-danger { background: linear-gradient(135deg, #FEF2F2 0%, #fff 55%); border-color: rgba(239, 68, 68, .32); }
+/* 三档状态配色：整卡环绕描边（绿=全部正常 / 黄=轻度异常 / 红=严重异常），不再只在左侧着色 */
+.lv-ok     { background: linear-gradient(135deg, #F0FDF4 0%, #fff 55%); border: 1.5px solid rgba(16, 185, 129, .45); }
+.lv-warn   { background: linear-gradient(135deg, #FFFBEB 0%, #fff 55%); border: 1.5px solid rgba(245, 158, 11, .55); }
+.lv-danger { background: linear-gradient(135deg, #FEF2F2 0%, #fff 55%); border: 1.5px solid rgba(239, 68, 68, .6); }
 
 .lh-top {
   display: flex;
@@ -1132,6 +1380,34 @@ onBeforeUnmount(() => {
 .offline-body::-webkit-scrollbar { width: 6px; }
 .offline-body::-webkit-scrollbar-thumb { background: #D8DEEA; border-radius: 4px; }
 .offline-body::-webkit-scrollbar-track { background: transparent; }
+
+/* 自动巡检脚注：离线卡片底部一行小字，不参与卡片高度/列表布局 */
+.monitor-foot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-top: 1px solid var(--c-divider);
+  background: #F8FAFC;
+  font-size: 11.5px;
+  color: var(--c-text-mute);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.mf-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #10B981;
+  flex-shrink: 0;
+  animation: mf-pulse 1.6s infinite;
+}
+@keyframes mf-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, .4); }
+  70%  { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+.mf-sep { color: #CBD5E1; }
+.mf-spacer { flex: 1; }
 
 .health-grid::-webkit-scrollbar { width: 6px; }
 .health-grid::-webkit-scrollbar-thumb { background: #D8DEEA; border-radius: 4px; }

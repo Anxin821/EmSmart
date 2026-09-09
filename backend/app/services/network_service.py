@@ -100,40 +100,71 @@ def remove_server(db: Session, server_id: str, request, username: str):
     return True
 
 
-def _ping_and_update_all(db: Session) -> Dict[str, int]:
-    """对登记了 IP 的服务器 / 老化架 / AP 全部执行 Ping 并回写状态（一键检测使用）。"""
+def _ping_and_update_all(db: Session):
+    """对登记了 IP 的服务器 / 老化架 / AP 并发执行 Ping 并回写状态（一键检测使用）。
+
+    探测（线程池并发，互不阻塞）与写库（主线程批量提交）解耦；
+    返回 (stats, results)，results 为每台设备的检测明细，离线设备排前面。
+    """
     stats = {"servers_online": 0, "servers_offline": 0,
              "racks_online": 0, "racks_offline": 0,
              "aps_online": 0, "aps_offline": 0}
+    # (设备类型, ORM对象, 展示名, IP, 产线)
+    targets = []
     for s in db.query(Server).all():
-        if not s.ip_address:
-            continue
-        alive = _ping_device(s.ip_address)
-        s.status = "在线" if alive else "离线"
-        s.last_check_time = beijing_now()
-        stats["servers_online" if alive else "servers_offline"] += 1
+        if s.ip_address:
+            targets.append(("服务器", s, s.name or s.server_id, s.ip_address, s.production_line))
     for r in db.query(AgingRack).all():
-        if not r.ip_address:
-            continue
-        alive = _ping_device(r.ip_address)
-        r.status = "正常" if alive else "故障"
-        stats["racks_online" if alive else "racks_offline"] += 1
+        if r.ip_address:
+            targets.append(("老化架", r, r.name or r.rack_id, r.ip_address, r.production_line))
     for ap in db.query(WifiAp).all():
-        if not ap.ip_address:
-            continue
-        alive = _ping_device(ap.ip_address)
-        ap.status = "在线" if alive else "离线"
-        stats["aps_online" if alive else "aps_offline"] += 1
+        if ap.ip_address:
+            targets.append(("WiFi AP", ap, ap.ssid or ap.ap_id or ap.mac_address, ap.ip_address, ap.production_line))
+
+    results: List[Dict[str, Any]] = []
+
+    def _probe(target):
+        device_type, obj, name, ip, line = target
+        return target, _ping_device(ip)
+
+    if targets:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=min(16, len(targets))) as pool:
+            probed = list(pool.map(_probe, targets))
+        for (device_type, obj, name, ip, line), alive in probed:
+            if device_type == "服务器":
+                obj.status = "在线" if alive else "离线"
+                obj.last_check_time = beijing_now()
+                stats["servers_online" if alive else "servers_offline"] += 1
+                status_text = "在线" if alive else "离线"
+            elif device_type == "老化架":
+                obj.status = "正常" if alive else "故障"
+                stats["racks_online" if alive else "racks_offline"] += 1
+                status_text = "正常" if alive else "故障"
+            else:
+                obj.status = "在线" if alive else "离线"
+                stats["aps_online" if alive else "aps_offline"] += 1
+                status_text = "在线" if alive else "离线"
+            results.append({
+                "device_type": device_type,
+                "device_name": name,
+                "ip_address": ip,
+                "production_line": line,
+                "alive": alive,
+                "status": status_text,
+            })
     db.commit()
-    return stats
+    results.sort(key=lambda x: (x["alive"], x["device_type"], x["device_name"] or ""))
+    return stats, results
 
 
 def check_all_servers(db: Session, request, username: str):
-    """一键检测：服务器 + 老化架 + AP 全量 Ping，并自动对账告警/钉钉通知。
+    """一键检测：服务器 + 老化架 + AP 全量 Ping（ping 通=在线，不通=离线/故障），
+    并自动对账告警/钉钉通知。返回每台设备的检测明细供看板实时展示。
 
     函数名保持兼容（路由 /network/servers/check-all 与前端 networkApi.checkAll 均调用它）。
     """
-    stats = _ping_and_update_all(db)
+    stats, results = _ping_and_update_all(db)
     sync = sync_alerts(db, notify=True)
     online = stats["servers_online"] + stats["racks_online"] + stats["aps_online"]
     offline = stats["servers_offline"] + stats["racks_offline"] + stats["aps_offline"]
@@ -142,8 +173,10 @@ def check_all_servers(db: Session, request, username: str):
         f"一键检测: 在线{online} 离线{offline} 新增告警{sync['new_alerts']}", request,
     )
     return {
-        "online": online, "offline": offline, **stats,
+        "online": online, "offline": offline, "total": len(results), **stats,
         "new_alerts": sync["new_alerts"], "resolved_alerts": sync["resolved_alerts"],
+        "results": results,
+        "checked_at": beijing_now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
 
@@ -419,6 +452,7 @@ def sync_alerts(db: Session, notify: bool = True) -> Dict[str, int]:
 def monitor_tick(db: Session) -> int:
     """后台定时任务每轮调用：Ping 老化架/AP（服务器由 server_health 守护任务检测），
     对账告警并推送钉钉，返回设置中的下一轮检测间隔（秒）。
+    每轮无论设备状态是否变化都写入 last_monitor_tick 时间戳，供看板确认巡检在跑。
     """
     for r in db.query(AgingRack).all():
         if r.ip_address:
@@ -426,6 +460,11 @@ def monitor_tick(db: Session) -> int:
     for ap in db.query(WifiAp).all():
         if ap.ip_address:
             ap.status = "在线" if _ping_device(ap.ip_address) else "离线"
+    tick_row = db.query(Setting).filter(Setting.key == "last_monitor_tick").first()
+    if tick_row:
+        tick_row.value = beijing_now().strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        db.add(Setting(key="last_monitor_tick", value=beijing_now().strftime("%Y-%m-%d %H:%M:%S")))
     db.commit()
     sync_alerts(db, notify=True)
     return get_settings(db)["ping_interval"]

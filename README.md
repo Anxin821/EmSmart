@@ -5,7 +5,7 @@
 面向智能工厂的综合工作任务管理系统，采用 **FastAPI + Vue 3** 前后端分离架构，覆盖三大核心业务：
 
 1. **AOI&AI 设备管理** — 设备部署、生产数据管理、数据看板
-2. **车间网络管理** — 服务器/老化架/WiFi AP 管理、心跳检测、网络看板
+2. **车间网络管理** — 服务器/老化架/WiFi AP 管理、Ping 在线巡检、离线钉钉告警、网络看板
 3. **MES 系统管理** — 日常工单、异常 BUG、二次开发需求、MES 看板
 
 ## 项目结构
@@ -17,14 +17,16 @@ EmSmart/
 │   │   ├── config.py           # 配置管理（Pydantic Settings + .env）
 │   │   ├── database.py         # SQLAlchemy 引擎 & 会话管理
 │   │   ├── auth.py             # JWT 认证 & 权限控制
-│   │   └── crud.py             # 通用 CRUD 操作
-│   ├── models/                 # ORM 模型（15 张表，按业务域拆分）
+│   │   ├── crud.py             # 通用 CRUD 操作
+│   │   ├── dingtalk.py         # 钉钉机器人推送（HMAC-SHA256 加签，标准库实现）
+│   │   └── timeutil.py         # 北京时间工具
+│   ├── models/                 # ORM 模型（按业务域拆分）
 │   │   ├── users.py            # 用户 & 权限
 │   │   ├── device.py           # AOI/AI 设备
 │   │   ├── production.py       # 周报 & 月报
-│   │   ├── network.py          # 服务器 / 老化架 / WiFi AP
+│   │   ├── network.py          # 服务器 / 老化架 / WiFi AP / 网络告警(NetworkAlert)
 │   │   ├── mes.py              # 工单 / BUG / 二次开发需求
-│   │   └── system.py           # 项目 / 操作日志 / 杀毒 / 岗位职责
+│   │   └── system.py           # 项目 / 操作日志 / 杀毒 / 岗位职责 / 系统设置(Setting)
 │   ├── routers/                # 路由模块
 │   │   ├── auth.py             # 登录 / 当前用户 / 枚举选项
 │   │   ├── devices.py          # 设备管理
@@ -37,7 +39,7 @@ EmSmart/
 │   │   ├── projects.py         # 项目管理
 │   │   └── responsibilities.py # 岗位职责
 │   ├── schemas/                # Pydantic 请求/响应模型
-│   ├── tasks/                  # 定时任务（心跳检测）
+│   ├── tasks/                  # 后台任务（asyncio 守护协程：服务器健康检查 + 网络 Ping 巡检）
 │   ├── main.py                 # FastAPI 主入口
 │   ├── .env.example            # 环境变量模板
 │   └── requirements.txt        # Python 依赖
@@ -87,7 +89,8 @@ EmSmart/
 | **ORM** | SQLAlchemy 2.0 + PyODBC |
 | **数据库** | SQL Server |
 | **认证** | JWT (python-jose) + Passlib (bcrypt) |
-| **定时任务** | APScheduler 3.10 |
+| **定时任务** | asyncio 后台守护协程（随 FastAPI lifespan 启动，间隔可在「告警设置」中配置） |
+| **消息推送** | 钉钉自定义机器人（HMAC-SHA256 加签，urllib 标准库实现） |
 | **前端框架** | Vue 3.4 + Vue Router 4 + Pinia 2 |
 | **UI 组件** | Element Plus 2.14 + Bootstrap Icons |
 | **图表** | ECharts 5.5 |
@@ -108,6 +111,8 @@ EmSmart/
 ```bash
 sqlcmd -S localhost -U sa -P YourPassword123 -i database/init_db.sql
 ```
+
+> 网络监控新增的 `settings`（系统设置）、`network_alerts`（网络告警）表会在后端首次启动时自动创建；`wifi_aps.mac_address` 列也会在启动时自检并自动 `ALTER TABLE` 补齐，无需手工执行迁移脚本。
 
 ### 3. 后端启动
 
@@ -167,9 +172,13 @@ npm run build
 - 数据看板：设备状态、产量趋势、合格率对比
 
 ### 车间网络管理
-- 服务器 / 老化架 / WiFi AP 管理
-- 自动心跳检测（每 30 分钟）
-- 网络拓扑图、在线率仪表盘
+- 服务器 / 老化架 / WiFi AP 管理（WiFi AP 支持 MAC 地址字段，产线含 1~8 线、品质房、维修房）
+- **一键检测**：对三类设备并发 Ping（ping 通=在线，不通=离线/故障），结果明细实时展示在看板抽屉
+- **后台自动巡检**：按可配置的 Ping 间隔（默认 60 秒）持续巡检，看板同步自动刷新并显示巡检状态
+- **离线告警**：设备新离线自动落库告警并推送钉钉（同设备去重不轰炸，恢复在线自动关闭）；看板「未处理告警」KPI + 告警抽屉支持单条/批量标记已处理
+- **告警设置**：钉钉机器人 Webhook、加签 Secret、Ping 间隔均可在网络看板顶栏「告警设置」中配置，支持发送测试消息
+- 网络看板：在线率环形仪表盘、各线体健康卡（状态色整卡环绕）、离线设备列表
+- Excel 批量导入导出
 
 ### MES 系统管理
 - 工单状态流转（表格/泳道双视图）
@@ -208,6 +217,12 @@ npm run build
 | 生产 | `/api/v1/production/weekly` | 周报管理 |
 | 生产 | `/api/v1/production/monthly` | 月报管理 |
 | 网络 | `/api/v1/network/servers` | 服务器管理 |
+| 网络 | `/api/v1/network/aging-racks` | 老化架管理 |
+| 网络 | `/api/v1/network/wifi-aps` | WiFi AP 管理（含 MAC 地址） |
+| 网络 | `/api/v1/network/servers/check-all` | 一键检测（并发 Ping 三类设备） |
+| 网络 | `/api/v1/network/settings` | 告警设置（钉钉 Webhook/Secret、Ping 间隔） |
+| 网络 | `/api/v1/network/settings/test` | 发送钉钉测试消息 |
+| 网络 | `/api/v1/network/alerts` | 离线告警列表 / 标记已处理 |
 | MES | `/api/v1/mes/work-orders` | 工单管理 |
 | MES | `/api/v1/mes/bugs` | BUG 管理 |
 | 看板 | `/api/v1/dashboard/*` | 各维度看板 |

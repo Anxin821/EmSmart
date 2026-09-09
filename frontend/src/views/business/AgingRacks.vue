@@ -167,7 +167,7 @@ const pageSize = ref(20)
 const total = ref(0)
 const loading = ref(false)
 const filters = ref({ keyword:'', line:'', status:'' })
-const lines = ['1线','2线','3线','4线','5线','6线','7线','8线']
+const lines = ['1线','2线','3线','4线','5线','6线','7线','8线','品质房','维修房']
 
 // 用于取消请求的 AbortController
 let abortController = null

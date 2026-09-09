@@ -181,7 +181,7 @@ const pageSize = ref(20)
 const total = ref(0)
 const loading = ref(false)
 const filters = ref({ keyword:'', line:'', status:'' })
-const lines = ['1线','2线','3线','4线','5线','6线','7线','8线']
+const lines = ['1线','2线','3线','4线','5线','6线','7线','8线','品质房','维修房']
 
 // 用于取消请求的 AbortController
 let abortController = null
@@ -392,4 +392,8 @@ onUnmounted(() => {
 /* 底部为 position:fixed 的分页条预留空间；表格改用 height="100%" 填满剩余区域，
    末尾正好停在分页条上方，表头固定、仅数据区垂直滚动。 */
 .page-content { padding-bottom: 48px; }
+
+/* 表格一行显示：所有单元格内容不换行，列总宽超出容器时整表横向滚动（不挤压换行） */
+:deep(.el-table .cell) { white-space: nowrap; }
+:deep(.el-table .cell .el-button) { flex-shrink: 0; }
 </style>
