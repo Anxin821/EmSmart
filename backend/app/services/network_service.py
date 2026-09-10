@@ -457,6 +457,20 @@ def _build_alert_text(device_type: str, name: str, line: str, ip: str, ts: str) 
     return _format_alert_text(title, ts, "严重", ip, "设备离线（Ping 不可达）")
 
 
+def _build_recover_text(device_type: str, name: str, line: str, ip: str, ts: str) -> str:
+    """设备恢复在线通知文案：与离线告警标题对齐，仅把「异常报警」改为「已恢复在线」。"""
+    if device_type == "未知设备" or not name:
+        title = f"未知设备（{ip}）已恢复在线✅"
+    else:
+        head = f"{line or ''}{name}"
+        if device_type == "WiFi AP":
+            title = f"{head}已恢复在线✅"
+        else:
+            kind = {"老化架": "老化架", "服务器": "服务器"}.get(device_type, device_type)
+            title = f"{head} {kind}已恢复在线✅"
+    return _format_alert_text(title, ts, "信息", ip, "设备 Ping 恢复可达，告警自动关闭")
+
+
 # Syslog 日志告警内存去重：key="IP|消息" → 上次告警的 time.time()
 _SYSLOG_DEDUP: Dict[str, float] = {}
 _SYSLOG_DEDUP_WINDOW = 60.0
@@ -562,9 +576,17 @@ def sync_alerts(db: Session, notify: bool = True) -> Dict[str, int]:
                     send_dingtalk(cfg["dingtalk_webhook"], cfg["dingtalk_secret"],
                                   _build_alert_text(device_type, name, line, ip, ts))
         elif key in open_map:
+            # 设备恢复在线：自动关闭未处理告警，并推送「恢复在线」钉钉通知
+            # （否则用户体感是「ping 通了也不通知」，必须先点开告警抽屉刷新才感知到）
             open_map[key].status = "已处理"
             open_map[key].resolved_at = now
             resolved_count += 1
+            if cfg and cfg.get("dingtalk_webhook"):
+                try:
+                    send_dingtalk(cfg["dingtalk_webhook"], cfg["dingtalk_secret"],
+                                  _build_recover_text(device_type, name, line, ip, ts))
+                except Exception:
+                    pass
     if new_count or resolved_count:
         db.commit()
     return {"new_alerts": new_count, "resolved_alerts": resolved_count}
