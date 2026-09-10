@@ -499,7 +499,7 @@ const renderGauge = () => {
       detail: {
         valueAnimation: true,
         offsetCenter: [0, '-2%'],
-        fontSize: 44,
+        fontSize: 40,
         fontWeight: 800,
         formatter: '{value}%',
         color: rateColor,
