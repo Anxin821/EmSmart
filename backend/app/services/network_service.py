@@ -282,7 +282,14 @@ DEFAULT_SETTINGS = {
     "dingtalk_webhook": "",
     "dingtalk_secret": "",
     "ping_interval": "60",
+    # Syslog UDP 日志监听（迁移自 wifi-monitor/syslog_listener.py）
+    "syslog_enabled": "0",            # 默认关闭：Windows 绑定 514 需管理员权限
+    "syslog_port": "514",
+    "syslog_keywords": "登录,退出,error,失败,攻击,非法,警告,warning,critical",
 }
+
+# Syslog 严重等级（不依赖关键词，命中即告警）
+SYSLOG_ALERT_LEVELS = {"notice", "warning", "error", "critical", "emergency", "alert"}
 
 
 def ensure_default_settings(db: Session) -> None:
@@ -301,15 +308,23 @@ def get_settings(db: Session) -> Dict[str, Any]:
         interval = int(m.get("ping_interval") or 60)
     except (TypeError, ValueError):
         interval = 60
+    try:
+        syslog_port = int(m.get("syslog_port") or 514)
+    except (TypeError, ValueError):
+        syslog_port = 514
     return {
         "dingtalk_webhook": m.get("dingtalk_webhook") or "",
         "dingtalk_secret": m.get("dingtalk_secret") or "",
         "ping_interval": interval,
+        "syslog_enabled": (m.get("syslog_enabled") or "0") in ("1", "true", "True", "on"),
+        "syslog_port": syslog_port,
+        "syslog_keywords": m.get("syslog_keywords") or "",
     }
 
 
 def update_settings(db: Session, data: dict, request, username: str) -> Dict[str, Any]:
-    for k in ("dingtalk_webhook", "dingtalk_secret", "ping_interval"):
+    for k in ("dingtalk_webhook", "dingtalk_secret", "ping_interval",
+              "syslog_port", "syslog_keywords"):
         if k not in data or data[k] is None:
             continue
         val = str(data[k]).strip()
@@ -318,8 +333,17 @@ def update_settings(db: Session, data: dict, request, username: str) -> Dict[str
             obj.value = val
         else:
             db.add(Setting(key=k, value=val))
+    # Syslog 开关：兼容布尔 / "1" / "on"
+    if data.get("syslog_enabled") is not None:
+        v = data.get("syslog_enabled")
+        enabled = v is True or str(v).strip().lower() in ("1", "true", "on")
+        obj = db.query(Setting).filter(Setting.key == "syslog_enabled").first()
+        if obj:
+            obj.value = "1" if enabled else "0"
+        else:
+            db.add(Setting(key="syslog_enabled", value="1" if enabled else "0"))
     db.commit()
-    write_operation_log(db, username, "UPDATE", "setting", None, "更新网络监控设置（钉钉/Ping间隔）", request)
+    write_operation_log(db, username, "UPDATE", "setting", None, "更新网络监控设置（钉钉/Ping间隔/Syslog）", request)
     return get_settings(db)
 
 
@@ -393,21 +417,115 @@ def _network_device_states(db: Session):
     return states
 
 
-def _build_alert_text(device_type: str, name: str, line: str, ip: str, ts: str) -> str:
-    """按设备类型拼装钉钉报警文案（对齐 wifi-monitor/syslog_listener 的前缀风格）。"""
-    if device_type == "WiFi AP":
-        prefix = f"{line} WiFi异常报警！！！" if line else "WiFi异常报警！！！"
-    elif device_type == "老化架":
-        prefix = f"{line} 老化架异常报警！！！" if line else "老化架异常报警！！！"
-    else:
-        prefix = f"{line} 服务器异常报警！！！" if line else "服务器异常报警！！！"
+def _device_alert_title(device_type: str, name: str, line: str, ip: str = "") -> str:
+    """告警标题：产线+设备名拼接（如“8线下载WiFi WiFi异常报警！！！”）。"""
+    if device_type == "未知设备" or not name:
+        return f"未知设备（{ip}）异常报警！！！"
+    head = f"{line or ''}{name}"
+    kind = {"WiFi AP": "WiFi", "老化架": "老化架", "服务器": "服务器"}.get(device_type, device_type)
+    return f"{head} {kind}异常报警！！！"
+
+
+_LEVEL_CN = {
+    "emergency": "紧急", "alert": "警戒", "critical": "严重", "error": "错误",
+    "warning": "警告", "warn": "警告", "notice": "通知", "info": "信息",
+    "information": "信息", "informational": "信息", "debug": "调试",
+}
+
+
+def _level_cn(level: str) -> str:
+    return _LEVEL_CN.get((level or "").strip().lower(), level or "警告")
+
+
+def _format_alert_text(title: str, ts: str, level_cn: str, ip: str, detail: str) -> str:
+    """统一钉钉文本格式（\\n 换行，钉钉 text 消息原生支持）。"""
     return (
-        f"⚠️ {prefix}\n"
+        f"⚠️ {title}\n"
         f"时间：{ts}\n"
-        f"设备：{name}\n"
+        f"等级：{level_cn}\n"
         f"来源IP：{ip or 'N/A'}\n"
-        f"事件：设备离线（Ping 不可达）"
+        f"日志详情：{detail}"
     )
+
+
+def _build_alert_text(device_type: str, name: str, line: str, ip: str, ts: str) -> str:
+    """设备离线告警文案。"""
+    title = _device_alert_title(device_type, name, line, ip)
+    return _format_alert_text(title, ts, "严重", ip, "设备离线（Ping 不可达）")
+
+
+# Syslog 日志告警内存去重：key="IP|消息" → 上次告警的 time.time()
+_SYSLOG_DEDUP: Dict[str, float] = {}
+_SYSLOG_DEDUP_WINDOW = 60.0
+
+
+def _find_device_by_ip(db: Session, ip: str):
+    """按 IP 匹配已登记设备，返回 (类型, 名称, 业务ID, 产线)；未登记返回 None。"""
+    srv = db.query(Server).filter(Server.ip_address == ip).first()
+    if srv:
+        return "服务器", srv.name, srv.server_id, srv.production_line
+    rack = db.query(AgingRack).filter(AgingRack.ip_address == ip).first()
+    if rack:
+        return "老化架", rack.name, rack.rack_id, rack.production_line
+    ap = db.query(WifiAp).filter(WifiAp.ip_address == ip).first()
+    if ap:
+        return "WiFi AP", ap.ssid, ap.ap_id, ap.production_line
+    return None
+
+
+def record_syslog_alert(db: Session, src_ip: str, parsed: dict) -> bool:
+    """Syslog 命中告警规则后的统一处理：去重 → 落 network_alerts → 推钉钉。
+
+    与离线告警的区别：
+    - alert_type="日志告警"，device_key 带 :syslog 后缀，不参与 Ping 恢复自动关闭；
+    - 同一来源 IP + 相同消息 60 秒内只告警一次（防止日志刷屏轰炸群聊）。
+    """
+    import time
+    message = (parsed.get("message") or parsed.get("raw") or "").strip()
+    if not message:
+        return False
+    message = message[:500]
+    level = (parsed.get("level") or "warning").strip() or "warning"
+    ts = parsed.get("timestamp") or beijing_now().strftime("%Y-%m-%d %H:%M:%S")
+
+    dedup_key = f"{src_ip}|{message}"
+    now_ts = time.time()
+    last = _SYSLOG_DEDUP.get(dedup_key)
+    if last is not None and now_ts - last < _SYSLOG_DEDUP_WINDOW:
+        return False
+    _SYSLOG_DEDUP[dedup_key] = now_ts
+    if len(_SYSLOG_DEDUP) > 1000:   # 简单清理，避免长期运行内存膨胀
+        for k in [k for k, v in _SYSLOG_DEDUP.items() if now_ts - v > _SYSLOG_DEDUP_WINDOW]:
+            _SYSLOG_DEDUP.pop(k, None)
+
+    dev = _find_device_by_ip(db, src_ip)
+    if dev:
+        dtype, name, biz_key, line = dev
+    else:
+        dtype, name, biz_key, line = "未知设备", src_ip, src_ip, ""
+
+    sev = "critical" if level.lower() in ("error", "critical", "emergency", "alert") else "warning"
+    alert = NetworkAlert(
+        device_type=dtype, device_name=name,
+        device_key=f"{dtype}:{biz_key}:syslog",
+        production_line=line or None, ip_address=src_ip,
+        alert_type="日志告警", level=sev,
+        message=f"[{level}] {message}",
+    )
+    db.add(alert)
+    db.commit()
+
+    cfg = get_settings(db)
+    if cfg.get("dingtalk_webhook"):
+        title = _device_alert_title(dtype, name, line, src_ip)
+        # 日志详情优先转发完整原始报文（含 <PRI> 头），无原始报文时用截断后的正文
+        detail = (parsed.get("raw") or message).strip()
+        text = _format_alert_text(title, ts, _level_cn(level), src_ip, detail)
+        try:
+            send_dingtalk(cfg["dingtalk_webhook"], cfg["dingtalk_secret"], text)
+        except Exception:
+            pass
+    return True
 
 
 def sync_alerts(db: Session, notify: bool = True) -> Dict[str, int]:

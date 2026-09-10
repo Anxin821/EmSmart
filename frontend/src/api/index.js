@@ -1,4 +1,4 @@
-﻿import axios from 'axios'
+import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
 const api = axios.create({
@@ -44,5 +44,6 @@ export { usersApi } from './users'
 export { projectsApi } from './projects'
 export { dutiesApi } from './duties'
 export { esopApi } from './esop'
+export { warehouseApi } from './warehouse'
 
 export default api

@@ -162,7 +162,7 @@
           <div v-if="!alertsLoading && !alerts.length" class="ad-empty">
             <span class="bi bi-bell-slash ad-empty-icon"></span>
             <span class="ad-empty-text">暂无告警记录</span>
-            <span class="ad-empty-sub">设备离线时将自动记录并推送钉钉</span>
+            <span class="ad-empty-sub">设备离线或 Syslog 命中告警关键词时自动记录并推送钉钉</span>
           </div>
 
           <div
@@ -175,6 +175,7 @@
             <div class="ad-card-main">
               <div class="ad-card-head">
                 <span class="offline-type" :class="typeClass(a.device_type)">{{ a.device_type }}</span>
+                <span v-if="a.alert_type === '日志告警'" class="ad-card-atype">Syslog</span>
                 <span class="ad-card-name">{{ a.device_name }}</span>
                 <span class="ad-card-status" :class="a.status === '未处理' ? 'st-open' : 'st-done'">
                   <span :class="a.status === '未处理' ? 'bi bi-exclamation-circle-fill' : 'bi bi-check-circle-fill'"></span>
@@ -313,11 +314,24 @@
             <el-input-number v-model="settingsForm.ping_interval" :min="10" :max="3600" :step="10" controls-position="right" />
             <span class="ns-hint">秒（后台自动巡检间隔）</span>
           </el-form-item>
+
+          <el-divider content-position="left">Syslog 日志监听（UDP）</el-divider>
+          <el-form-item label="启用监听">
+            <el-switch v-model="settingsForm.syslog_enabled" active-text="接收设备 Syslog 并自动告警" />
+          </el-form-item>
+          <el-form-item label="监听端口">
+            <el-input-number v-model="settingsForm.syslog_port" :min="1" :max="65535" controls-position="right" :disabled="!settingsForm.syslog_enabled" />
+          </el-form-item>
+          <el-form-item label="告警关键词">
+            <el-input
+              v-model="settingsForm.syslog_keywords"
+              type="textarea"
+              :rows="2"
+              placeholder="逗号分隔，如：登录,退出,error,失败,攻击,非法"
+              :disabled="!settingsForm.syslog_enabled"
+            />
+          </el-form-item>
         </el-form>
-        <div class="ns-tip">
-          <span class="bi bi-info-circle"></span>
-          设备离线时自动记录告警并推送钉钉；同一设备离线期间只推送一次，恢复在线后告警自动关闭。
-        </div>
       </div>
       <template #footer>
         <div class="ns-footer">
@@ -574,7 +588,10 @@ const settingsTesting = ref(false)
 const settingsForm = ref({
   dingtalk_webhook: '',
   dingtalk_secret: '',
-  ping_interval: 60
+  ping_interval: 60,
+  syslog_enabled: false,
+  syslog_port: 514,
+  syslog_keywords: ''
 })
 
 const openSettings = async () => {
@@ -585,7 +602,10 @@ const openSettings = async () => {
     settingsForm.value = {
       dingtalk_webhook: res.data?.dingtalk_webhook || '',
       dingtalk_secret: res.data?.dingtalk_secret || '',
-      ping_interval: res.data?.ping_interval || 60
+      ping_interval: res.data?.ping_interval || 60,
+      syslog_enabled: !!res.data?.syslog_enabled,
+      syslog_port: res.data?.syslog_port || 514,
+      syslog_keywords: res.data?.syslog_keywords || ''
     }
   } catch (e) {
     console.error(e)
@@ -594,6 +614,15 @@ const openSettings = async () => {
     settingsLoading.value = false
   }
 }
+
+const buildSettingsPayload = () => ({
+  dingtalk_webhook: (settingsForm.value.dingtalk_webhook || '').trim(),
+  dingtalk_secret: (settingsForm.value.dingtalk_secret || '').trim(),
+  ping_interval: settingsForm.value.ping_interval || 60,
+  syslog_enabled: !!settingsForm.value.syslog_enabled,
+  syslog_port: settingsForm.value.syslog_port || 514,
+  syslog_keywords: (settingsForm.value.syslog_keywords || '').trim()
+})
 
 const handleSaveSettings = async () => {
   const webhook = (settingsForm.value.dingtalk_webhook || '').trim()
@@ -607,11 +636,7 @@ const handleSaveSettings = async () => {
   }
   settingsSaving.value = true
   try {
-    await networkApi.saveSettings({
-      dingtalk_webhook: webhook,
-      dingtalk_secret: (settingsForm.value.dingtalk_secret || '').trim(),
-      ping_interval: settingsForm.value.ping_interval
-    })
+    await networkApi.saveSettings(buildSettingsPayload())
     ElMessage.success('设置已保存')
     settingsDialog.value = false
   } catch (e) {
@@ -631,11 +656,7 @@ const handleTestSettings = async () => {
   }
   settingsTesting.value = true
   try {
-    await networkApi.saveSettings({
-      dingtalk_webhook: webhook,
-      dingtalk_secret: (settingsForm.value.dingtalk_secret || '').trim(),
-      ping_interval: settingsForm.value.ping_interval || 60
-    })
+    await networkApi.saveSettings(buildSettingsPayload())
     await networkApi.testDingtalk()
     ElMessage.success('测试消息已发送，请查看钉钉群')
   } catch (e) {
@@ -1053,7 +1074,28 @@ onBeforeUnmount(() => {
 }
 .cr-ok-line { margin-left: auto; font-size: 12px; color: var(--c-text-mute); white-space: nowrap; }
 
-/* ---- 告警通知设置弹窗 ---- */
+/* ---- 告警通知设置弹窗（限高：内容超出时仅表单区滚动，头尾固定） ---- */
+.net-settings-dialog { margin-top: 5vh !important; margin-bottom: 5vh; }
+.net-settings-dialog :deep(.el-dialog) {
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+}
+.net-settings-dialog :deep(.el-dialog__header) { flex-shrink: 0; }
+.net-settings-dialog :deep(.el-dialog__body) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.net-settings-dialog :deep(.el-dialog__footer) { flex-shrink: 0; }
+.ns-body {
+  max-height: calc(90vh - 150px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
 .ns-hint { margin-left: 12px; font-size: 12px; color: var(--c-text-3); }
 .ns-tip {
   display: flex;
@@ -1320,6 +1362,16 @@ onBeforeUnmount(() => {
   padding: 2px 6px;
   border-radius: 4px;
   text-align: center;
+  white-space: nowrap;
+}
+
+.ad-card-atype {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #EDE9FE;
+  color: #6D28D9;
   white-space: nowrap;
 }
 

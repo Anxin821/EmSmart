@@ -38,8 +38,9 @@ from app.api.v1.routers.users import router as users_router
 from app.api.v1.routers.responsibilities import router as responsibilities_router
 from app.api.v1.routers.esop import router as esop_router
 from app.api.v1.routers.exception import router as exception_router
+from app.api.v1.routers.warehouse import router as warehouse_router
 # ---------- 定时任务 ----------
-from app.tasks import check_server_health
+from app.tasks import check_server_health, start_syslog_listener
 
 
 # ============================================================
@@ -98,6 +99,12 @@ def _ensure_tables_and_seed():
         # 4. 网络监控默认设置（钉钉 Webhook/Secret、Ping 间隔）
         from app.services import network_service
         network_service.ensure_default_settings(db)
+
+        # 5. 历史长 ID 迁移为 5 位数字（BUG1789002010631 → 5位随机不重复；幂等）
+        from app.core.crud import migrate_legacy_ids_to_5digit
+        id_changes = migrate_legacy_ids_to_5digit(db)
+        if any(id_changes.values()):
+            print(f"[Startup] 历史编号已迁移为5位数字: {id_changes}")
     except Exception:
         db.rollback()
     finally:
@@ -131,6 +138,12 @@ async def lifespan(app: FastAPI):
         check_server_health(get_session=lambda: SessionLocal()),
         name="server_health_daemon",
     )
+
+    # Syslog UDP 监听守护线程（daemon，随进程退出；开关在「告警设置」中控制）
+    try:
+        start_syslog_listener(get_session=lambda: SessionLocal())
+    except Exception as e:
+        print(f"[Startup] Syslog 监听线程启动失败（不影响主服务）: {e}")
 
     try:
         yield
@@ -192,6 +205,7 @@ app.include_router(users_router, prefix=API_PREFIX)
 app.include_router(responsibilities_router, prefix=API_PREFIX)
 app.include_router(esop_router, prefix=API_PREFIX)
 app.include_router(exception_router, prefix=API_PREFIX)
+app.include_router(warehouse_router, prefix=API_PREFIX)
 
 
 # ============================================================

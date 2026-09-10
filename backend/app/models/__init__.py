@@ -16,6 +16,7 @@ from .mes import WorkOrder, Bug, DevRequest
 from .system import Project, OperationLog, AntivirusRecord, JobResponsibility, Setting
 from .esop import EsopPart
 from .exception import ExceptionRecord
+from .warehouse import WarehousePart, PartTransaction
 
 __all__ = [
     "Base",
@@ -38,4 +39,6 @@ __all__ = [
     "Setting",
     "EsopPart",
     "ExceptionRecord",
+    "WarehousePart",
+    "PartTransaction",
 ]

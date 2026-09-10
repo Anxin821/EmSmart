@@ -59,15 +59,17 @@
           <ul v-else class="risk-list">
             <li v-for="(r, idx) in data.risks" :key="idx">
               <span class="risk-bullet" :style="{background: r.icon==='p0_bug' ? '#EF4444' : '#F59E0B'}"></span>
-              <span class="risk-title">
-                <b>{{ r.label }}</b>：{{ r.value }} {{ r.unit }}
-                <template v-if="r.items && r.items.length">
-                  <span v-if="r.items.length" class="risk-detail">
-                    ({{ r.items.join('、') }}{{ r.value > r.items.length ? ' 等' : '' }})
-                  </span>
-                </template>
-                <span v-else class="risk-detail muted">（暂无）</span>
-              </span>
+              <el-tooltip placement="top-start" effect="dark" :content="riskFullText(r)" :show-after="200">
+                <span class="risk-title clamp-2">
+                  <b>{{ r.label }}</b>：{{ r.value }} {{ r.unit }}
+                  <template v-if="r.items && r.items.length">
+                    <span v-if="r.items.length" class="risk-detail">
+                      ({{ r.items.join('、') }}{{ r.value > r.items.length ? ' 等' : '' }})
+                    </span>
+                  </template>
+                  <span v-else class="risk-detail muted">（暂无）</span>
+                </span>
+              </el-tooltip>
             </li>
           </ul>
         </div>
@@ -84,9 +86,11 @@
               <span class="ms-check bi bi-check2-circle"></span>
               <b>{{ data.milestones?.label }}</b>：{{ data.milestones?.count }} 个需求
             </div>
-            <div class="ms-list">
-              ({{ data.milestones?.items?.join('、') || '' }}{{ (data.milestones?.count || 0) > (data.milestones?.items?.length || 0) ? ' 等' : '' }})
-            </div>
+            <el-tooltip placement="top-start" effect="dark" :content="milestoneFullText" :show-after="200">
+              <div class="ms-list clamp-3">
+                ({{ data.milestones?.items?.join('、') || '' }}{{ (data.milestones?.count || 0) > (data.milestones?.items?.length || 0) ? ' 等' : '' }})
+              </div>
+            </el-tooltip>
           </div>
         </div>
       </section>
@@ -101,17 +105,17 @@
       align-center
       destroy-on-close
     >
-      <el-table :data="openBugRecords" stripe border style="width:100%;" max-height="420" empty-text="暂无未关闭 BUG">
+      <el-table :data="openBugRecords" stripe border style="width:100%;" max-height="56vh" empty-text="暂无未关闭 BUG">
         <el-table-column prop="bug_id" label="BUG ID" min-width="140" align="center" show-overflow-tooltip />
-        <el-table-column prop="title" label="标题" min-width="200" align="center" show-overflow-tooltip />
-        <el-table-column prop="severity" label="严重等级" width="100" align="center">
+        <el-table-column prop="title" label="标题" min-width="220" align="center" show-overflow-tooltip />
+        <el-table-column prop="severity" label="严重等级" width="100" align="center" show-overflow-tooltip>
           <template #default="s"><span :class="'status-badge ' + getStatusClass(cleanStatus(s.row.severity))">{{ cleanStatus(s.row.severity) }}</span></template>
         </el-table-column>
         <el-table-column prop="module" label="模块" min-width="110" align="center" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="100" align="center" />
-        <el-table-column prop="discoverer" label="发现人" width="100" align="center" />
-        <el-table-column prop="assignee" label="指派给" width="100" align="center" />
-        <el-table-column prop="deadline" label="截止日期" width="120" align="center" />
+        <el-table-column prop="status" label="状态" width="100" align="center" show-overflow-tooltip />
+        <el-table-column prop="discoverer" label="发现人" width="100" align="center" show-overflow-tooltip />
+        <el-table-column prop="assignee" label="指派给" width="100" align="center" show-overflow-tooltip />
+        <el-table-column prop="deadline" label="截止日期" width="120" align="center" show-overflow-tooltip />
         <el-table-column label="录入时间" width="160" align="center">
           <template #default="s">{{ formatTime(s.row.created_at) }}</template>
         </el-table-column>
@@ -131,14 +135,14 @@
       align-center
       destroy-on-close
     >
-      <el-table :data="overdueReqRecords" stripe border style="width:100%;" max-height="420" empty-text="暂无延期需求">
+      <el-table :data="overdueReqRecords" stripe border style="width:100%;" max-height="56vh" empty-text="暂无延期需求">
         <el-table-column prop="request_id" label="需求ID" min-width="140" align="center" show-overflow-tooltip />
-        <el-table-column prop="title" label="标题" min-width="200" align="center" show-overflow-tooltip />
-        <el-table-column prop="priority" label="优先级" width="100" align="center" />
-        <el-table-column prop="status" label="状态" width="100" align="center" />
-        <el-table-column prop="submitter" label="提交人" width="100" align="center" />
-        <el-table-column prop="assignee" label="指派给" width="100" align="center" />
-        <el-table-column prop="expected_date" label="期望日期" width="120" align="center" />
+        <el-table-column prop="title" label="标题" min-width="220" align="center" show-overflow-tooltip />
+        <el-table-column prop="priority" label="优先级" width="100" align="center" show-overflow-tooltip />
+        <el-table-column prop="status" label="状态" width="110" align="center" show-overflow-tooltip />
+        <el-table-column prop="submitter" label="提交人" width="100" align="center" show-overflow-tooltip />
+        <el-table-column prop="assignee" label="指派给" width="100" align="center" show-overflow-tooltip />
+        <el-table-column prop="expected_date" label="期望日期" width="120" align="center" show-overflow-tooltip />
         <el-table-column label="录入时间" width="160" align="center">
           <template #default="s">{{ formatTime(s.row.created_at) }}</template>
         </el-table-column>
@@ -187,6 +191,18 @@ const overdueReqTotal = ref(0)
 const overdueReqLoading = ref(false) // 防止重复打开
 const overdueReqLastOpen = ref(0)    // 时间戳防抖
 if (typeof window !== 'undefined' && !window.__overdueReqDialog) window.__overdueReqDialog = false
+
+// 工具：风险/里程碑悬浮查看的完整文本（卡片内最多显示 2~3 行）
+const riskFullText = (r) => {
+  if (!r) return ''
+  const items = (r.items && r.items.length) ? `（${r.items.join('、')}${r.value > r.items.length ? ' 等' : ''}）` : '（暂无）'
+  return `${r.label}：${r.value} ${r.unit} ${items}`
+}
+const milestoneFullText = computed(() => {
+  const m = data.value?.milestones
+  if (!m) return ''
+  return `(${m.items?.join('、') || ''}${(m.count || 0) > (m.items?.length || 0) ? ' 等' : ''})`
+})
 
 // 工具：清理字段显示
 const cleanStatus = (v) => (v == null ? '-' : String(v))
@@ -331,7 +347,18 @@ const resize = () => {
   cReqs && cReqs.resize()
 }
 
+let loading = false   // 防止轮询与手动刷新并发
 const loadData = async () => {
+  if (loading) return
+  loading = true
+  try {
+    await doLoadData()
+  } finally {
+    loading = false
+  }
+}
+
+const doLoadData = async () => {
   try {
     const res = await mesApi.dashboard()
     data.value = res.data || null
@@ -375,6 +402,22 @@ const renderCharts = () => {
   const bugOrder = data.value?.bug_status_order || ['确认新增', '修复中', '解决关闭']
   const reqOrder = data.value?.req_status_order || ['收集评估', '开发测试中', '上线']
 
+  // X 轴月份标签与 AOI&AI 看板一致：后端只返回有数据的月份（有则显示、无则不显示）；
+  // 同年内显示“N月”，窗口跨年度时显示“25/9”避免两个 9月 无法区分
+  const monthAxisLabels = (months) => {
+    const years = new Set(months.map(m => m.year))
+    return months.map(m => years.size > 1 ? `${String(m.year).slice(2)}/${m.month}` : `${m.month}月`)
+  }
+  // tooltip 始终显示完整年月，避免跨年标签歧义
+  const monthTooltipFormatter = (months) => (params) => {
+    const arr = Array.isArray(params) ? params : [params]
+    const m = months[arr[0]?.dataIndex]
+    if (!m) return ''
+    const head = `${m.year}年${m.month}月`
+    const lines = arr.filter(p => p.value > 0).map(p => `${p.marker}${p.seriesName}：${p.value}`)
+    return lines.length ? [head, ...lines].join('<br/>') : head
+  }
+
   // ---- BUG 堆叠柱 ----
   if (cBugs) cBugs.dispose()
   cBugs = echarts.init(document.getElementById('chart-bugs'))
@@ -383,11 +426,12 @@ const renderCharts = () => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
+      formatter: monthTooltipFormatter(bugMonths),
     },
     grid: { left: 40, right: 20, top: 24, bottom: 44 },
     xAxis: {
       type: 'category',
-      data: bugMonths.map(m => m.label),
+      data: monthAxisLabels(bugMonths),
       axisLine: { lineStyle: { color: '#D8DEEA' } },
       axisTick: { show: false },
       axisLabel: { fontSize: 11 },
@@ -426,11 +470,12 @@ const renderCharts = () => {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
+      formatter: monthTooltipFormatter(reqMonths),
     },
     grid: { left: 40, right: 20, top: 24, bottom: 44 },
     xAxis: {
       type: 'category',
-      data: reqMonths.map(m => m.label),
+      data: monthAxisLabels(reqMonths),
       axisLine: { lineStyle: { color: '#D8DEEA' } },
       axisTick: { show: false },
       axisLabel: { fontSize: 11 },
@@ -480,12 +525,23 @@ const exportPPT = async () => {
   }
 }
 
+// 实时性：每 60 秒自动轮询；页面从后台切回前台时立即刷新一次
+const REFRESH_INTERVAL = 60 * 1000
+let refreshTimer = null
+const onVisible = () => {
+  if (!document.hidden) loadData()
+}
+
 onMounted(() => {
   loadData()
   window.addEventListener('resize', resize)
+  document.addEventListener('visibilitychange', onVisible)
+  refreshTimer = setInterval(loadData, REFRESH_INTERVAL)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resize)
+  document.removeEventListener('visibilitychange', onVisible)
+  if (refreshTimer) clearInterval(refreshTimer)
   cBugs && cBugs.dispose()
   cReqs && cReqs.dispose()
 })
@@ -593,7 +649,22 @@ onBeforeUnmount(() => {
   margin-top: 9px;
   flex-shrink: 0;
 }
-.risk-title { font-size: 14px; color: #111827; line-height: 1.6; }
+.risk-title {
+  font-size: 14px; color: #111827; line-height: 1.6;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 长文本统一省略：卡片内最多 2~3 行，悬浮 tooltip 显示全文（见模板 el-tooltip） */
+.clamp-2, .clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  min-width: 0;
+}
+.clamp-2 { -webkit-line-clamp: 2; }
+.clamp-3 { -webkit-line-clamp: 3; }
 .risk-detail.muted { color: #9CA3AF; }
 .risk-detail { color: #6B7280; font-weight: 400; margin-left: 4px; }
 

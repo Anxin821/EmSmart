@@ -68,15 +68,17 @@ const goDevices = () => router.push('/devices')
 
 const summary = ref({ total_output: 0, total_qualified: 0, yield_rate: 0, months: 0 })
 const trend   = ref([])
+// 看板口径的“本月”：优先当前自然月（周报实时聚合），当月尚无数据时回退最新有数据的月份
+const boardMonth = ref(null)
 const exporting = ref(false)
+let loading = false   // 防止轮询与手动刷新并发
 
 const stats = reactive({ total: 0, normal: 0, fault: 0, maintenance: 0 })
 
-// KPI 派生指标：设备可用率 / 本月产量 / 本月直通率（本月取月度趋势最后一项）
+// KPI 派生指标：设备可用率 / 本月产量 / 本月直通率
 const availability = computed(() => stats.total ? (stats.normal / stats.total * 100).toFixed(1) : '0.0')
-const latestMonth = computed(() => (trend.value && trend.value.length) ? trend.value[trend.value.length - 1] : null)
-const latestOutput = computed(() => latestMonth.value ? (latestMonth.value.total_output || 0).toLocaleString() : '0')
-const latestYield = computed(() => latestMonth.value ? (latestMonth.value.yield_rate || 0) : '0.00')
+const latestOutput = computed(() => boardMonth.value ? (boardMonth.value.total_output || 0).toLocaleString() : '0')
+const latestYield = computed(() => boardMonth.value ? (boardMonth.value.yield_rate || 0) : '0.00')
 
 let chartYield = null, chartOutput = null
 const resizeCharts = () => {
@@ -85,6 +87,16 @@ const resizeCharts = () => {
 }
 
 const loadData = async () => {
+  if (loading) return
+  loading = true
+  try {
+    await doLoadData()
+  } finally {
+    loading = false
+  }
+}
+
+const doLoadData = async () => {
   const [devResult, trendResult] = await Promise.allSettled([
     devicesApi.list({ page_size: 100 }),
     productionApi.monthlyTrend(),
@@ -102,18 +114,31 @@ const loadData = async () => {
     console.error('[AOI Dashboard] devices API failed:', devResult.reason)
   }
 
-  // 月度趋势
+  // 月度趋势（后端直接由周报实时聚合：动态月份、最多12个月，新增周报后立即可见）
   if (trendResult.status === 'fulfilled') {
-    const trendRes = trendResult.value
-    trend.value = trendRes?.data?.items || []
-    const tot_out  = trend.value.reduce((s, d) => s + (d.total_output || 0), 0)
-    const tot_qual = trend.value.reduce((s, d) => s + (d.total_qualified || 0), 0)
-    summary.value = {
-      total_output: tot_out,
-      total_qualified: tot_qual,
-      yield_rate: tot_out ? (tot_qual / tot_out * 100).toFixed(2) : 0,
-      months: trend.value.length,
+    const payload = trendResult.value?.data || {}
+    trend.value = payload.items || []
+    // 优先用后端按年汇总的年累/年均；兼容旧结构时前端兜底计算
+    if (payload.summary) {
+      summary.value = {
+        total_output: payload.summary.total_output || 0,
+        total_qualified: payload.summary.total_qualified || 0,
+        yield_rate: payload.summary.yield_rate || 0,
+        months: payload.summary.months || trend.value.length,
+      }
+    } else {
+      const tot_out  = trend.value.reduce((s, d) => s + (d.total_output || 0), 0)
+      const tot_qual = trend.value.reduce((s, d) => s + (d.total_qualified || 0), 0)
+      summary.value = {
+        total_output: tot_out,
+        total_qualified: tot_qual,
+        yield_rate: tot_out ? (tot_qual / tot_out * 100).toFixed(2) : 0,
+        months: trend.value.length,
+      }
     }
+    // 本月：当前自然月有数据则取当月，否则回退最新月份
+    boardMonth.value = payload.current_month || payload.latest_month ||
+      (trend.value.length ? trend.value[trend.value.length - 1] : null)
   } else {
     console.error('[AOI Dashboard] monthlyTrend API failed:', trendResult.reason)
   }
@@ -123,8 +148,10 @@ const loadData = async () => {
 }
 
 const renderCharts = () => {
-  const labels = (trend.value || []).map(d => `${d.month}月`)
   const trendData = trend.value || []
+  // 12 个月窗口可能跨年，跨年时 X 轴标签加年份（如 25/9），避免两个“9月”无法区分
+  const years = new Set(trendData.map(d => d.year))
+  const labels = trendData.map(d => years.size > 1 ? `${String(d.year).slice(2)}/${d.month}` : `${d.month}月`)
 
   if (chartYield) chartYield.dispose()
   chartYield = echarts.init(document.getElementById('chart-yield'))
@@ -209,12 +236,23 @@ const renderCharts = () => {
   })
 }
 
+// 实时性：每 60 秒自动轮询；页面从后台切回前台时立即刷新一次
+const REFRESH_INTERVAL = 60 * 1000
+let refreshTimer = null
+const onVisible = () => {
+  if (!document.hidden) loadData()
+}
+
 onMounted(() => {
   loadData()
   window.addEventListener('resize', resizeCharts)
+  document.addEventListener('visibilitychange', onVisible)
+  refreshTimer = setInterval(loadData, REFRESH_INTERVAL)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeCharts)
+  document.removeEventListener('visibilitychange', onVisible)
+  if (refreshTimer) clearInterval(refreshTimer)
   chartYield && chartYield.dispose()
   chartOutput && chartOutput.dispose()
 })

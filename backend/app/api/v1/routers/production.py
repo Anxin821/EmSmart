@@ -168,7 +168,7 @@ def monthly_trend_route(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    return ApiResponse(data={"items": monthly_trend(db, year)})
+    return ApiResponse(data=monthly_trend(db, year))
 
 
 @router.post("/monthly")

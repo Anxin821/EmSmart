@@ -109,6 +109,12 @@ const routes = [
         meta: { requiresAuth: true }
       },
       {
+        path: '/warehouse',
+        name: 'Warehouse',
+        component: () => import('../views/business/Warehouse.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
         path: '/exception',
         name: 'Exception',
         component: () => import('../views/business/exception.vue'),

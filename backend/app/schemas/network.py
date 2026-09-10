@@ -138,6 +138,9 @@ class NetworkSettings(BaseModel):
     dingtalk_webhook: Optional[str] = ""
     dingtalk_secret: Optional[str] = ""
     ping_interval: Optional[int] = 60
+    syslog_enabled: Optional[bool] = False
+    syslog_port: Optional[int] = 514
+    syslog_keywords: Optional[str] = ""
 
 
 # ============================================================

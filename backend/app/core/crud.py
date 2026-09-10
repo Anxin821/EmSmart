@@ -3,7 +3,7 @@
 提供各业务模块的标准增删改查函数
 """
 import random
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 from datetime import date, datetime, timedelta
 
 import recorder
@@ -84,6 +84,37 @@ def _gen_unique_5digit_id(db: Session, model, column) -> str:
         if not db.query(model).filter(column == candidate).first():
             return candidate
     raise ValueError("无法生成唯一的 5 位编号，请稍后重试")
+
+
+def migrate_legacy_ids_to_5digit(db: Session) -> dict:
+    """一次性迁移：把历史遗留的非 5 位纯数字 bug_id / request_id 换成唯一 5 位数字。
+
+    - 幂等：已是 5 位数字的记录不动；
+    - 同步更新 operation_logs.target_id 中的旧 ID 快照，保持审计链不断；
+    - 无外键约束（ID 仅为业务字符串列），直接更新即可。
+    """
+    import re
+    pat = re.compile(r"^\d{5}$")
+    changed = {"bug": 0, "dev_request": 0}
+    jobs = (
+        (Bug, Bug.bug_id, "bug", "bug"),
+        (DevRequest, DevRequest.request_id, "dev_request", "dev_request"),
+    )
+    for model, col, log_target_type, key in jobs:
+        rows = db.query(model).all()
+        for row in rows:
+            old = str(getattr(row, col.name) or "")
+            if pat.match(old):
+                continue
+            new_id = _gen_unique_5digit_id(db, model, col)
+            db.query(OperationLog).filter(
+                OperationLog.target_type == log_target_type,
+                OperationLog.target_id == old,
+            ).update({OperationLog.target_id: new_id}, synchronize_session=False)
+            setattr(row, col.name, new_id)
+            changed[key] += 1
+    db.commit()
+    return changed
 
 
 def create_aoi_device(db: Session, data: dict) -> AoiAiDevice:
@@ -236,36 +267,98 @@ def get_monthly_summary_stats(
     return {"total_output": total_output, "total_qualified": total_qualified, "yield_rate": yield_rate}
 
 
-def get_monthly_trend(
-    db: Session, year: Optional[int] = None,
-) -> list:
-    """按 (年,月) 聚合每月的总产量、直通率，返回按时间升序的趋势数据。
-    口径与列表页一致：sum(monthly_total_output) / sum(monthly_qualified_count) 计算直通率。
+def _iso_week_to_month(iso_year: int, iso_week: int) -> Tuple[int, int]:
+    """ISO 周年/周数 → 该周周四所在的自然月 (年, 月)。
+
+    ISO 周归属到其周四所在月（ISO 规定周四决定周年/周月），
+    月末边界周只计入一个月，不会在相邻两月重复统计。
     """
-    q = db.query(
-        MonthlyProduction.year,
-        MonthlyProduction.month,
-        func.sum(MonthlyProduction.monthly_total_output).label("out"),
-        func.sum(MonthlyProduction.monthly_qualified_count).label("q"),
-    ).group_by(MonthlyProduction.year, MonthlyProduction.month)
+    from datetime import date
+    try:
+        d = date.fromisocalendar(int(iso_year), int(iso_week), 4)
+        return d.year, d.month
+    except (TypeError, ValueError):
+        return int(iso_year or 0), 0
+
+
+def get_monthly_trend(
+    db: Session, year: Optional[int] = None, months_limit: int = 12,
+) -> dict:
+    """直接由周报(weekly_production)实时聚合指定年份的月度趋势。
+
+    口径（按用户确认）：
+    - 以“自然年”为单位，输出该年 1 月 → 当年最新有数据月份的连续月份，
+      中间无周报的月份补 0（1~8 月有数据、9 月新录入后，图表变为 1~9 月，以此类推）；
+    - 一年最多 12 个月，不做跨年滚动截断（避免把年初 1~2 月挤掉）；
+    - 周报的 ISO 周按“周四所在自然月”归属，月末跨月周只计入一个月；
+    - 直通率按 sum(合格) / sum(产量) 加权计算。
+    未指定 year 时默认当前自然年；当前年尚无任何周报时回退到最新有数据的年份。
+    """
+    rows = db.query(
+        WeeklyProduction.year,
+        WeeklyProduction.week_number,
+        func.sum(WeeklyProduction.total_output),
+        func.sum(WeeklyProduction.qualified_count),
+    ).group_by(WeeklyProduction.year, WeeklyProduction.week_number).all()
+
+    # 全部周报先按 (年, 月) 落桶（先不按 year 过滤，以便判断最新有数据年份）
+    buckets: Dict[Tuple[int, int], List[int]] = {}
+    for wy, ww, out, qual in rows:
+        y, m = _iso_week_to_month(wy, ww)
+        if not m:
+            continue
+        b = buckets.setdefault((y, m), [0, 0])
+        b[0] += int(out or 0)
+        b[1] += int(qual or 0)
+
+    today_year = beijing_now().year
+    years_with_data = sorted({y for (y, _m) in buckets})
     if year:
-        q = q.filter(MonthlyProduction.year == year)
-    q = q.order_by(MonthlyProduction.year, MonthlyProduction.month)
-    rows = q.all()
-    result = []
-    for y, m, o, qty in rows:
-        o_i   = int(o or 0)
-        q_i   = int(qty or 0)
-        rate  = round(q_i / o_i * 100, 2) if o_i > 0 else 0
-        result.append({
-            "year": y,
+        stat_year = int(year)
+    elif today_year in years_with_data:
+        stat_year = today_year
+    else:
+        stat_year = years_with_data[-1] if years_with_data else today_year
+
+    # 该年最新有数据的月份（一年上限 12）
+    months_with_data = sorted(m for (y, m) in buckets if y == stat_year)
+    last_month = min(max(months_with_data) if months_with_data else 0, int(months_limit))
+
+    items = []
+    year_out = year_qual = year_months = 0
+    for m in range(1, last_month + 1):
+        o_i, q_i = buckets.get((stat_year, m), [0, 0])
+        if o_i > 0:
+            year_months += 1
+        year_out += o_i
+        year_qual += q_i
+        items.append({
+            "year": stat_year,
             "month": m,
-            "label": f"{y}年{m}月",
+            "label": f"{stat_year}年{m}月",
             "total_output": o_i,
             "total_qualified": q_i,
-            "yield_rate": rate,
+            "yield_rate": round(q_i / o_i * 100, 2) if o_i > 0 else 0,
         })
-    return result
+
+    now = beijing_now()
+    current_month = next(
+        (it for it in items if it["year"] == now.year and it["month"] == now.month and it["total_output"] > 0),
+        None,
+    )
+    return {
+        "items": items,
+        "summary": {
+            "year": stat_year,
+            "total_output": year_out,
+            "total_qualified": year_qual,
+            "yield_rate": round(year_qual / year_out * 100, 2) if year_out > 0 else 0,
+            "months": year_months,
+        },
+        # 本月尚无周报时为 null，前端回退展示最新有数据的月份
+        "current_month": current_month,
+        "latest_month": next((it for it in reversed(items) if it["total_output"] > 0), None),
+    }
 
 
 # ============================================================

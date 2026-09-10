@@ -28,7 +28,7 @@
         :height="'calc(100vh - 210px)'"
       >
 
-        <el-table-column label="BUG ID" prop="bug_id" width="68" align="center" class-name="cell-clip" show-overflow-tooltip>
+        <el-table-column label="BUG ID" prop="bug_id" width="80" align="center" class-name="cell-clip" show-overflow-tooltip>
           <template #default="{ row }">
             <code style="display: inline-block; max-width: 100%; background: var(--primary-50); padding: 1px 5px; border-radius: 4px; font-size: 12px; line-height: 1.6; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;">{{ row.bug_id }}</code>
           </template>
