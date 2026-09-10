@@ -140,6 +140,7 @@
               <el-select v-model="form.status" style="width:100%;">
                 <el-option label="在线" value="在线" />
                 <el-option label="离线" value="离线" />
+                <el-option label="维护" value="维护" />
               </el-select>
             </el-form-item>
           </div>
@@ -228,13 +229,14 @@ const filterFields = computed(() => [
     options: [
       { label: '全部', value: '' },
       { label: '在线', value: '在线' },
-      { label: '离线', value: '离线' }
+      { label: '离线', value: '离线' },
+      { label: '维护', value: '维护' }
     ],
     autoSearch: true
   }
 ])
 
-const statusClass = (s) => ({ '在线':'normal', '离线':'fault' }[s] || 'muted')
+const statusClass = (s) => ({ '在线':'normal', '离线':'fault', '维护':'warn' }[s] || 'muted')
 
 const resetFilters = () => {
   filters.value = { keyword:'', line:'', status:'' }

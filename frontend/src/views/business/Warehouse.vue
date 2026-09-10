@@ -1,61 +1,82 @@
 <template>
   <div class="page">
-    <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;">
-        <span class="emoji">📦</span> 库房管理
-      </h1>
+    <div class="page-header">
+      <h1 class="page-title"><span class="emoji">📦</span> 库房管理</h1>
 
-      <!-- 搜索框：名称 / 型号 / 借用人 / 领用人，兼容扫码枪输入 -->
-      <el-input
-        v-model="keyword"
-        placeholder="名称 / 型号 / 借用人 / 领用人（支持扫码）"
-        clearable
-        style="width: 300px;"
-        @keyup.enter="onSearch"
-        @clear="onSearch"
-      >
-        <template #prefix><el-icon><Search /></el-icon></template>
-      </el-input>
-      <el-button type="primary" @click="onSearch"><el-icon style="margin-right:4px;"><Search /></el-icon>搜索</el-button>
-      <el-button @click="onReset"><el-icon style="margin-right:4px;"><RefreshRight /></el-icon>重置</el-button>
+      <div class="ph-right-group">
+        <el-input v-model="keyword" placeholder="名称 / 型号 / 借用人（支持扫码）" clearable
+          style="width: 300px;" @keyup.enter="onSearch" @clear="onSearch">
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-select v-model="stockStatusFilter" placeholder="全部状态" clearable style="width: 140px;" @change="onSearch">
+          <el-option label="在库 / 正常" value="in_stock" />
+          <el-option label="借出 / 领用" value="borrowed" />
+        </el-select>
+        <el-button @click="onSearch">搜索</el-button>
+        <el-button @click="onReset">重置</el-button>
 
-      <!-- 类型切换 -->
-      <el-radio-group v-model="typeFilter" @change="onSearch">
-        <el-radio-button value="">全部</el-radio-button>
-        <el-radio-button value="治具">🔧 治具</el-radio-button>
-        <el-radio-button value="耗材">🧴 耗材</el-radio-button>
-      </el-radio-group>
-
-      <template v-if="userStore.canEdit">
-        <el-button type="success" @click="openEdit(null)"><el-icon style="margin-right:4px;"><Plus /></el-icon>新增物品</el-button>
-        <el-button type="warning" @click="openImport"><el-icon style="margin-right:4px;"><Upload /></el-icon>批量导入</el-button>
-      </template>
+        <template v-if="userStore.canEdit">
+          <el-button @click="openImport">批量导入</el-button>
+          <el-button type="primary" @click="openEdit(null)">新增物品</el-button>
+        </template>
+      </div>
     </div>
 
     <div class="page-content wh-content">
+      <div class="wh-tabs-row">
+      <el-tabs v-model="activeTab" @tab-change="onTabChange" class="wh-tabs">
+        <el-tab-pane label="🔧 治具" name="治具" />
+        <el-tab-pane label="🧴 耗材" name="耗材" />
+      </el-tabs>
+      <el-button text @click="txDrawer = true">操作记录</el-button>
+    </div>
+
       <!-- 统计看板 -->
       <div class="wh-stats">
-        <div class="wh-stat clickable" :class="{ active: stockStatusFilter === '' && !lowStockOnly }" @click="filterByStatus('')">
-          <div class="wh-stat-num">{{ stats.total }}</div>
-          <div class="wh-stat-label">总物品</div>
-        </div>
-        <div class="wh-stat clickable" :class="{ active: stockStatusFilter === 'in_stock' }" @click="filterByStatus('in_stock')">
-          <div class="wh-stat-num ok">{{ stats.in_stock }}</div>
-          <div class="wh-stat-label">在库</div>
-        </div>
-        <div class="wh-stat clickable" :class="{ active: stockStatusFilter === 'borrowed' }" @click="filterByStatus('borrowed')">
-          <div class="wh-stat-num warn">{{ stats.borrowed_out }}</div>
-          <div class="wh-stat-label">借出 / 领用</div>
-        </div>
-        <div class="wh-stat clickable" :class="{ active: lowStockOnly }" @click="toggleLowStock">
-          <div class="wh-stat-num danger">{{ stats.low_stock }}</div>
-          <div class="wh-stat-label">低于预警 <el-icon style="vertical-align:-2px;"><ArrowDown /></el-icon></div>
-        </div>
+        <!-- 治具 -->
+        <template v-if="activeTab === '治具'">
+          <div class="wh-stat clickable" :class="{ active: stockStatusFilter === '' }" @click="filterByStatus('')">
+            <div class="wh-stat-num">{{ stats.total }}</div>
+            <div class="wh-stat-label">总治具</div>
+          </div>
+          <div class="wh-stat clickable" :class="{ active: stockStatusFilter === 'in_stock' }" @click="filterByStatus('in_stock')">
+            <div class="wh-stat-num ok">{{ stats.in_stock }}</div>
+            <div class="wh-stat-label">在库</div>
+          </div>
+          <div class="wh-stat clickable" :class="{ active: stockStatusFilter === 'borrowed' }" @click="filterByStatus('borrowed')">
+            <div class="wh-stat-num warn">{{ stats.borrowed_out }}</div>
+            <div class="wh-stat-label">借出</div>
+          </div>
+          <div class="wh-stat">
+            <div class="wh-stat-num" style="color:var(--c-text-mute)">{{ stats.repairing || 0 }}</div>
+            <div class="wh-stat-label">维修中</div>
+          </div>
+        </template>
+
+        <!-- 耗材 -->
+        <template v-else>
+          <div class="wh-stat clickable" :class="{ active: stockStatusFilter === '' }" @click="filterByStatus('')">
+            <div class="wh-stat-num">{{ stats.total }}</div>
+            <div class="wh-stat-label">总耗材</div>
+          </div>
+          <div class="wh-stat clickable" :class="{ active: stockStatusFilter === 'in_stock' }" @click="filterByStatus('in_stock')">
+            <div class="wh-stat-num ok">{{ stats.in_stock }}</div>
+            <div class="wh-stat-label">正常</div>
+          </div>
+          <div class="wh-stat clickable" :class="{ active: stockStatusFilter === 'low_stock' }" @click="filterByStatus('low_stock')">
+            <div class="wh-stat-num danger">{{ stats.low_stock }}</div>
+            <div class="wh-stat-label">低于预警</div>
+          </div>
+          <div class="wh-stat">
+            <div class="wh-stat-num" style="color:#DC2626">{{ stats.out_of_stock || 0 }}</div>
+            <div class="wh-stat-label">缺货</div>
+          </div>
+        </template>
       </div>
 
       <!-- 低库存预警条 -->
       <div v-if="lowItems.length" class="wh-warn-bar">
-        <span class="wh-warn-title"><span class="bi bi-exclamation-triangle-fill"></span> 低库存预警：</span>
+        <span class="wh-warn-title"><el-icon><WarningFilled /></el-icon> 低库存预警：</span>
         <div class="wh-warn-items">
           <span v-for="it in lowItems" :key="it.id" class="wh-warn-chip">
             {{ it.name }}
@@ -66,45 +87,55 @@
       </div>
 
       <!-- 物品列表 -->
+      <div class="wh-table-wrap">
       <el-table
         :data="items"
         v-loading="loading"
         stripe
         border
-        :height="'calc(100vh - 360px)'"
         style="width: 100%"
         empty-text="暂无数据"
-        :header-cell-style="{ fontWeight: 600, textAlign: 'center' }"
+        :header-cell-style="{ fontWeight: 600 }"
         @row-click="openDetail"
       >
-        <el-table-column label="物品名称" min-width="180" align="center" show-overflow-tooltip>
+        <el-table-column label="物品名称" min-width="180" align="left" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="wh-name">{{ row.name }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="型号/编号" prop="model" min-width="130" align="center" show-overflow-tooltip>
+        <el-table-column label="型号/编号" prop="model" min-width="130" align="left" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="row.model" style="font-family: Consolas, monospace;">{{ row.model }}</span>
             <span v-else style="color: var(--c-text-mute);">-</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="类型" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.part_type === '治具' ? 'primary' : 'success'" size="small" effect="light">
-              {{ row.part_type }}
-            </el-tag>
-          </template>
-        </el-table-column>
+        <!-- 治具专属列 -->
+        <template v-if="activeTab === '治具'">
+          <el-table-column label="总数" prop="total_qty" width="90" align="center" />
+          <el-table-column label="可用" width="90" align="center">
+            <template #default="{ row }"><b class="ok-text">{{ row.available_qty }}</b></template>
+          </el-table-column>
+          <el-table-column label="外借" width="90" align="center">
+            <template #default="{ row }">
+              <b :class="row.total_qty - row.available_qty > 0 ? 'warn-text' : ''">{{ row.total_qty - row.available_qty }}</b>
+            </template>
+          </el-table-column>
+        </template>
 
-        <el-table-column label="数量" width="120" align="center">
-          <template #default="{ row }">
-            <b :style="{ color: row.status === '缺货' ? '#DC2626' : 'var(--c-text)' }">{{ row.qty_text }}</b>
-          </template>
-        </el-table-column>
+        <!-- 耗材专属列 -->
+        <template v-else>
+          <el-table-column label="库存" width="100" align="center">
+            <template #default="{ row }">
+              <b :style="{ color: row.status === '缺货' ? '#DC2626' : 'var(--c-text)' }">{{ row.stock_qty }}</b>
+              <span style="font-size:12px;color:var(--c-text-mute)"> {{ row.unit }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="预警值" prop="warn_qty" width="90" align="center" />
+        </template>
 
-        <el-table-column label="货位" prop="location" width="110" align="center">
+        <el-table-column label="货位" prop="location" width="110" align="left">
           <template #default="{ row }">{{ row.location || '-' }}</template>
         </el-table-column>
 
@@ -114,23 +145,27 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="230" align="center" fixed="right">
+        <el-table-column label="操作" width="280" align="center" fixed="right">
           <template #default="{ row }">
             <template v-if="userStore.canEdit">
-              <!-- 治具：在库可借；部分借出时仍有余量可继续借、也可归还；全部借出只能归还 -->
+              <!-- 治具：在库/部分借出可借 -->
               <el-button v-if="row.part_type === '治具' && (row.status === '在库' || row.status === '部分借出')"
                 type="primary" link size="small" @click.stop="openBorrow(row)">借出</el-button>
+              <!-- 治具：已借出/部分借出可归还 -->
               <el-button v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')"
                 type="warning" link size="small" @click.stop="openReturn(row)">归还</el-button>
+              <!-- 治具：维修中显示文本 -->
               <span v-if="row.part_type === '治具' && row.status === '维修中'"
                 class="wh-repair-text">维修中</span>
-              <!-- 耗材 -->
+              <!-- 耗材：有库存可领用 -->
               <el-button v-if="row.part_type === '耗材' && row.stock_qty > 0"
                 type="primary" link size="small" @click.stop="openConsume(row)">领用</el-button>
+              <!-- 耗材：都可补货 -->
               <el-button v-if="row.part_type === '耗材'"
                 type="success" link size="small" @click.stop="openRestock(row)">补货</el-button>
-              <!-- 管理 -->
+              <!-- 公共：编辑 -->
               <el-button type="info" link size="small" @click.stop="openEdit(row)">编辑</el-button>
+              <!-- 公共：删除（仅管理员） -->
               <el-button v-if="userStore.isAdmin" type="danger" link size="small" @click.stop="handleDelete(row)">删除</el-button>
             </template>
             <span v-else style="color: var(--c-text-mute); font-size: 12px;">点击行查看详情</span>
@@ -143,20 +178,21 @@
           </el-empty>
         </template>
       </el-table>
+      </div>
 
       <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact />
     </div>
 
     <!-- 新增 / 编辑物品 -->
     <el-dialog v-model="editDialog" :title="editForm.id ? '编辑物品' : '新增物品'" width="560px" destroy-on-close>
-      <el-form :model="editForm" label-width="92px">
-        <el-form-item label="物品名称" required>
+      <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="92px">
+        <el-form-item label="物品名称" prop="name" required>
           <el-input v-model="editForm.name" placeholder="如：测试治具A / 高温胶带" maxlength="100" />
         </el-form-item>
         <el-form-item label="型号/编号">
           <el-input v-model="editForm.model" placeholder="设备型号或内部编号" maxlength="100" />
         </el-form-item>
-        <el-form-item label="类型" required>
+        <el-form-item label="类型" prop="part_type" required>
           <el-radio-group v-model="editForm.part_type" :disabled="!!editForm.id">
             <el-radio value="治具">🔧 治具</el-radio>
             <el-radio value="耗材">🧴 耗材</el-radio>
@@ -394,6 +430,40 @@
         <el-button @click="detailDialog = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 操作记录抽屉（可查询） -->
+    <el-drawer v-model="txDrawer" title="操作记录" size="800px" destroy-on-close @open="loadTxData">
+      <div class="tx-filter">
+        <el-input v-model="txKeyword" placeholder="物品名称 / 借领用人" clearable
+          style="width: 240px;" @keyup.enter="loadTxData" @clear="loadTxData">
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-select v-model="txTypeFilter" placeholder="操作类型" clearable style="width: 130px;" @change="loadTxData">
+          <el-option label="借出" value="借出" />
+          <el-option label="归还" value="归还" />
+          <el-option label="领用" value="领用" />
+          <el-option label="补货" value="补货" />
+        </el-select>
+        <el-button @click="loadTxData">查询</el-button>
+      </div>
+      <el-table :data="txRecords" v-loading="txLoading" stripe border size="small" empty-text="暂无记录"
+        :header-cell-style="{ fontWeight: 600 }">
+        <el-table-column label="时间" prop="created_at" width="155" align="center" />
+        <el-table-column label="操作" width="70" align="center">
+          <template #default="{ row }">
+            <el-tag :type="txTagType(row.tx_type)" size="small">{{ row.tx_type }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="物品名称" prop="part_name" min-width="140" show-overflow-tooltip />
+        <el-table-column label="数量" prop="qty" width="60" align="center" />
+        <el-table-column label="借/领用人" prop="operator" width="100" show-overflow-tooltip />
+        <el-table-column label="线体" prop="line" width="80" align="center" />
+        <el-table-column label="备注" prop="remark" min-width="120" show-overflow-tooltip />
+      </el-table>
+      <div style="margin-top: 16px;">
+        <CommonPagination v-model:page="txPage" v-model:page-size="txPageSize" :total="txTotal" compact />
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -401,7 +471,7 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { warehouseApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, RefreshRight, Plus, ArrowDown, Upload, UploadFilled } from '@element-plus/icons-vue'
+import { Search, RefreshRight, Plus, ArrowDown, Upload, UploadFilled, List, WarningFilled } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 
@@ -417,12 +487,41 @@ const page = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
 const keyword = ref('')
-const typeFilter = ref('')
-const lowStockOnly = ref(false)
-// 统计卡联动：'' 全部 / 'in_stock' 在库 / 'borrowed' 借出领用
+const activeTab = ref('治具')
+// 统计卡联动：'' 全部 / 'in_stock' 在库 / 'borrowed' 借出领用 / 'low_stock' 低于预警
 const stockStatusFilter = ref('')
 const stats = reactive({ total: 0, in_stock: 0, borrowed_out: 0, low_stock: 0 })
 const lowItems = ref([])
+
+// 操作记录抽屉（可查询）
+const txDrawer = ref(false)
+const txRecords = ref([])
+const txKeyword = ref('')
+const txTypeFilter = ref('')
+const txPage = ref(1)
+const txPageSize = ref(20)
+const txTotal = ref(0)
+const txLoading = ref(false)
+
+const loadTxData = async () => {
+  txLoading.value = true
+  try {
+    const params = { page: txPage.value, page_size: txPageSize.value }
+    if (txKeyword.value) params.keyword = txKeyword.value
+    if (txTypeFilter.value) params.tx_type = txTypeFilter.value
+    const res = await warehouseApi.transactions(params)
+    txRecords.value = res.data?.items || []
+    txTotal.value = res.data?.total || 0
+  } catch (e) {
+    console.error('加载操作记录失败:', e)
+    txRecords.value = []
+    txTotal.value = 0
+  } finally {
+    txLoading.value = false
+  }
+}
+
+watch([txPage, txPageSize], () => { if (txDrawer.value) loadTxData() })
 
 const statusTagType = (row) => {
   if (row.part_type === '治具') {
@@ -445,8 +544,7 @@ const loadData = async () => {
   try {
     const params = { page: page.value, page_size: pageSize.value }
     if (keyword.value) params.keyword = keyword.value
-    if (typeFilter.value) params.part_type = typeFilter.value
-    if (lowStockOnly.value) params.low_stock = true
+    params.part_type = activeTab.value
     if (stockStatusFilter.value) params.stock_status = stockStatusFilter.value
     const res = await warehouseApi.list(params)
     items.value = res.data?.items || []
@@ -461,34 +559,37 @@ const loadData = async () => {
 const refreshAll = () => { loadData(); loadStats() }
 
 const onSearch = () => { page.value = 1; loadData() }
+const onTabChange = () => {
+  page.value = 1
+  stockStatusFilter.value = ''
+  refreshAll()
+}
 const onReset = () => {
   keyword.value = ''
-  typeFilter.value = ''
-  lowStockOnly.value = false
   stockStatusFilter.value = ''
   page.value = 1
   loadData()
 }
-// 统计卡点击：再次点击同一筛选则取消（回到全部）；与“低于预警”互斥
+// 统计卡点击：再次点击同一筛选则取消（回到全部）
 const filterByStatus = (s) => {
   stockStatusFilter.value = stockStatusFilter.value === s ? '' : s
-  if (stockStatusFilter.value) lowStockOnly.value = false
   page.value = 1
   loadData()
 }
-const toggleLowStock = () => {
-  lowStockOnly.value = !lowStockOnly.value
-  if (lowStockOnly.value) stockStatusFilter.value = ''
-  page.value = 1
-  loadData()
-}
-
 watch([page, pageSize], () => loadData())
 
 // ---------------- 新增 / 编辑 ----------------
 const editDialog = ref(false)
+const editFormRef = ref(null)
 const saving = ref(false)
-const editForm = reactive({})
+const editRules = {
+  name: [{ required: true, message: '请填写物品名称', trigger: 'blur' }],
+  part_type: [{ required: true, message: '请选择类型', trigger: 'change' }],
+}
+const editForm = reactive({
+  id: null, name: '', model: '', part_type: '治具',
+  total_qty: 1, unit: '个', location: '', warn_qty: 0, supplier: '', in_repair: false,
+})
 
 const openEdit = (row) => {
   if (row) {
@@ -507,7 +608,11 @@ const openEdit = (row) => {
 }
 
 const submitEdit = async () => {
-  if (!editForm.name?.trim()) { toast.error('请填写物品名称'); return }
+  try {
+    await editFormRef.value.validate()
+  } catch {
+    return
+  }
   saving.value = true
   try {
     const payload = { ...editForm }
@@ -682,19 +787,68 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.wh-content { padding-bottom: 48px; }
+/* 间距 / 圆角 Token */
+:root {
+  --sp-1: 8px; --sp-2: 12px; --sp-3: 16px; --sp-4: 24px;
+  --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-pill: 999px;
+}
+
+/* 顶部标题栏（与筛选合并为一行） */
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px var(--sp-2);
+  border-bottom: 1px solid var(--c-divider);
+  flex-wrap: wrap;
+}
+.page-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.ph-right-group {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* 内容区 — flex 撑满 */
+.wh-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+  padding-bottom: 0;
+}
+.wh-tabs { flex-shrink: 0; }
+.wh-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.wh-stats { flex-shrink: 0; }
+.wh-warn-bar { flex-shrink: 0; }
+.wh-table-wrap { flex: 1; min-height: 0; }
+.wh-table-wrap :deep(.el-table) { height: 100%; }
 
 /* 统计看板 */
 .wh-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: var(--sp-2);
   margin-bottom: 10px;
 }
 .wh-stat {
   background: #fff;
   border: 1px solid var(--c-divider);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -705,8 +859,8 @@ onMounted(() => {
   box-shadow: 0 2px 6px rgba(15, 23, 42, .03);
 }
 .wh-stat.clickable { cursor: pointer; transition: all .15s; }
-.wh-stat.clickable:hover { border-color: #F59E0B; box-shadow: 0 4px 12px rgba(245, 158, 11, .15); }
-.wh-stat.active { border-color: #F59E0B; background: #FFFBEB; }
+.wh-stat.clickable:hover { border-color: #93C5FD; box-shadow: 0 4px 12px rgba(59,130,246,.10); }
+.wh-stat.active { border-color: #3B82F6; background: #EFF6FF; }
 .wh-stat-num { font-size: 26px; font-weight: 800; color: var(--c-text); line-height: 1; }
 .wh-stat-num.ok { color: #059669; }
 .wh-stat-num.warn { color: #D97706; }
@@ -717,32 +871,40 @@ onMounted(() => {
 .wh-warn-bar {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 8px 14px;
+  gap: var(--sp-1);
+  padding: var(--sp-1) 14px;
   margin-bottom: 10px;
   background: #FEF2F2;
   border: 1px solid #FECACA;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   font-size: 13px;
 }
-.wh-warn-title { color: #DC2626; font-weight: 700; white-space: nowrap; padding-top: 3px; }
-.wh-warn-items { display: flex; flex-wrap: wrap; gap: 8px; }
+.wh-warn-title { color: #DC2626; font-weight: 700; white-space: nowrap; padding-top: 3px; display: flex; align-items: center; gap: 4px; }
+.wh-warn-items { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
 .wh-warn-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   background: #fff;
   border: 1px solid #FECACA;
-  border-radius: 999px;
-  padding: 2px 6px 2px 12px;
+  border-radius: var(--r-pill);
+  padding: 2px 6px 2px var(--sp-2);
   color: var(--c-text-2);
 }
 .wh-warn-chip b { color: #DC2626; }
 
 /* 表格 */
 .wh-name { font-weight: 600; color: var(--c-text); }
-.wh-borrower { color: #D97706; font-size: 12px; }
 .wh-repair-text { color: var(--c-text-mute); font-size: 12px; }
+
+/* 操作记录抽屉筛选 */
+.tx-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
 
 .wh-form-hint { margin-left: 10px; font-size: 12px; color: var(--c-text-mute); }
 .ok-text { color: #059669; }
@@ -753,7 +915,7 @@ onMounted(() => {
 .wh-action-info {
   background: #F8FAFC;
   border: 1px solid var(--c-divider);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: 10px 14px;
   margin-bottom: 14px;
   font-size: 13px;
@@ -767,7 +929,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: var(--sp-2);
 }
 .wh-detail-name { font-size: 17px; font-weight: 700; color: var(--c-text); }
 .wh-detail-block { margin-top: 14px; }
@@ -782,7 +944,7 @@ onMounted(() => {
   padding: 10px 14px;
   background: #FEF2F2;
   border: 1px solid #FECACA;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   color: #DC2626;
   font-size: 13px;
   font-weight: 600;
@@ -793,7 +955,7 @@ onMounted(() => {
 .wh-import-result {
   margin-top: 14px;
   border: 1px solid var(--c-divider);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: 10px 14px;
   background: #F8FAFC;
 }

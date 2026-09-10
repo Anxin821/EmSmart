@@ -376,7 +376,7 @@ const activeLines = computed(() =>
       const racks   = line.aging_racks ?? []
       const aps     = line.wifi_aps ?? []
       const sOff = servers.filter(s => s.status !== '在线').length
-      const rOff = racks.filter(a => a.status !== '正常').length
+      const rOff = racks.filter(a => a.status !== '在线').length
       const aOff = aps.filter(ap => ap.status !== '在线').length
       const total   = servers.length + racks.length + aps.length
       const offline = sOff + rOff + aOff

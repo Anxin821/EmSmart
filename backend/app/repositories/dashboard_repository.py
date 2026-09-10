@@ -235,7 +235,7 @@ def network_summary(db: Session) -> Dict[str, Any]:
         result[line] = {
             "line": line,
             "servers": {"total": 0, "online": 0, "offline": 0, "maintenance": 0},
-            "aging_racks": {"total": 0, "normal": 0, "fault": 0},
+            "aging_racks": {"total": 0, "online": 0, "offline": 0, "maintenance": 0},
             "wifi_aps": {"total": 0, "online": 0, "offline": 0},
         }
 
@@ -252,10 +252,12 @@ def network_summary(db: Session) -> Dict[str, Any]:
     for line, status, cnt in aging_data:
         if line in result:
             result[line]["aging_racks"]["total"] += cnt
-            if status == "正常":
-                result[line]["aging_racks"]["normal"] += cnt
-            else:
-                result[line]["aging_racks"]["fault"] += cnt
+            if status == "在线":
+                result[line]["aging_racks"]["online"] += cnt
+            elif status == "离线":
+                result[line]["aging_racks"]["offline"] += cnt
+            elif status == "维护":
+                result[line]["aging_racks"]["maintenance"] += cnt
 
     for line, status, cnt in ap_data:
         if line in result:
@@ -265,7 +267,7 @@ def network_summary(db: Session) -> Dict[str, Any]:
             elif status == "离线":
                 result[line]["wifi_aps"]["offline"] += cnt
 
-    total_online = sum(v["servers"]["online"] + v["aging_racks"]["normal"] + v["wifi_aps"]["online"] for v in result.values())
+    total_online = sum(v["servers"]["online"] + v["aging_racks"]["online"] + v["wifi_aps"]["online"] for v in result.values())
     total_all = sum(v["servers"]["total"] + v["aging_racks"]["total"] + v["wifi_aps"]["total"] for v in result.values())
 
     return {
@@ -490,8 +492,8 @@ def network_dashboard(db: Session) -> Dict[str, Any]:
 
     online_servers = sum(1 for s in servers if s.status == "在线")
     offline_servers = sum(1 for s in servers if s.status == "离线")
-    online_aging = sum(1 for a in aging_racks if a.status == "正常")
-    offline_aging = sum(1 for a in aging_racks if a.status != "正常")
+    online_aging = sum(1 for a in aging_racks if a.status == "在线")
+    offline_aging = sum(1 for a in aging_racks if a.status == "离线")
     online_aps = sum(1 for ap in wifi_aps if ap.status == "在线")
     offline_aps = sum(1 for ap in wifi_aps if ap.status == "离线")
 
@@ -505,7 +507,7 @@ def network_dashboard(db: Session) -> Dict[str, Any]:
         if s.status == "离线":
             offline_list.append({"type": "服务器", "name": s.name, "line": s.production_line, "status": s.status, "ip": s.ip_address})
     for a in aging_racks:
-        if a.status != "正常":
+        if a.status == "离线":
             offline_list.append({"type": "老化架", "name": a.name, "line": a.production_line, "status": a.status, "ip": a.ip_address})
     for ap in wifi_aps:
         if ap.status == "离线":

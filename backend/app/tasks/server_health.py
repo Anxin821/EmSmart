@@ -59,6 +59,9 @@ async def check_server_health(get_session) -> None:
             for s in servers:
                 try:
                     ip = (s.ip_address or "").strip()
+                    # 手动设为"维护"的设备不做网络检测，保留维护状态
+                    if s.status == "维护":
+                        continue
                     if ip:
                         online = _tcp_open(ip, 22, 0.6) or _ping(ip, 400)
                         new_status = "在线" if online else "离线"

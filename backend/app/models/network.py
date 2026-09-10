@@ -38,7 +38,7 @@ class AgingRack(Base):
     ip_address = Column(String(50))
     total_slots = Column(Integer, nullable=False, default=0)
     used_slots = Column(Integer, nullable=False, default=0)
-    status = Column(String(20), nullable=False, default="正常")
+    status = Column(String(20), nullable=False, default="在线")
     responsible_person = Column(String(50))
     created_at = Column(DateTime, default=beijing_now)
     updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)

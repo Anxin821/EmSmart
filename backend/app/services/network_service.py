@@ -115,7 +115,7 @@ def _ping_and_update_all(db: Session):
         if s.ip_address:
             targets.append(("服务器", s, s.name or s.server_id, s.ip_address, s.production_line))
     for r in db.query(AgingRack).all():
-        if r.ip_address:
+        if r.ip_address and r.status != "维护":
             targets.append(("老化架", r, r.name or r.rack_id, r.ip_address, r.production_line))
     for ap in db.query(WifiAp).all():
         if ap.ip_address:
@@ -138,9 +138,9 @@ def _ping_and_update_all(db: Session):
                 stats["servers_online" if alive else "servers_offline"] += 1
                 status_text = "在线" if alive else "离线"
             elif device_type == "老化架":
-                obj.status = "正常" if alive else "故障"
+                obj.status = "在线" if alive else "离线"
                 stats["racks_online" if alive else "racks_offline"] += 1
-                status_text = "正常" if alive else "故障"
+                status_text = "在线" if alive else "离线"
             else:
                 obj.status = "在线" if alive else "离线"
                 stats["aps_online" if alive else "aps_offline"] += 1
@@ -159,7 +159,7 @@ def _ping_and_update_all(db: Session):
 
 
 def check_all_servers(db: Session, request, username: str):
-    """一键检测：服务器 + 老化架 + AP 全量 Ping（ping 通=在线，不通=离线/故障），
+    """一键检测：服务器 + 老化架 + AP 全量 Ping（ping 通=在线，不通=离线），
     并自动对账告警/钉钉通知。返回每台设备的检测明细供看板实时展示。
 
     函数名保持兼容（路由 /network/servers/check-all 与前端 networkApi.checkAll 均调用它）。
@@ -411,7 +411,7 @@ def _network_device_states(db: Session):
     for s in db.query(Server).all():
         states.append(("服务器", f"服务器:{s.server_id}", s.name, s.production_line, s.ip_address, s.status == "离线"))
     for r in db.query(AgingRack).all():
-        states.append(("老化架", f"老化架:{r.rack_id}", r.name, r.production_line, r.ip_address, r.status != "正常"))
+        states.append(("老化架", f"老化架:{r.rack_id}", r.name, r.production_line, r.ip_address, r.status == "离线"))
     for ap in db.query(WifiAp).all():
         states.append(("WiFi AP", f"WiFi AP:{ap.ap_id}", ap.ssid, ap.production_line, ap.ip_address, ap.status == "离线"))
     return states
@@ -576,10 +576,10 @@ def monitor_tick(db: Session) -> int:
     每轮无论设备状态是否变化都写入 last_monitor_tick 时间戳，供看板确认巡检在跑。
     """
     for r in db.query(AgingRack).all():
-        if r.ip_address:
-            r.status = "正常" if _ping_device(r.ip_address) else "故障"
+        if r.ip_address and r.status != "维护":
+            r.status = "在线" if _ping_device(r.ip_address) else "离线"
     for ap in db.query(WifiAp).all():
-        if ap.ip_address:
+        if ap.ip_address and ap.status != "维护":
             ap.status = "在线" if _ping_device(ap.ip_address) else "离线"
     tick_row = db.query(Setting).filter(Setting.key == "last_monitor_tick").first()
     if tick_row:

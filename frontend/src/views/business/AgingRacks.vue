@@ -124,8 +124,9 @@
           <div class="col-6">
             <el-form-item label="状态">
               <el-select v-model="form.status" style="width:100%;">
-                <el-option label="正常" value="正常" />
-                <el-option label="故障" value="故障" />
+                <el-option label="在线" value="在线" />
+                <el-option label="离线" value="离线" />
+                <el-option label="维护" value="维护" />
               </el-select>
             </el-form-item>
           </div>
@@ -179,7 +180,7 @@ const saving = ref(false)
 const editRow = ref(null)
 const form = ref({
   rack_id: '', name: '', production_line: '1线', location: '',
-  ip_address: '', total_slots: 40, used_slots: 0, status: '正常', responsible_person: ''
+  ip_address: '', total_slots: 40, used_slots: 0, status: '在线', responsible_person: ''
 })
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
@@ -212,14 +213,15 @@ const filterFields = computed(() => [
     width: 100,
     options: [
       { label: '全部', value: '' },
-      { label: '正常', value: '正常' },
-      { label: '故障', value: '故障' }
+      { label: '在线', value: '在线' },
+      { label: '离线', value: '离线' },
+      { label: '维护', value: '维护' }
     ],
     autoSearch: true
   }
 ])
 
-const statusClass = (s) => ({ '正常':'normal', '故障':'fault' }[s] || 'muted')
+const statusClass = (s) => ({ '在线':'normal', '离线':'fault', '维护':'warn' }[s] || 'muted')
 
 const resetFilters = () => {
   filters.value = { keyword:'', line:'', status:'' }
@@ -274,7 +276,7 @@ const openCreateModal = () => {
   editRow.value = null
   form.value = {
     rack_id: '', name: '', production_line: '1线', location: '',
-    ip_address: '', total_slots: 40, used_slots: 0, status: '正常', responsible_person: ''
+    ip_address: '', total_slots: 40, used_slots: 0, status: '在线', responsible_person: ''
   }
   formModalVisible.value = true
 }
@@ -290,7 +292,7 @@ const openEditModal = (row) => {
     ip_address: row.ip_address ?? '',
     total_slots: typeof row.total_slots === 'number' ? row.total_slots : 40,
     used_slots: typeof row.used_slots === 'number' ? row.used_slots : 0,
-    status: row.status ?? '正常',
+    status: row.status ?? '在线',
     responsible_person: row.responsible_person ?? '',
   }
   formModalVisible.value = true
