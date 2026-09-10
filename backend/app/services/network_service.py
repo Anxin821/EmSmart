@@ -418,11 +418,14 @@ def _network_device_states(db: Session):
 
 
 def _device_alert_title(device_type: str, name: str, line: str, ip: str = "") -> str:
-    """告警标题：产线+设备名拼接（如“8线下载WiFi WiFi异常报警！！！”）。"""
+    """告警标题：产线+设备名拼接（如"8线下载WiFi异常报警！！！"）。
+    WiFi AP 名称通常已含"WiFi"（如"下载WiFi"），不再追加设备类型后缀。"""
     if device_type == "未知设备" or not name:
         return f"未知设备（{ip}）异常报警！！！"
     head = f"{line or ''}{name}"
-    kind = {"WiFi AP": "WiFi", "老化架": "老化架", "服务器": "服务器"}.get(device_type, device_type)
+    if device_type == "WiFi AP":
+        return f"{head}异常报警！！！"
+    kind = {"老化架": "老化架", "服务器": "服务器"}.get(device_type, device_type)
     return f"{head} {kind}异常报警！！！"
 
 

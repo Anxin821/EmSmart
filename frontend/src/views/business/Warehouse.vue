@@ -108,12 +108,9 @@
           <template #default="{ row }">{{ row.location || '-' }}</template>
         </el-table-column>
 
-        <el-table-column label="状态" min-width="150" align="center">
+        <el-table-column label="状态" min-width="110" align="center">
           <template #default="{ row }">
             <el-tag :type="statusTagType(row)" size="small">{{ row.status }}</el-tag>
-            <span v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')" class="wh-borrower">
-              （{{ row.current_borrower || '有借出未还' }}）
-            </span>
           </template>
         </el-table-column>
 

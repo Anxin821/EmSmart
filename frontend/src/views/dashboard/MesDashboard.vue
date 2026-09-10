@@ -101,7 +101,7 @@
     <el-dialog
       v-model="openBugModalVisible"
       :title="openBugTitle"
-      width="900px"
+      width="1100px"
       align-center
       destroy-on-close
     >
@@ -131,7 +131,7 @@
     <el-dialog
       v-model="overdueReqModalVisible"
       :title="overdueReqTitle"
-      width="900px"
+      width="1100px"
       align-center
       destroy-on-close
     >

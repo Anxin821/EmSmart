@@ -181,6 +181,18 @@ def get_detail(db: Session, part_id: int) -> Optional[dict]:
     return {"part": _part_to_dict(p), "transactions": [_tx_to_dict(t) for t in txs]}
 
 
+def list_transactions(db: Session, page: int = 1, page_size: int = 50,
+                      tx_type: Optional[str] = None) -> Tuple[List[dict], int]:
+    """查询所有物品的借出/领用/归还/补货流水（按时间倒序）。"""
+    q = db.query(PartTransaction)
+    if tx_type in ("借出", "归还", "领用", "补货"):
+        q = q.filter(PartTransaction.tx_type == tx_type)
+    total = q.count()
+    items = (q.order_by(PartTransaction.id.desc())
+              .offset((page - 1) * page_size).limit(page_size).all())
+    return [_tx_to_dict(t) for t in items], total
+
+
 # ---------------- CRUD ----------------
 def create_part(db: Session, data: dict, request, username: str) -> dict:
     name = (data.get("name") or "").strip()

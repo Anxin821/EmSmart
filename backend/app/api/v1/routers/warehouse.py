@@ -108,6 +108,34 @@ def part_detail(
     return ApiResponse(data=detail)
 
 
+@router.get("/parts/{part_id}/transactions")
+def list_part_transactions(
+    part_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """查询指定物品的操作流水。"""
+    items, total = service.list_transactions(db, page=page, page_size=page_size)
+    # 只返回该物品的记录
+    part_txs = [t for t in items if t["part_id"] == part_id]
+    return ApiResponse(data=PaginatedData(total=len(part_txs), page=page, page_size=page_size, items=part_txs))
+
+
+@router.get("/transactions")
+def list_all_transactions(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    tx_type: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """查询所有物品的借出/领用/归还/补货流水。"""
+    items, total = service.list_transactions(db, page=page, page_size=page_size, tx_type=tx_type)
+    return ApiResponse(data=PaginatedData(total=total, page=page, page_size=page_size, items=items))
+
+
 @router.post("/parts/{part_id}/borrow")
 def borrow_part(
     part_id: int,

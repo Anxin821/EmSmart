@@ -20,4 +20,6 @@ export const warehouseApi = {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 60000,
   }),
+  // 借出/领用操作流水（全部物品）
+  transactions: (params) => api.get('/warehouse/transactions', { params }),
 }
