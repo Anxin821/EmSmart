@@ -55,14 +55,6 @@
         </template>
       </el-table-column>
 
-      <el-table-column prop="cpu_usage" label="CPU" width="80" align="center">
-        <template #default="{ row }">{{ row.cpu_usage || 0 }}%</template>
-      </el-table-column>
-
-      <el-table-column prop="memory_usage" label="内存" width="80" align="center">
-        <template #default="{ row }">{{ row.memory_usage || 0 }}%</template>
-      </el-table-column>
-
       <el-table-column prop="responsible_person" label="负责人" min-width="90" align="center" show-overflow-tooltip>
         <template #default="{ row }">{{ row.responsible_person || '-' }}</template>
       </el-table-column>
