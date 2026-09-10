@@ -7,7 +7,6 @@
         {{ exporting ? '导出中...' : '导出PPT' }}
       </button>
     </Teleport>
-
     <div class="cockpit">
     <!-- KPI 指标：BUG修复率 / 需求完成率 / 未关闭BUG / 延期需求 -->
     <div class="stat-grid">
@@ -16,7 +15,6 @@
       <StatCard centered color="red" icon="bi bi-exclamation-octagon-fill" :num="openBugCount" label="未关闭BUG" clickable @click="showOpenBugsModal(null)" />
       <StatCard centered color="yellow" icon="bi bi-alarm-fill" :num="overdueReqCount" label="延期需求" clickable @click="showOverdueReqModal(null)" />
     </div>
-
     <!-- 两张堆叠柱状图 -->
     <div class="card-grid-2">
       <section class="page-section chart-card">
@@ -32,7 +30,6 @@
           </div>
         </div>
       </section>
-
       <section class="page-section chart-card">
         <header class="section-head">
           <h2 class="sec-title">需求月度状态分布</h2>
@@ -47,7 +44,6 @@
         </div>
       </section>
     </div>
-
     <!-- 底部 2 块：风险 + 里程碑 -->
     <div class="card-grid-2">
       <section class="page-section risk-card">
@@ -74,7 +70,6 @@
           </ul>
         </div>
       </section>
-
       <section class="page-section milestone-card">
         <header class="section-head">
           <h2 class="sec-title"><span class="sec-emoji ok">✅</span>本月里程碑 & 下月承诺</h2>
@@ -96,7 +91,6 @@
       </section>
     </div>
     </div>
-
     <!-- 未关闭 BUG 弹窗 -->
     <el-dialog
       v-model="openBugModalVisible"
@@ -108,16 +102,20 @@
     >
       <el-table :data="openBugRecords" stripe border style="width:100%;" max-height="56vh" empty-text="暂无未关闭 BUG">
         <el-table-column prop="bug_id" label="BUG ID" width="130" align="center" show-overflow-tooltip />
-        <el-table-column prop="title" label="标题" min-width="200" align="left" show-overflow-tooltip />
+        <el-table-column prop="title" label="标题" min-width="200" align="center" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.title || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="severity" label="严重等级" width="90" align="center">
           <template #default="s"><span :class="'status-badge ' + getStatusClass(cleanStatus(s.row.severity))">{{ cleanStatus(s.row.severity) }}</span></template>
         </el-table-column>
         <el-table-column prop="module" label="模块" width="110" align="center" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="90" align="center" />
-        <el-table-column prop="discoverer" label="发现人" width="90" align="center" />
-        <el-table-column prop="assignee" label="指派给" width="90" align="center" />
-        <el-table-column prop="deadline" label="截止日期" width="110" align="center" />
-        <el-table-column label="录入时间" width="150" align="center">
+        <el-table-column prop="discoverer" label="发现人" width="90" align="center" show-overflow-tooltip />
+        <el-table-column prop="assignee" label="指派给" width="90" align="center" show-overflow-tooltip />
+        <el-table-column prop="deadline" label="截止日期" width="110" align="center" show-overflow-tooltip />
+        <el-table-column label="录入时间" width="150" align="center" show-overflow-tooltip>
           <template #default="s">{{ formatTime(s.row.created_at) }}</template>
         </el-table-column>
       </el-table>
@@ -127,7 +125,6 @@
         </div>
       </template>
     </el-dialog>
-
     <!-- 延期需求 弹窗 -->
     <el-dialog
       v-model="overdueReqModalVisible"
@@ -139,13 +136,18 @@
     >
       <el-table :data="overdueReqRecords" stripe border style="width:100%;" max-height="56vh" empty-text="暂无延期需求">
         <el-table-column prop="request_id" label="需求ID" width="130" align="center" show-overflow-tooltip />
-        <el-table-column prop="title" label="标题" min-width="200" align="left" show-overflow-tooltip />
+        <!-- ========== 修改：延期需求标题列改为插槽 ========== -->
+        <el-table-column prop="title" label="标题" min-width="200" align="center" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.title || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="priority" label="优先级" width="90" align="center" />
         <el-table-column prop="status" label="状态" width="100" align="center" />
-        <el-table-column prop="submitter" label="提交人" width="90" align="center" />
-        <el-table-column prop="assignee" label="指派给" width="90" align="center" />
-        <el-table-column prop="expected_date" label="期望日期" width="110" align="center" />
-        <el-table-column label="录入时间" width="150" align="center">
+        <el-table-column prop="submitter" label="提交人" width="90" align="center" show-overflow-tooltip />
+        <el-table-column prop="assignee" label="指派给" width="90" align="center" show-overflow-tooltip />
+        <el-table-column prop="expected_date" label="期望日期" width="110" align="center" show-overflow-tooltip />
+        <el-table-column label="录入时间" width="150" align="center" show-overflow-tooltip>
           <template #default="s">{{ formatTime(s.row.created_at) }}</template>
         </el-table-column>
       </el-table>
@@ -155,10 +157,8 @@
         </div>
       </template>
     </el-dialog>
-
   </div>
 </template>
-
 <script setup>
 import { ref, computed, onMounted, nextTick, onBeforeUnmount, getCurrentInstance } from 'vue'
 import * as echarts from 'echarts'
@@ -166,15 +166,12 @@ import { mesApi } from '@/api'
 import StatCard from '@/components/common/StatCard.vue'
 import { ElMessage } from 'element-plus'
 import { createPresentation, addFullImageSlide, savePresentation, captureElement } from '@/utils/pptExport'
-
 const data = ref(null)
-
 // KPI 派生指标：按真实 BUG 列表计算，和弹窗保持一致。
 const openBugCount = ref(0)
 const overdueReqCount = ref(0)
 const exporting = ref(false)
 let cBugs = null, cReqs = null
-
 // 未关闭 BUG 弹窗数据
 const openBugModalVisible = ref(false)
 const openBugTitle = ref('未关闭 BUG')
@@ -184,7 +181,6 @@ const openBugLoading = ref(false) // 防止重复打开
 const openBugLastOpen = ref(0)    // 时间戳防抖
 // 全局防重复（跨组件实例）
 if (typeof window !== 'undefined' && !window.__openBugDialog) window.__openBugDialog = false
-
 // 延期需求 弹窗数据
 const overdueReqModalVisible = ref(false)
 const overdueReqTitle = ref('延期需求')
@@ -193,7 +189,6 @@ const overdueReqTotal = ref(0)
 const overdueReqLoading = ref(false) // 防止重复打开
 const overdueReqLastOpen = ref(0)    // 时间戳防抖
 if (typeof window !== 'undefined' && !window.__overdueReqDialog) window.__overdueReqDialog = false
-
 // 工具：风险/里程碑悬浮查看的完整文本（卡片内最多显示 2~3 行）
 const riskFullText = (r) => {
   if (!r) return ''
@@ -205,7 +200,6 @@ const milestoneFullText = computed(() => {
   if (!m) return ''
   return `(${m.items?.join('、') || ''}${(m.count || 0) > (m.items?.length || 0) ? ' 等' : ''})`
 })
-
 // 工具：清理字段显示
 const cleanStatus = (v) => (v == null ? '-' : String(v))
 // 时间格式化（与需求时间保持一致，显示到分钟）
@@ -214,7 +208,6 @@ const getStatusClass = (s) => {
   const map = { '致命': 'severe', '严重': 'severe', '一般': 'muted', '建议': 'muted', '确认新增': 'severe', '修复中': 'progress', '解决关闭': 'normal' }
   return map[s] || 'muted'
 }
-
 // 点击显示未关闭 BUG 列表（与杀毒超时弹窗一致风格）
 const showOpenBugsModal = async () => {
   const now = Date.now()
@@ -250,7 +243,6 @@ const showOpenBugsModal = async () => {
     setTimeout(() => { openBugLastOpen.value = 0 }, 1500)
   }
 }
-
 // 点击显示延期需求（按期望日期计算 overdue，与风险数据一致）
 const showOverdueReqModal = async () => {
   const now = Date.now()
@@ -268,14 +260,11 @@ const showOverdueReqModal = async () => {
   overdueReqModalVisible.value = true
   overdueReqRecords.value = []
   overdueReqTotal.value = 0
-
   const params = { page: 1, page_size: 100 }
-
   // 先直接获取全部（客户端过滤更可靠），再按需尝试后端筛选作为备用
   try {
     const res = await mesApi.devreqs(params)
     const items = (res && (res.data?.items || res.items || res.data || [])) || []
-
     const todayStart = new Date(); todayStart.setHours(0,0,0,0)
     const list = items.filter(i => {
       const expectedRaw = i.expected_date || i.expected || ''
@@ -290,9 +279,7 @@ const showOverdueReqModal = async () => {
       expectedDate.setHours(0,0,0,0)
       return expectedDate.getTime() < todayStart.getTime() && (i.status || '') !== '上线'
     })
-
     console.debug('showOverdueReqModal: fetched', items.length, 'items, filtered', list.length)
-
     if (list.length > 0) {
       overdueReqRecords.value = list
       overdueReqTotal.value = list.length
@@ -343,12 +330,10 @@ const showOverdueReqModal = async () => {
     setTimeout(() => { overdueReqLastOpen.value = 0 }, 1500)
   }
 }
-
 const resize = () => {
   cBugs && cBugs.resize()
   cReqs && cReqs.resize()
 }
-
 let loading = false   // 防止轮询与手动刷新并发
 const loadData = async () => {
   if (loading) return
@@ -359,15 +344,12 @@ const loadData = async () => {
     loading = false
   }
 }
-
 const doLoadData = async () => {
   try {
     const res = await mesApi.dashboard()
     data.value = res.data || null
-
     // 未关闭 BUG 数：以看板聚合数据为准（与 P0级BUG 同源），保证 KPI 与风险块一致
     openBugCount.value = data.value?.unclosed_bugs ?? 0
-
     // 同步计算延期需求数：以 devreqs 接口为准，按期望日期且非上线视为延期
     try {
       const r = await mesApi.devreqs({ page: 1, page_size: 100 })
@@ -390,20 +372,17 @@ const doLoadData = async () => {
       const r = (data.value?.risks || []).find(x => x.icon === 'overdue_req')
       overdueReqCount.value = r?.value ?? 0
     }
-
     await nextTick()
     renderCharts()
   } catch (e) {
     console.error(e)
   }
 }
-
 const renderCharts = () => {
   const bugMonths = (data.value?.bug_monthly || [])
   const reqMonths = (data.value?.req_monthly || [])
   const bugOrder = data.value?.bug_status_order || ['确认新增', '修复中', '解决关闭']
   const reqOrder = data.value?.req_status_order || ['收集评估', '开发测试中', '上线']
-
   // X 轴月份标签与 AOI&AI 看板一致：后端只返回有数据的月份（有则显示、无则不显示）；
   // 同年内显示“N月”，窗口跨年度时显示“25/9”避免两个 9月 无法区分
   const monthAxisLabels = (months) => {
@@ -419,7 +398,6 @@ const renderCharts = () => {
     const lines = arr.filter(p => p.value > 0).map(p => `${p.marker}${p.seriesName}：${p.value}`)
     return lines.length ? [head, ...lines].join('<br/>') : head
   }
-
   // ---- BUG 堆叠柱 ----
   if (cBugs) cBugs.dispose()
   cBugs = echarts.init(document.getElementById('chart-bugs'))
@@ -463,7 +441,6 @@ const renderCharts = () => {
       data: bugMonths.map(m => m[status] || 0),
     })),
   })
-
   // ---- REQ 堆叠柱 ----
   if (cReqs) cReqs.dispose()
   cReqs = echarts.init(document.getElementById('chart-reqs'))
@@ -508,7 +485,6 @@ const renderCharts = () => {
     })),
   })
 }
-
 // 导出PPT：整屏看板截图，仅一页
 const exportPPT = async () => {
   exporting.value = true
@@ -526,14 +502,12 @@ const exportPPT = async () => {
     exporting.value = false
   }
 }
-
 // 实时性：每 60 秒自动轮询；页面从后台切回前台时立即刷新一次
 const REFRESH_INTERVAL = 60 * 1000
 let refreshTimer = null
 const onVisible = () => {
   if (!document.hidden) loadData()
 }
-
 onMounted(() => {
   loadData()
   window.addEventListener('resize', resize)
@@ -548,7 +522,6 @@ onBeforeUnmount(() => {
   cReqs && cReqs.dispose()
 })
 </script>
-
 <style scoped>
 /* 一屏驾驶舱：撑满内容区，KPI / 图表 / 风险里程碑 三行弹性自适应视口，无页面级滚动 */
 .page {
@@ -605,7 +578,6 @@ onBeforeUnmount(() => {
 }
 .sec-emoji.warn { background: rgba(245,158,11,0.12); }
 .sec-emoji.ok   { background: rgba(16,185,129,0.12); }
-
 /* 自定义 legend（放在图块下方，与截图对齐） */
 .chart-legend {
   display: flex;
@@ -635,7 +607,6 @@ onBeforeUnmount(() => {
 .bg-assess  { background: #64748B; }
 .bg-testing { background: #F97316; }
 .bg-online  { background: #10B981; }
-
 /* 风险 / 里程碑块 */
 .risk-list { list-style: none; margin: 0; padding: 2px 0 0; }
 .risk-list li {
@@ -656,7 +627,6 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
 }
-
 /* 长文本统一省略：卡片内最多 2~3 行，悬浮 tooltip 显示全文（见模板 el-tooltip） */
 .clamp-2, .clamp-3 {
   display: -webkit-box;
@@ -669,7 +639,6 @@ onBeforeUnmount(() => {
 .clamp-3 { -webkit-line-clamp: 3; }
 .risk-detail.muted { color: #9CA3AF; }
 .risk-detail { color: #6B7280; font-weight: 400; margin-left: 4px; }
-
 .milestone-box { padding: 4px 0; }
 .ms-top {
   font-size: 15px; color: #111827; line-height: 1.5;
@@ -692,7 +661,6 @@ onBeforeUnmount(() => {
 }
 .ms-list::-webkit-scrollbar-thumb { background: #D8DEEA; border-radius: 4px; }
 .ms-list::-webkit-scrollbar      { width: 6px; }
-
 .dialog-footer-bar {
   display: flex;
   align-items: center;
@@ -703,19 +671,21 @@ onBeforeUnmount(() => {
 .dialog-total {
   color: var(--c-text-3);
   font-size: 13px;
-  white-space: nowrap;
-  text-align: center;
 }
-
 /* 卡尺寸统一：图表随容器高度自适应 */
 .chart-container {
   width: 100%;
   height: 100%;
 }
-
 /* 弹窗表格防溢出 */
 .bug-dialog .el-dialog__body {
   padding: 12px 16px;
   overflow-x: auto;
+}
+/* ========== 新增：强制弹窗表格单元格单行省略，解决show-overflow-tooltip失效 ========== */
+:deep(.bug-dialog .el-table .cell) {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 </style>
