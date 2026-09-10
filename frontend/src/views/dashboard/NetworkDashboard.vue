@@ -327,7 +327,7 @@
               v-model="settingsForm.syslog_keywords"
               type="textarea"
               :rows="2"
-              placeholder="逗号分隔，如：登录,退出,error,失败,攻击,非法"
+              placeholder="逗号分隔，如：失败,攻击,非法,error,warning,critical"
               :disabled="!settingsForm.syslog_enabled"
             />
           </el-form-item>

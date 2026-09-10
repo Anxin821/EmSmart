@@ -285,19 +285,38 @@ DEFAULT_SETTINGS = {
     # Syslog UDP 日志监听（迁移自 wifi-monitor/syslog_listener.py）
     "syslog_enabled": "0",            # 默认关闭：Windows 绑定 514 需管理员权限
     "syslog_port": "514",
-    "syslog_keywords": "登录,退出,error,失败,攻击,非法,警告,warning,critical",
+    # 关键词覆盖登录/退出（用户要求监控），同时保留真正的异常词。
+    # 防轰炸靠 _SYSLOG_DEDUP（同 IP + 同消息 60 秒内只发一次）+ 移除 notice 级别告警。
+    "syslog_keywords": "登录,退出,失败,攻击,非法,error,warning,critical,异常,故障,断开,down",
 }
 
 # Syslog 严重等级（不依赖关键词，命中即告警）
-SYSLOG_ALERT_LEVELS = {"notice", "warning", "error", "critical", "emergency", "alert"}
+# 移除 notice：H3C 登录/退出日志为 notice/info，避免每条 notice 都触发等级告警；
+# 登录/退出靠关键词命中触发，更可控。
+SYSLOG_ALERT_LEVELS = {"warning", "error", "critical", "emergency", "alert"}
+
+# 历史默认关键词版本，ensure_default_settings 中用于一次性迁移到新默认值
+# 包含所有历史默认值：原始版（含登录/退出/警告）+ 中间版（移除登录/退出/警告）
+_LEGACY_SYSLOG_KEYWORDS = {
+    "登录,退出,error,失败,攻击,非法,警告,warning,critical",   # 原始版
+    "失败,攻击,非法,error,warning,critical,异常,故障,断开,down",  # 中间版（曾短暂使用）
+}
 
 
 def ensure_default_settings(db: Session) -> None:
-    """启动时补齐默认设置项（幂等）。"""
-    existing = {s.key for s in db.query(Setting).all()}
+    """启动时补齐默认设置项（幂等）。
+    对 syslog_keywords 做一次性迁移：如果当前值是任意历史默认关键词，
+    自动替换为新默认值（用户自定义的关键词不会被覆盖）。
+    """
+    existing = {s.key: s.value for s in db.query(Setting).all()}
     missing = [Setting(key=k, value=v) for k, v in DEFAULT_SETTINGS.items() if k not in existing]
     if missing:
         db.add_all(missing)
+    # 迁移历史默认关键词 → 新默认值（只替换恰好等于历史默认值的，自定义值不动）
+    kw_row = db.query(Setting).filter(Setting.key == "syslog_keywords").first()
+    if kw_row and kw_row.value in _LEGACY_SYSLOG_KEYWORDS:
+        kw_row.value = DEFAULT_SETTINGS["syslog_keywords"]
+    if missing or (kw_row and kw_row.value == DEFAULT_SETTINGS["syslog_keywords"]):
         db.commit()
 
 
@@ -503,7 +522,13 @@ def record_syslog_alert(db: Session, src_ip: str, parsed: dict) -> bool:
         return False
     message = message[:500]
     level = (parsed.get("level") or "warning").strip() or "warning"
-    ts = parsed.get("timestamp") or beijing_now().strftime("%Y-%m-%d %H:%M:%S")
+    ts = parsed.get("timestamp") or ""
+    # 路由器时钟未同步（如显示 1970 年）→ 用服务器当前时间兜底
+    try:
+        if not ts or int(ts[:4]) < 2000:
+            ts = beijing_now().strftime("%Y-%m-%d %H:%M:%S")
+    except (ValueError, IndexError):
+        ts = beijing_now().strftime("%Y-%m-%d %H:%M:%S")
 
     dedup_key = f"{src_ip}|{message}"
     now_ts = time.time()
