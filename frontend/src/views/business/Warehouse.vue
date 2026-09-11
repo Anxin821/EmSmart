@@ -8,13 +8,7 @@
           style="width: 300px;" @keyup.enter="onSearch" @clear="onSearch">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
-        <el-select v-model="stockStatusFilter" placeholder="全部状态" clearable style="width: 140px;" @change="onSearch">
-          <el-option label="在库 / 正常" value="in_stock" />
-          <el-option label="借出 / 领用" value="borrowed" />
-        </el-select>
         <el-button @click="onSearch">搜索</el-button>
-        <el-button @click="onReset">重置</el-button>
-
         <template v-if="userStore.canEdit">
           <el-button @click="openImport">批量导入</el-button>
           <el-button type="primary" @click="openEdit(null)">新增物品</el-button>
@@ -28,17 +22,18 @@
         <el-tab-pane label="🔧 治具" name="治具" />
         <el-tab-pane label="🧴 耗材" name="耗材" />
       </el-tabs>
-      <el-button text @click="txDrawer = true">操作记录</el-button>
+      <div class="wh-mode-switch">
+        <el-button text @click="txDrawer = true">操作记录</el-button>
+        <el-button v-if="userStore.canEdit" type="warning" @click="openCartDrawer">
+          <el-icon><ShoppingCart /></el-icon>
+          借出/领用<span v-if="cartItems.length" class="cart-badge">{{ cartTotalQty }}</span>
+        </el-button>
+      </div>
     </div>
 
-      <!-- 统计看板 -->
+      <!-- 统计看板（精简） -->
       <div class="wh-stats">
-        <!-- 治具 -->
         <template v-if="activeTab === '治具'">
-          <div class="wh-stat clickable" :class="{ active: stockStatusFilter === '' }" @click="filterByStatus('')">
-            <div class="wh-stat-num">{{ stats.total }}</div>
-            <div class="wh-stat-label">总治具</div>
-          </div>
           <div class="wh-stat clickable" :class="{ active: stockStatusFilter === 'in_stock' }" @click="filterByStatus('in_stock')">
             <div class="wh-stat-num ok">{{ stats.in_stock }}</div>
             <div class="wh-stat-label">在库</div>
@@ -47,18 +42,8 @@
             <div class="wh-stat-num warn">{{ stats.borrowed_out }}</div>
             <div class="wh-stat-label">借出</div>
           </div>
-          <div class="wh-stat">
-            <div class="wh-stat-num" style="color:var(--c-text-mute)">{{ stats.repairing || 0 }}</div>
-            <div class="wh-stat-label">维修中</div>
-          </div>
         </template>
-
-        <!-- 耗材 -->
         <template v-else>
-          <div class="wh-stat clickable" :class="{ active: stockStatusFilter === '' }" @click="filterByStatus('')">
-            <div class="wh-stat-num">{{ stats.total }}</div>
-            <div class="wh-stat-label">总耗材</div>
-          </div>
           <div class="wh-stat clickable" :class="{ active: stockStatusFilter === 'in_stock' }" @click="filterByStatus('in_stock')">
             <div class="wh-stat-num ok">{{ stats.in_stock }}</div>
             <div class="wh-stat-label">正常</div>
@@ -66,10 +51,6 @@
           <div class="wh-stat clickable" :class="{ active: stockStatusFilter === 'low_stock' }" @click="filterByStatus('low_stock')">
             <div class="wh-stat-num danger">{{ stats.low_stock }}</div>
             <div class="wh-stat-label">低于预警</div>
-          </div>
-          <div class="wh-stat">
-            <div class="wh-stat-num" style="color:#DC2626">{{ stats.out_of_stock || 0 }}</div>
-            <div class="wh-stat-label">缺货</div>
           </div>
         </template>
       </div>
@@ -145,27 +126,30 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="280" align="center" fixed="right">
+        <el-table-column label="操作" width="320" align="center" fixed="right">
           <template #default="{ row }">
             <template v-if="userStore.canEdit">
-              <!-- 治具：在库/部分借出可借 -->
-              <el-button v-if="row.part_type === '治具' && (row.status === '在库' || row.status === '部分借出')"
-                type="primary" link size="small" @click.stop="openBorrow(row)">借出</el-button>
-              <!-- 治具：已借出/部分借出可归还 -->
-              <el-button v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')"
-                type="warning" link size="small" @click.stop="openReturn(row)">归还</el-button>
-              <!-- 治具：维修中显示文本 -->
-              <span v-if="row.part_type === '治具' && row.status === '维修中'"
-                class="wh-repair-text">维修中</span>
-              <!-- 耗材：有库存可领用 -->
-              <el-button v-if="row.part_type === '耗材' && row.stock_qty > 0"
-                type="primary" link size="small" @click.stop="openConsume(row)">领用</el-button>
-              <!-- 耗材：都可补货 -->
-              <el-button v-if="row.part_type === '耗材'"
-                type="success" link size="small" @click.stop="openRestock(row)">补货</el-button>
-              <!-- 公共：编辑 -->
+              <!-- 治具 -->
+              <template v-if="row.part_type === '治具'">
+                <el-button v-if="row.status === '维修中'" type="info" link size="small" disabled>维修中</el-button>
+                <template v-else>
+                  <el-button v-if="row.available_qty > 0"
+                    type="primary" link size="small" @click.stop="openBorrow(row)">借出</el-button>
+                  <el-button v-else type="info" link size="small" disabled @click.stop="toast.warn(`「${row.name}」库存不足，请先补货`)">借出</el-button>
+                  <el-button v-if="row.status === '已借出' || row.status === '部分借出'"
+                    type="warning" link size="small" @click.stop="openReturn(row)">归还</el-button>
+                  <el-button v-else type="info" link size="small" disabled>归还</el-button>
+                </template>
+              </template>
+              <!-- 耗材 -->
+              <template v-else>
+                <el-button v-if="row.stock_qty > 0"
+                  type="primary" link size="small" @click.stop="openConsume(row)">领用</el-button>
+                <el-button v-else type="info" link size="small" @click.stop="toast.warn(`「${row.name}」库存不足，请及时补货`)">领用</el-button>
+                <el-button type="success" link size="small" @click.stop="openRestock(row)">补货</el-button>
+              </template>
+              <!-- 公共 -->
               <el-button type="info" link size="small" @click.stop="openEdit(row)">编辑</el-button>
-              <!-- 公共：删除（仅管理员） -->
               <el-button v-if="userStore.isAdmin" type="danger" link size="small" @click.stop="handleDelete(row)">删除</el-button>
             </template>
             <span v-else style="color: var(--c-text-mute); font-size: 12px;">点击行查看详情</span>
@@ -182,6 +166,100 @@
 
       <CommonPagination v-model:page="page" v-model:page-size="pageSize" :total="total" compact />
     </div>
+
+    <!-- 购物车抽屉（扫码 + 借出/领用/归还 一站式） -->
+    <el-drawer
+      v-model="cartDrawer"
+      direction="rtl"
+      size="480px"
+      destroy-on-close
+      class="cart-drawer"
+      :with-header="false"
+    >
+      <div class="cd-wrap">
+        <header class="cd-header">
+          <div class="cd-title">
+            <el-icon><ShoppingCart /></el-icon>
+            <span>{{ scanModeName }}</span>
+            <span v-if="cartItems.length" class="cd-count">{{ cartTotalQty }} 件</span>
+          </div>
+          <el-button text @click="cartDrawer = false"><el-icon><Close /></el-icon></el-button>
+        </header>
+
+        <!-- 模式选择 -->
+        <div class="cd-mode-bar">
+          <el-radio-group v-model="scanMode" size="small">
+            <el-radio-button label="borrow" v-if="activeTab === '治具'">借出</el-radio-button>
+            <el-radio-button label="return" v-if="activeTab === '治具'">归还</el-radio-button>
+            <el-radio-button label="consume" v-if="activeTab === '耗材'">领用</el-radio-button>
+          </el-radio-group>
+        </div>
+
+        <!-- 扫码输入 -->
+        <div class="cd-scan-bar">
+          <el-input
+            ref="scanInputRef"
+            v-model="scanKeyword"
+            :placeholder="scanPlaceholder"
+            clearable
+            @keyup.enter="onScan"
+          >
+            <template #prefix><el-icon><Search /></el-icon></template>
+          </el-input>
+        </div>
+
+        <!-- 购物车列表 -->
+        <div class="cd-body">
+          <div v-if="!cartItems.length" class="cd-empty">
+            <span style="font-size:36px;">📦</span>
+            <p>暂无添加物品</p>
+            <span class="cd-empty-sub">扫码或输入物品名称，回车添加</span>
+          </div>
+
+          <div v-else class="cd-list">
+            <div v-for="item in cartItems" :key="item.id" class="cd-row">
+              <div class="cd-row-info">
+                <span class="cd-row-name">{{ item.name }}</span>
+                <span class="cd-row-model">{{ item.model || '-' }}</span>
+              </div>
+              <div class="cd-row-qty">
+                <el-button size="small" circle @click="changeQty(item, -1)"><el-icon><Minus /></el-icon></el-button>
+                <span class="cd-qty-num">{{ item.qty }}</span>
+                <el-button size="small" circle @click="changeQty(item, 1)" :disabled="item.qty >= item.maxQty">
+                  <el-icon><Plus /></el-icon></el-button>
+                <span class="cd-qty-limit">/{{ item.maxQty }}</span>
+              </div>
+              <el-button text type="danger" size="small" @click="removeFromCart(item.id)">
+                <el-icon><Close /></el-icon>
+              </el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部信息 + 提交 -->
+        <footer class="cd-footer">
+          <div class="cd-form-row" v-if="scanMode !== 'return'">
+            <el-input v-model="scanForm.operator" placeholder="借用人/领用人姓名 *" maxlength="50" />
+            <el-select v-model="scanForm.line" placeholder="线体 *" style="width:110px;">
+              <el-option v-for="l in lines" :key="l" :label="l" :value="l" />
+            </el-select>
+          </div>
+          <div class="cd-form-row" v-if="scanMode === 'borrow'">
+            <el-date-picker v-model="scanForm.expected_return" type="date" value-format="YYYY-MM-DD"
+              placeholder="预计归还日期" style="width:100%;" />
+          </div>
+          <el-input v-model="scanForm.remark" placeholder="备注（选填）" maxlength="255" />
+          <div class="cd-submit-row">
+            <el-button text type="danger" :disabled="!cartItems.length" @click="clearCart">清空</el-button>
+            <el-button type="primary" size="large" :loading="scanSubmitting"
+              :disabled="!cartItems.length" @click="submitBatch">
+              <el-icon><Check /></el-icon>
+              提交（{{ cartTotalQty }} 件）
+            </el-button>
+          </div>
+        </footer>
+      </div>
+    </el-drawer>
 
     <!-- 新增 / 编辑物品 -->
     <el-dialog v-model="editDialog" :title="editForm.id ? '编辑物品' : '新增物品'" width="560px" destroy-on-close>
@@ -468,10 +546,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed, nextTick } from 'vue'
 import { warehouseApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, RefreshRight, Plus, ArrowDown, Upload, UploadFilled, List, WarningFilled } from '@element-plus/icons-vue'
+import { Search, RefreshRight, Plus, ArrowDown, Upload, UploadFilled, WarningFilled,
+         ShoppingCart, Delete, Minus, Close, Check } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 
@@ -533,7 +612,7 @@ const txTagType = (t) => ({ '借出': 'warning', '归还': 'success', '领用': 
 
 const loadStats = async () => {
   try {
-    const res = await warehouseApi.stats()
+    const res = await warehouseApi.stats({ part_type: activeTab.value })
     Object.assign(stats, res.data || {})
     lowItems.value = res.data?.low_stock_items || []
   } catch (e) { console.error(e) }
@@ -784,6 +863,157 @@ onMounted(() => {
   loadData()
   loadStats()
 })
+
+// ---------------- 扫码购物车（抽屉模式） ----------------
+const cartDrawer = ref(false)
+const scanMode = ref('borrow')             // 'borrow' | 'return' | 'consume'
+const scanKeyword = ref('')
+const scanLoading = ref(false)
+const scanInputRef = ref(null)
+const cartItems = ref([])                  // [{ id, name, model, part_type, qty, maxQty }]
+const scanSubmitting = ref(false)
+const scanForm = reactive({ operator: '', line: '', expected_return: '', remark: '' })
+
+const scanModeName = computed(() => {
+  const map = { borrow: '治具借出', return: '治具归还', consume: '耗材领用' }
+  return map[scanMode.value] || '借出/领用'
+})
+
+const scanPlaceholder = computed(() => {
+  const map = {
+    borrow: '扫码或输入治具名称/型号，回车添加',
+    return: '扫码或输入治具名称/型号，回车添加到归还列表',
+    consume: '扫码或输入耗材名称/型号，回车添加',
+  }
+  return map[scanMode.value] || '扫码或搜索'
+})
+
+const cartTotalQty = computed(() => cartItems.value.reduce((s, i) => s + i.qty, 0))
+
+const focusScanInput = () => { nextTick(() => scanInputRef.value?.focus()) }
+
+// 切换 Tab 时重置扫码模式
+watch(activeTab, (t) => {
+  scanMode.value = t === '治具' ? 'borrow' : 'consume'
+  cartItems.value = []
+})
+
+const openCartDrawer = () => {
+  cartDrawer.value = true
+  nextTick(focusScanInput)
+}
+
+const onScan = async () => {
+  const kw = scanKeyword.value.trim()
+  if (!kw) return
+  scanLoading.value = true
+  try {
+    const res = await warehouseApi.list({ keyword: kw, part_type: activeTab.value, page: 1, page_size: 5 })
+    const found = res.data?.items || []
+    if (!found.length) {
+      toast.error('未找到匹配物品')
+    } else if (found.length === 1) {
+      addToCart(found[0])
+      scanKeyword.value = ''
+      focusScanInput()
+    } else {
+      // 多条匹配：让用户选第一个，后续可优化为弹窗选择
+      addToCart(found[0])
+      toast.info(`匹配到 ${found.length} 条，已添加第一条「${found[0].name}」`)
+      scanKeyword.value = ''
+      focusScanInput()
+    }
+  } catch (e) {
+    console.error(e)
+    toast.error('搜索失败')
+  } finally {
+    scanLoading.value = false
+  }
+}
+
+const addToCart = (item) => {
+  // 计算可用上限
+  let maxQty = 0
+  if (scanMode.value === 'borrow') {
+    maxQty = item.available_qty || 0
+  } else if (scanMode.value === 'return') {
+    maxQty = (item.total_qty || 0) - (item.available_qty || 0)   // 当前借出数
+  } else {
+    maxQty = item.stock_qty || item.total_qty || 0
+  }
+  if (maxQty <= 0) {
+    toast.error(`「${item.name}」${scanMode.value === 'return' ? '没有借出记录' : '库存不足'}`)
+    return
+  }
+  // 已在购物车则 +1
+  const existing = cartItems.value.find(c => c.id === item.id)
+  if (existing) {
+    if (existing.qty >= maxQty) { toast.error(`「${item.name}」已达上限 ${maxQty}`); return }
+    existing.qty++
+    existing.maxQty = maxQty
+  } else {
+    cartItems.value.push({ id: item.id, name: item.name, model: item.model, part_type: item.part_type, qty: 1, maxQty })
+  }
+}
+
+const changeQty = (item, delta) => {
+  const newQty = item.qty + delta
+  if (newQty < 1) { removeFromCart(item.id); return }
+  if (newQty > item.maxQty) { toast.error(`上限 ${item.maxQty}`); return }
+  item.qty = newQty
+}
+
+const removeFromCart = (id) => { cartItems.value = cartItems.value.filter(c => c.id !== id) }
+const clearCart = () => { cartItems.value = [] }
+
+const submitBatch = async () => {
+  if (!cartItems.value.length) return
+  // 借出/领用需要借用人 + 线体
+  if (scanMode.value !== 'return') {
+    if (!scanForm.operator?.trim()) { toast.error('请填写借用人/领用人'); return }
+    if (!scanForm.line) { toast.error('请选择线体'); return }
+  }
+  scanSubmitting.value = true
+  const results = { ok: 0, fail: 0, errors: [] }
+  try {
+    for (const item of cartItems.value) {
+      try {
+        const payload = { qty: item.qty, remark: scanForm.remark }
+        if (scanMode.value === 'return') {
+          await warehouseApi.returnBack(item.id, payload)
+        } else {
+          payload.operator = scanForm.operator
+          payload.line = scanForm.line
+          if (scanMode.value === 'borrow') {
+            payload.expected_return = scanForm.expected_return
+            await warehouseApi.borrow(item.id, payload)
+          } else {
+            await warehouseApi.consume(item.id, payload)
+          }
+        }
+        results.ok++
+      } catch (e) {
+        results.fail++
+        results.errors.push(`${item.name}: ${e.response?.data?.detail || '操作失败'}`)
+      }
+    }
+    if (results.fail === 0) {
+      toast.success(`全部成功（${results.ok} 件）`)
+      clearCart()
+    } else {
+      toast.error(`成功 ${results.ok} 件，失败 ${results.fail} 件：\n${results.errors.join('\n')}`)
+      // 移除成功的物品，保留失败的
+      cartItems.value = cartItems.value.filter(item => {
+        return !results.errors.some(e => e.startsWith(item.name + ':'))
+      })
+    }
+    refreshAll()
+  } catch (e) {
+    toast.error('批量提交失败')
+  } finally {
+    scanSubmitting.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -792,7 +1022,12 @@ onMounted(() => {
   --sp-1: 8px; --sp-2: 12px; --sp-3: 16px; --sp-4: 24px;
   --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-pill: 999px;
 }
-
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
 /* 顶部标题栏（与筛选合并为一行） */
 .page-header {
   display: flex;
@@ -801,6 +1036,7 @@ onMounted(() => {
   padding: 0 4px var(--sp-2);
   border-bottom: 1px solid var(--c-divider);
   flex-wrap: wrap;
+  flex-shrink: 0;    /* ← 新增 */
 }
 .page-title {
   font-size: 18px;
@@ -823,8 +1059,10 @@ onMounted(() => {
 .wh-content {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 120px);
-  padding-bottom: 0;
+  flex: 1;                /* ← 撑满 .page 剩余高度 */
+  min-height: 0;          /* ← 关键：允许内部收缩 */
+  padding-bottom: 16px;   /* ← 关键：给 fixed 分页条预留空间 */
+  box-sizing: border-box;
 }
 .wh-tabs { flex-shrink: 0; }
 .wh-tabs-row {
@@ -977,4 +1215,66 @@ onMounted(() => {
   color: #DC2626;
   line-height: 1.9;
 }
+
+/* ---- 模式切换 ---- */
+.wh-mode-switch { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.cart-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; margin-left: 6px;
+  font-size: 12px; font-weight: 700;
+  background: #DC2626; color: #fff;
+  border-radius: 9px; padding: 0 5px;
+}
+
+/* ---- 购物车抽屉 ---- */
+.cart-drawer :deep(.el-drawer__body) {
+  padding: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden;
+}
+.cd-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.cd-header {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 15px 20px;
+  background: linear-gradient(135deg, #F7FAFF 0%, #EEF4FF 100%);
+  border-bottom: 1px solid var(--c-divider);
+}
+.cd-title { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; }
+.cd-count { font-size: 13px; font-weight: 600; color: var(--primary, #2563EB); }
+
+.cd-mode-bar { flex-shrink: 0; padding: 10px 20px; border-bottom: 1px solid var(--c-divider); }
+.cd-scan-bar { flex-shrink: 0; padding: 10px 20px; border-bottom: 1px solid var(--c-divider); }
+
+.cd-body {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.cd-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 60px 0; color: var(--c-text-mute);
+}
+.cd-empty p { margin: 0; font-size: 14px; }
+.cd-empty-sub { font-size: 12px; }
+
+.cd-list { display: flex; flex-direction: column; gap: 8px; }
+.cd-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border: 1px solid var(--c-divider); border-radius: 8px;
+  background: var(--c-bg);
+}
+.cd-row-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cd-row-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-row-model { font-size: 12px; color: var(--c-text-mute); font-family: Consolas, monospace; }
+.cd-row-qty { display: flex; align-items: center; gap: 6px; }
+.cd-qty-num { font-weight: 700; font-size: 16px; min-width: 32px; text-align: center; }
+.cd-qty-limit { font-size: 12px; color: var(--c-text-mute); }
+
+.cd-footer {
+  flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--c-divider);
+  background: var(--c-bg-soft, #f5f7fa);
+}
+.cd-form-row { display: flex; gap: 8px; }
+.cd-submit-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 </style>

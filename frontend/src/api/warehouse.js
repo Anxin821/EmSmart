@@ -2,7 +2,8 @@ import api from './index'
 
 export const warehouseApi = {
   // 统计看板（总物品 / 在库 / 借出领用 / 低于预警 + 预警明细）
-  stats: () => api.get('/warehouse/stats'),
+  // part_type: '治具' | '耗材'，按 Tab 分别统计，避免总治具/总耗材混在一起
+  stats: (params) => api.get('/warehouse/stats', { params }),
   // 物品列表（keyword 名称/型号/借用人/领用人；part_type 治具/耗材；low_stock 仅低库存）
   list: (params) => api.get('/warehouse/parts', { params }),
   detail: (id) => api.get(`/warehouse/parts/${id}`),

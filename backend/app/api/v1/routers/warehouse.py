@@ -14,10 +14,11 @@ router = APIRouter(prefix="/warehouse", tags=["库房管理"])
 
 @router.get("/stats")
 def warehouse_stats(
+    part_type: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    return ApiResponse(data=service.get_stats(db))
+    return ApiResponse(data=service.get_stats(db, part_type=part_type))
 
 
 @router.get("/parts")

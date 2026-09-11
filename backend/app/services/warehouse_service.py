@@ -143,8 +143,12 @@ def list_parts(db: Session, page: int = 1, page_size: int = 20,
     return [_part_to_dict(p) for p in items], total
 
 
-def get_stats(db: Session) -> Dict[str, Any]:
-    parts = db.query(WarehousePart).all()
+def get_stats(db: Session, part_type: Optional[str] = None) -> Dict[str, Any]:
+    """统计物品状态。支持按类型过滤（治具/耗材），避免总治具/总耗材数字混在一起。"""
+    q = db.query(WarehousePart)
+    if part_type:
+        q = q.filter(WarehousePart.part_type == part_type)
+    parts = q.all()
     in_stock = 0
     borrowed_out = 0
     low_items: List[dict] = []
