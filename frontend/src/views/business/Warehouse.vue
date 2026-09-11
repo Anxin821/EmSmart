@@ -85,12 +85,12 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="型号/编号" prop="model" min-width="130" align="left" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span v-if="row.model" style="font-family: Consolas, monospace;">{{ row.model }}</span>
-            <span v-else style="color: var(--c-text-mute);">-</span>
-          </template>
-        </el-table-column>
+        <el-table-column label="型号/编号" prop="model" min-width="150" align="left" show-overflow-tooltip>
+  <template #default="{ row }">
+    <span v-if="row.model" class="wh-model">{{ row.model }}</span>
+    <span v-else class="wh-model-empty">-</span>
+  </template>
+</el-table-column>
 
         <!-- 治具专属列 -->
         <template v-if="activeTab === '治具'">
@@ -1054,7 +1054,18 @@ const submitBatch = async () => {
   gap: 10px;
   flex-wrap: wrap;
 }
-
+/* 型号列：单元格内文本必须自己处理溢出，否则会穿透单元格 */
+.wh-model {
+  display: block;              /* ← 关键：inline 转 block，才能被 overflow 裁 */
+  font-family: Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wh-model-empty {
+  display: block;
+  color: var(--c-text-mute);
+}
 /* 内容区 — flex 撑满 */
 .wh-content {
   display: flex;
