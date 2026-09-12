@@ -26,6 +26,7 @@
         style="width: 100%"
         :header-cell-style="{ fontWeight: 600 }"
         :height="'calc(100vh - 210px)'"
+        @row-click="openDetail"
       >
 
         <el-table-column label="BUG ID" prop="bug_id" width="80" align="center" class-name="cell-clip" show-overflow-tooltip>
@@ -73,15 +74,15 @@
         <el-table-column label="操作" width="210" align="center" fixed="right">
           <template #default="{ row }">
             <template v-if="userStore.canEdit">
-              <el-button type="primary" link size="small" @click="showModal(row)">
+              <el-button type="primary" link size="small" @click.stop="showModal(row)">
                 <el-icon><Edit /></el-icon>编辑
               </el-button>
-              <el-button type="warning" link size="small" @click="handleFlow(row)">
+              <el-button type="warning" link size="small" @click.stop="handleFlow(row)">
                 <el-icon><Refresh /></el-icon>流转
               </el-button>
             </template>
             <template v-if="userStore.isAdmin">
-              <el-button type="danger" link size="small" @click="handleDelete(row)">
+              <el-button type="danger" link size="small" @click.stop="handleDelete(row)">
                 <el-icon><Delete /></el-icon>删除
               </el-button>
             </template>
@@ -149,6 +150,14 @@
           <label class="small form-label">截止日期</label>
           <el-date-picker v-model="form.deadline" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%;" />
         </div>
+        <div class="col-6">
+          <label class="small form-label">发现日期</label>
+          <el-date-picker v-model="form.created_date" type="date" value-format="YYYY-MM-DD" placeholder="选择发现日期" style="width: 100%;" />
+        </div>
+        <div class="col-12">
+          <label class="small form-label">解决方案</label>
+          <el-input v-model="form.solution" type="textarea" :rows="4" placeholder="请输入解决方案" maxlength="2000" show-word-limit />
+        </div>
       </div>
       <template #footer="f">
         <div class="cm-footer">
@@ -184,6 +193,32 @@
         </div>
       </template>
     </CommonModal>
+    <!-- 详情弹窗 -->
+    <el-dialog v-model="detailVisible" :title="`BUG详情 - ${detailRow?.bug_id || ''}`" width="720px" destroy-on-close>
+      <el-descriptions :column="2" border v-if="detailRow">
+        <el-descriptions-item label="BUG ID">{{ detailRow.bug_id }}</el-descriptions-item>
+        <el-descriptions-item label="标题">{{ detailRow.title || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="严重等级">
+          <span :class="'status-badge ' + getStatusClass(cleanStatus(detailRow.severity))">{{ cleanStatus(detailRow.severity) }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <span :class="'status-badge ' + getStatusClass(cleanStatus(detailRow.status))">{{ cleanStatus(detailRow.status) }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="模块">{{ detailRow.module || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="发现人">{{ detailRow.discoverer || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="指派给">{{ detailRow.assignee || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="截止日期">{{ detailRow.deadline ? detailRow.deadline.slice(0, 10) : '-' }}</el-descriptions-item>
+        <el-descriptions-item label="发现日期">{{ detailRow.created_date ? detailRow.created_date.slice(0, 10) : '-' }}</el-descriptions-item>
+        <el-descriptions-item label="录入时间" :span="2">{{ formatTime(detailRow.created_at) }}</el-descriptions-item>
+        <el-descriptions-item label="解决方案" :span="2">
+          <div style="white-space: pre-wrap;">{{ detailRow.solution || '-' }}</div>
+        </el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button v-if="userStore.canEdit" type="primary" @click="detailToEdit">编辑</el-button>
+        <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 <script setup>
@@ -210,6 +245,8 @@ const editingId = ref(null)
 const saving = ref(false)
 const flowSaving = ref(false)
 const form = ref({})
+const detailVisible = ref(false)
+const detailRow = ref(null)
 
 // 用于取消请求的 AbortController
 let abortController = null
@@ -266,7 +303,9 @@ const getStatusClass = (s) => {
 
 const defaultForm = () => ({
   bug_id: '', title: '', severity: '一般', module: '',
-  status: '确认新增', discoverer: '', assignee: '', deadline: ''
+  status: '确认新增', discoverer: '', assignee: '',
+  deadline: null, created_date: null,
+  solution: ''
 })
 
 const resetFilters = () => {
@@ -326,18 +365,33 @@ const closeModal = () => {
   form.value = {}
 }
 
+const openDetail = (row) => {
+  detailRow.value = row
+  detailVisible.value = true
+}
+
+const detailToEdit = () => {
+  const row = detailRow.value
+  detailVisible.value = false
+  showModal(row)
+}
+
 const handleSave = async () => {
   if (!form.value.title || !String(form.value.title).trim()) {
     toast.warn('请输入 BUG 标题')
     return
   }
+  // 清洗日期字段：空字符串转为 null，避免 Pydantic 验证失败
+  const payload = { ...form.value }
+  if (payload.deadline === '' || payload.deadline === undefined) payload.deadline = null
+  if (payload.created_date === '' || payload.created_date === undefined) payload.created_date = null
   saving.value = true
   try {
     if (editingId.value) {
-      await mesApi.update('bugs', editingId.value, form.value)
+      await mesApi.update('bugs', editingId.value, payload)
       toast.success('修改成功')
     } else {
-      const r = await mesApi.create('bugs', form.value)
+      const r = await mesApi.create('bugs', payload)
       toast.success(`创建成功 ${r.data?.bug_id ? '（'+r.data.bug_id+'）' : ''}`)
     }
     closeModal()

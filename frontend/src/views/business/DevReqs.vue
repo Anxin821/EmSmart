@@ -33,6 +33,7 @@
         style="width: 100%"
         :header-cell-style="{ fontWeight: 600 }"
         :height="'calc(100vh - 210px)'"
+        @row-click="openDetail"
       >
 
         <el-table-column label="需求ID" prop="request_id" width="80" align="center" class-name="cell-clip" show-overflow-tooltip>
@@ -76,15 +77,15 @@
         <el-table-column label="操作" width="210" align="center" fixed="right">
           <template #default="s">
             <template v-if="userStore.canEdit">
-              <el-button type="primary" link size="small" @click="showModal(s.row)">
+              <el-button type="primary" link size="small" @click.stop="showModal(s.row)">
                 <el-icon><Edit /></el-icon>编辑
               </el-button>
-              <el-button type="warning" link size="small" @click="handleFlow(s.row)">
+              <el-button type="warning" link size="small" @click.stop="handleFlow(s.row)">
                 <el-icon><Refresh /></el-icon>流转
               </el-button>
             </template>
             <template v-if="userStore.isAdmin">
-              <el-button type="danger" link size="small" @click="handleDelete(s.row)">
+              <el-button type="danger" link size="small" @click.stop="handleDelete(s.row)">
                 <el-icon><Delete /></el-icon>删除
               </el-button>
             </template>
@@ -160,6 +161,10 @@
             style="width: 100%;"
           />
         </div>
+        <div class="col-12">
+          <label class="small">需求描述</label>
+          <el-input v-model="form.description" type="textarea" :rows="4" placeholder="请输入需求详细描述" maxlength="2000" show-word-limit />
+        </div>
       </div>
       <template #footer="f">
         <div class="cm-footer">
@@ -171,6 +176,30 @@
         </div>
       </template>
     </CommonModal>
+    <!-- 详情弹窗 -->
+    <el-dialog v-model="detailVisible" :title="`需求详情 - ${detailRow?.request_id || ''}`" width="720px" destroy-on-close>
+      <el-descriptions :column="2" border v-if="detailRow">
+        <el-descriptions-item label="需求 ID">{{ detailRow.request_id }}</el-descriptions-item>
+        <el-descriptions-item label="标题">{{ detailRow.title || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="优先级">
+          <span :class="'status-badge ' + getStatusClass(cleanField(detailRow.priority))">{{ cleanField(detailRow.priority) }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <span :class="'status-badge ' + getStatusClass(cleanField(detailRow.status))">{{ cleanField(detailRow.status) }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="提交人">{{ detailRow.submitter || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="指派给">{{ detailRow.assignee || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="期望日期">{{ detailRow.expected_date ? detailRow.expected_date.slice(0, 10) : '-' }}</el-descriptions-item>
+        <el-descriptions-item label="录入时间">{{ formatTime(detailRow.created_at) }}</el-descriptions-item>
+        <el-descriptions-item label="需求描述" :span="2">
+          <div style="white-space: pre-wrap;">{{ detailRow.description || '-' }}</div>
+        </el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button v-if="userStore.canEdit" type="primary" @click="detailToEdit">编辑</el-button>
+        <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 <script setup>
@@ -195,6 +224,8 @@ const modalVisible = ref(false)
 const editingId = ref(null)
 const saving = ref(false)
 const form = ref({})
+const detailVisible = ref(false)
+const detailRow = ref(null)
 
 // 用于取消请求的 AbortController
 let abortController = null
@@ -264,7 +295,7 @@ const getStatusClass = (s) => {
 
 const defaultForm = () => ({
   request_id: '', title: '', priority: '中', status: '收集评估',
-  submitter: '', assignee: '', expected_date: ''
+  submitter: '', assignee: '', expected_date: null
 })
 
 const resetFilters = () => {
@@ -329,15 +360,28 @@ const closeModal = () => {
   form.value = {}
 }
 
+const openDetail = (row) => {
+  detailRow.value = row
+  detailVisible.value = true
+}
+
+const detailToEdit = () => {
+  detailVisible.value = false
+  showModal(detailRow.value)
+}
+
 const handleSave = async () => {
   if (!form.value.title || !String(form.value.title).trim()) {
     ElMessage.warning('请输入需求标题')
     return
   }
+  // 清洗日期字段：空字符串转为 null，避免 Pydantic 验证失败
+  const payload = { ...form.value }
+  if (payload.expected_date === '' || payload.expected_date === undefined) payload.expected_date = null
   saving.value = true
   try {
-    if (editingId.value) await mesApi.update('dev-requests', editingId.value, form.value)
-    else                  await mesApi.create('dev-requests', form.value)
+    if (editingId.value) await mesApi.update('dev-requests', editingId.value, payload)
+    else                  await mesApi.create('dev-requests', payload)
     closeModal()
     loadData()
     ElMessage.success(editingId.value ? '需求修改成功' : '需求新增成功')

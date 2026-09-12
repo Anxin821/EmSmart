@@ -50,7 +50,7 @@
         <template v-if="activeTab === '出入库记录'">
           <div class="wh-table-section">
             <div class="tx-filter-row">
-              <el-input v-model="txFilterTime" placeholder="时间" clearable size="small" style="width: 140px;" />
+              <el-input v-model="txFilterTime" placeholder="操作时间" clearable size="small" style="width: 140px;" />
               <el-select v-model="txFilterType" placeholder="操作" clearable size="small" style="width: 100px;">
                 <el-option label="借出" value="借出" />
                 <el-option label="归还" value="归还" />
@@ -126,13 +126,15 @@
                   </template>
                 </el-table-column>
 
-                <el-table-column label="型号" prop="model" min-width="130" align="left" show-overflow-tooltip>
+                <el-table-column label="型号" prop="model" min-width="130" align="left" show-overflow-tooltip
+                  v-if="activeTab !== '耗材'">
                   <template #default="{ row }">
                     <span v-if="row.model" class="wh-model">{{ row.model }}</span>
                     <span v-else class="wh-model-empty">-</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="编号" prop="code" min-width="130" align="left" show-overflow-tooltip>
+                <el-table-column label="编号" prop="code" min-width="130" align="left" show-overflow-tooltip
+                  v-if="activeTab !== '耗材'">
                   <template #default="{ row }">
                     <span v-if="row.code" class="wh-model">{{ row.code }}</span>
                     <span v-else class="wh-model-empty">-</span>
@@ -200,17 +202,18 @@
                         <el-button v-if="row.stock_qty > 0"
                           type="primary" link size="small" @click.stop="openConsume(row)">借领</el-button>
                         <el-button v-else type="info" link size="small" disabled @click.stop="toast.warn(`「${row.name}」库存不足`)">借领</el-button>
-                        <el-button type="success" link size="small" @click.stop="openRestock(row)">补货</el-button>
+                        <el-button type="warning" link size="small" @click.stop="openReturn(row)">归还</el-button>
                       </template>
                       <el-dropdown @command="(cmd) => handleMoreCommand(cmd, row)" trigger="click">
                         <el-button type="info" link size="small" @click.stop>更多<el-icon style="margin-left:2px"><ArrowDown /></el-icon></el-button>
                         <template #dropdown>
                           <el-dropdown-menu>
+                            <el-dropdown-item command="restock">补货</el-dropdown-item>
                             <el-dropdown-item v-if="row.part_type === '治具' && row.repair_qty > 0" command="finish_repair">维修完成</el-dropdown-item>
                             <el-dropdown-item v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')" command="loss">报失</el-dropdown-item>
                             <el-dropdown-item v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')" command="damaged">报损</el-dropdown-item>
                             <el-dropdown-item command="edit">编辑</el-dropdown-item>
-                            <el-dropdown-item v-if="userStore.isAdmin" command="delete" divided>删除</el-dropdown-item>
+                            <el-dropdown-item v-if="userStore.isAdmin || (userStore.user?.full_name === '秦江蓉' && userStore.isEngineer)" command="delete" divided>删除</el-dropdown-item>
                           </el-dropdown-menu>
                         </template>
                       </el-dropdown>
@@ -254,7 +257,7 @@
         <div class="cd-mode-bar">
           <el-radio-group v-model="scanMode" size="small">
             <el-radio-button label="borrow">借领</el-radio-button>
-            <el-radio-button label="return" v-if="activeTab === '治具' || activeTab === '全部'">归还</el-radio-button>
+            <el-radio-button label="return">归还</el-radio-button>
           </el-radio-group>
         </div>
 
@@ -324,10 +327,10 @@
         <el-form-item label="物品名称" prop="name" required>
           <el-input v-model="editForm.name" placeholder="如：测试治具A / 高温胶带" maxlength="100" />
         </el-form-item>
-        <el-form-item label="型号">
+        <el-form-item v-if="editForm.part_type !== '耗材'" label="型号">
           <el-input v-model="editForm.model" placeholder="设备型号" maxlength="100" />
         </el-form-item>
-        <el-form-item label="编号">
+        <el-form-item v-if="editForm.part_type !== '耗材'" label="编号">
           <el-input v-model="editForm.code" placeholder="内部编号" maxlength="100" />
         </el-form-item>
         <el-form-item label="类型" prop="part_type" required>
@@ -457,17 +460,22 @@
     </el-dialog>
 
     <!-- 耗材补货 -->
-    <el-dialog v-model="restockDialog" title="耗材补货" width="480px" destroy-on-close>
+    <el-dialog v-model="restockDialog" :title="(actionRow?.part_type === '治具' ? '治具' : '耗材') + '补货'" width="480px" destroy-on-close>
       <div class="wh-action-info" v-if="actionRow">
-        <p><b>{{ actionRow.name }}</b>（{{ actionRow.model || '无编号' }}）</p>
-        <p>当前库存：<b :class="actionRow.stock_qty <= actionRow.warn_qty ? 'danger-text' : ''">
-          {{ actionRow.stock_qty }}</b> {{ actionRow.unit }}　预警值：{{ actionRow.warn_qty }}
-        </p>
+        <p><b>{{ actionRow.name }}</b>（{{ actionRow.model || '-' }}）</p>
+        <template v-if="actionRow.part_type === '耗材'">
+          <p>当前库存：<b :class="actionRow.stock_qty <= actionRow.warn_qty ? 'danger-text' : ''">
+            {{ actionRow.stock_qty }}</b> {{ actionRow.unit }}　预警值：{{ actionRow.warn_qty }}
+          </p>
+        </template>
+        <template v-else>
+          <p>总 {{ actionRow.total_qty }} / 可用 <b class="ok-text">{{ actionRow.available_qty }}</b> / 外借 <b class="warn-text">{{ actionRow.total_qty - actionRow.available_qty }}</b></p>
+        </template>
       </div>
       <el-form :model="restockForm" label-width="92px">
         <el-form-item label="补货数量" required>
           <el-input-number v-model="restockForm.qty" :min="1" :max="999999" controls-position="right" />
-          <span class="wh-form-hint">{{ actionRow?.unit }}</span>
+          <span class="wh-form-hint" v-if="actionRow?.unit">{{ actionRow.unit }}</span>
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="restockForm.remark" type="textarea" :rows="2" maxlength="255" />
@@ -561,8 +569,8 @@
 
         <el-descriptions :column="2" border size="small" class="wh-desc">
           <el-descriptions-item label="类型">{{ detail.part.part_type }}</el-descriptions-item>
-          <el-descriptions-item label="型号">{{ detail.part.model || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="编号">{{ detail.part.code || '-' }}</el-descriptions-item>
+          <el-descriptions-item v-if="detail.part.part_type !== '耗材'" label="型号">{{ detail.part.model || '-' }}</el-descriptions-item>
+          <el-descriptions-item v-if="detail.part.part_type !== '耗材'" label="编号">{{ detail.part.code || '-' }}</el-descriptions-item>
           <el-descriptions-item label="货位">{{ detail.part.location || '-' }}</el-descriptions-item>
           <el-descriptions-item label="数量">{{ detail.part.qty_text }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.part.part_type === '治具'" label="维修中">
@@ -634,7 +642,7 @@ const page = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
 const keyword = ref('')
-const activeTab = ref('治具')
+const activeTab = ref('出入库记录')
 const lowItems = ref([])
 
 // 出入库记录（右侧常驻表格）
@@ -703,6 +711,8 @@ const loadStats = async () => {
 }
 
 const loadData = async () => {
+  // 出入库记录 tab 不加载物品列表
+  if (activeTab.value === '出入库记录') { items.value = []; total.value = 0; return }
   loading.value = true
   try {
     const params = { page: page.value, page_size: pageSize.value }
@@ -718,7 +728,10 @@ const loadData = async () => {
   }
 }
 
-const refreshAll = () => { loadData(); loadStats(); loadTxData() }
+const refreshAll = () => {
+  if (activeTab.value === '出入库记录') { loadTxData(); return }
+  loadData(); loadStats(); loadTxData()
+}
 
 const onSearch = () => { page.value = 1; loadData() }
 const onTabChange = () => {
@@ -876,7 +889,8 @@ const openReturn = (row) => { actionRow.value = row; resetActionForms(); returnD
 const openConsume = (row) => { actionRow.value = row; resetActionForms(); consumeForm.qty = 1; consumeDialog.value = true }
 const openRestock = (row) => { actionRow.value = row; resetActionForms(); restockForm.qty = 1; restockDialog.value = true }
 const handleMoreCommand = (cmd, row) => {
-  if (cmd === 'finish_repair') openFinishRepair(row)
+  if (cmd === 'restock') openRestock(row)
+  else if (cmd === 'finish_repair') openFinishRepair(row)
   else if (cmd === 'edit') openEdit(row)
   else if (cmd === 'delete') handleDelete(row)
   else if (cmd === 'loss') openLoss(row)

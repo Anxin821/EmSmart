@@ -903,6 +903,8 @@ def create_bug(db: Session, data: dict) -> Bug:
     if not data.get("bug_id"):
         data["bug_id"] = _gen_unique_5digit_id(db, Bug, Bug.bug_id)
     data = _clean_dev_request_fields(data)
+    # 移除 None 字段，让 SQLAlchemy 的 default 机制生效（如 created_date 默认当天）
+    data = {k: v for k, v in data.items() if v is not None}
     bug = Bug(**data)
     db.add(bug)
     db.commit()
@@ -972,6 +974,8 @@ def create_dev_request(db: Session, data: dict) -> DevRequest:
     if not data.get("request_id"):
         data["request_id"] = _gen_unique_5digit_id(db, DevRequest, DevRequest.request_id)
     data = _clean_dev_request_fields(data)
+    # 移除 None 字段，让 SQLAlchemy 的 default 机制生效（如 progress 默认为 0）
+    data = {k: v for k, v in data.items() if v is not None}
     req = DevRequest(**data)
     db.add(req)
     db.commit()
