@@ -45,7 +45,7 @@ def import_parts(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("admin", "engineer")),
 ):
-    """批量导入物品（支持 .xlsx / .xls）。表头：物品名称、型号、类型、数量、货位、单位、预警值、供应商"""
+    """批量导入物品（支持 .xlsx / .xls）。表头：物品名称、型号、类型、数量、货位、单位、预警值"""
     filename = (file.filename or "").lower()
     if not filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx / .xls 文件")
@@ -53,7 +53,6 @@ def import_parts(
         from openpyxl import load_workbook
         wb = load_workbook(filename=BytesIO(file.file.read()), read_only=True, data_only=True)
         ws = wb.active
-        # 全部行（第 1 行为表头）一并传给 service，由 service 做列名映射
         rows = [list(r) for r in ws.iter_rows(values_only=True)]
         wb.close()
     except HTTPException:
@@ -109,6 +108,18 @@ def part_detail(
     return ApiResponse(data=detail)
 
 
+@router.get("/parts/{part_id}/borrow-records")
+def list_borrow_records(
+    part_id: int,
+    active_only: bool = Query(True),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """查询治具的借出记录（默认只看未归还的）。"""
+    records = service.list_borrow_records(db, part_id, active_only=active_only)
+    return ApiResponse(data=records)
+
+
 @router.get("/parts/{part_id}/transactions")
 def list_part_transactions(
     part_id: int,
@@ -119,7 +130,6 @@ def list_part_transactions(
 ):
     """查询指定物品的操作流水。"""
     items, total = service.list_transactions(db, page=page, page_size=page_size)
-    # 只返回该物品的记录
     part_txs = [t for t in items if t["part_id"] == part_id]
     return ApiResponse(data=PaginatedData(total=len(part_txs), page=page, page_size=page_size, items=part_txs))
 
@@ -129,12 +139,30 @@ def list_all_transactions(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     tx_type: Optional[str] = None,
+    keyword: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     """查询所有物品的借出/领用/归还/补货流水。"""
-    items, total = service.list_transactions(db, page=page, page_size=page_size, tx_type=tx_type)
+    items, total = service.list_transactions(db, page=page, page_size=page_size,
+                                             tx_type=tx_type, keyword=keyword)
     return ApiResponse(data=PaginatedData(total=total, page=page, page_size=page_size, items=items))
+
+
+@router.put("/transactions/{tx_id}/remark")
+def update_tx_remark(
+    tx_id: int,
+    data: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "engineer")),
+):
+    """编辑出入库记录的备注。"""
+    remark = (data.get("remark") or "").strip()
+    result = service.update_tx_remark(db, tx_id, remark, request, current_user["username"])
+    if not result:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    return ApiResponse(data=result)
 
 
 @router.post("/parts/{part_id}/borrow")
@@ -159,6 +187,30 @@ def return_part(
     return ApiResponse(data=service.return_part(db, part_id, data, request, current_user["username"]))
 
 
+@router.post("/parts/{part_id}/to-repair")
+def to_repair(
+    part_id: int,
+    data: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "engineer")),
+):
+    """治具转维修：将借出记录转为维修状态（数量计入库存但不可借出）。"""
+    return ApiResponse(data=service.to_repair(db, part_id, data, request, current_user["username"]))
+
+
+@router.post("/parts/{part_id}/finish-repair")
+def finish_repair(
+    part_id: int,
+    data: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "engineer")),
+):
+    """治具维修完成：恢复正常可借出。"""
+    return ApiResponse(data=service.finish_repair(db, part_id, data, request, current_user["username"]))
+
+
 @router.post("/parts/{part_id}/consume")
 def consume_part(
     part_id: int,
@@ -168,6 +220,30 @@ def consume_part(
     current_user: dict = Depends(require_role("admin", "engineer")),
 ):
     return ApiResponse(data=service.consume(db, part_id, data, request, current_user["username"]))
+
+
+@router.post("/parts/{part_id}/loss")
+def report_loss(
+    part_id: int,
+    data: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "engineer")),
+):
+    """治具报失：借出后丢失，总数不变，可用减少。"""
+    return ApiResponse(data=service.report_loss(db, part_id, data, request, current_user["username"]))
+
+
+@router.post("/parts/{part_id}/damaged")
+def report_damaged(
+    part_id: int,
+    data: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "engineer")),
+):
+    """治具报损：借出后损坏，总数不变，可用减少。"""
+    return ApiResponse(data=service.report_damaged(db, part_id, data, request, current_user["username"]))
 
 
 @router.post("/parts/{part_id}/restock")

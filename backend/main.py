@@ -112,17 +112,49 @@ def _ensure_tables_and_seed():
 
 
 def _ensure_extra_columns():
-    """轻量列迁移：给旧库的 wifi_aps 补 mac_address 列（幂等）。"""
+    """轻量列迁移：给旧库的表补列（幂等）。"""
     from sqlalchemy import inspect, text
     try:
         insp = inspect(engine)
         existing_tables = set(insp.get_table_names())
+        # wifi_aps 补 mac_address 列
         if "wifi_aps" in existing_tables:
             cols = {c["name"] for c in insp.get_columns("wifi_aps")}
             if "mac_address" not in cols:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE wifi_aps ADD mac_address VARCHAR(20) NULL"))
                 print("[Startup] 已为 wifi_aps 补充 mac_address 列")
+        # part_transactions 补 department_manager 列
+        if "part_transactions" in existing_tables:
+            cols = {c["name"] for c in insp.get_columns("part_transactions")}
+            if "department_manager" not in cols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE part_transactions ADD department_manager VARCHAR(50) NULL"))
+                print("[Startup] 已为 part_transactions 补充 department_manager 列")
+            if "borrow_time" not in cols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE part_transactions ADD borrow_time DATETIME NULL"))
+                print("[Startup] 已为 part_transactions 补充 borrow_time 列")
+            if "return_time" not in cols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE part_transactions ADD return_time DATETIME NULL"))
+                print("[Startup] 已为 part_transactions 补充 return_time 列")
+        # warehouse_parts 补 repair_qty 列（替代旧 in_repair 布尔）
+        if "warehouse_parts" in existing_tables:
+            cols = {c["name"] for c in insp.get_columns("warehouse_parts")}
+            if "repair_qty" not in cols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE warehouse_parts ADD repair_qty INT DEFAULT 0"))
+                    # 旧 in_repair=True 的记录迁移为 repair_qty=1
+                    try:
+                        conn.execute(text("UPDATE warehouse_parts SET repair_qty=1 WHERE in_repair=1"))
+                    except Exception:
+                        pass  # in_repair 列可能不存在
+                print("[Startup] 已为 warehouse_parts 补充 repair_qty 列")
+            if "code" not in cols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE warehouse_parts ADD code VARCHAR(100) NULL"))
+                print("[Startup] 已为 warehouse_parts 补充 code 列")
     except Exception as e:
         print(f"[Startup] 列迁移检查失败（不影响启动）: {e}")
 

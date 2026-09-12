@@ -79,12 +79,19 @@ def list_servers(db: Session, page: int =1, page_size: int =20, keyword: Optiona
 
 
 def add_server(db: Session, data: dict, request, username: str):
+    sid = (data.get("server_id") or "").strip()
+    if sid and db.query(Server).filter(Server.server_id == sid).first():
+        raise HTTPException(status_code=400, detail=f"服务器ID「{sid}」已存在，请使用其他ID")
     server = repo.create_server_repo(db, data)
     write_operation_log(db, username, "CREATE", "server", data.get("server_id"), f"新增服务器: {data.get('name')}", request)
     return _server_to_dict(server)
 
 
 def edit_server(db: Session, server_id: str, data: dict, request, username: str):
+    new_sid = (data.get("server_id") or "").strip()
+    if new_sid and new_sid != server_id:
+        if db.query(Server).filter(Server.server_id == new_sid).first():
+            raise HTTPException(status_code=400, detail=f"服务器ID「{new_sid}」已存在，请使用其他ID")
     server = repo.update_server_repo(db, server_id, data)
     if not server:
         return None
@@ -208,12 +215,19 @@ def list_aging_racks(db: Session, page: int =1, page_size: int =20, keyword: Opt
 
 
 def add_aging_rack(db: Session, data: dict, request, username: str):
+    rid = (data.get("rack_id") or "").strip()
+    if rid and db.query(AgingRack).filter(AgingRack.rack_id == rid).first():
+        raise HTTPException(status_code=400, detail=f"老化架ID「{rid}」已存在，请使用其他ID")
     rack = repo.create_aging_rack_repo(db, data)
     write_operation_log(db, username, "CREATE", "aging_rack", data.get("rack_id"), f"新增老化架: {data.get('name')}", request)
     return _rack_to_dict(rack)
 
 
 def edit_aging_rack(db: Session, rack_id: str, data: dict, request, username: str):
+    new_rid = (data.get("rack_id") or "").strip()
+    if new_rid and new_rid != rack_id:
+        if db.query(AgingRack).filter(AgingRack.rack_id == new_rid).first():
+            raise HTTPException(status_code=400, detail=f"老化架ID「{new_rid}」已存在，请使用其他ID")
     rack = repo.update_aging_rack_repo(db, rack_id, data)
     if not rack:
         return None
@@ -245,12 +259,19 @@ def list_wifi_aps(db: Session, page: int =1, page_size: int =20, keyword: Option
 
 
 def add_wifi_ap(db: Session, data: dict, request, username: str):
+    aid = (data.get("ap_id") or "").strip()
+    if aid and db.query(WifiAp).filter(WifiAp.ap_id == aid).first():
+        raise HTTPException(status_code=400, detail=f"AP ID「{aid}」已存在，请使用其他ID")
     ap = repo.create_wifi_ap_repo(db, data)
     write_operation_log(db, username, "CREATE", "wifi_ap", data.get("ap_id"), f"新增AP: {data.get('ssid')}", request)
     return _ap_to_dict(ap)
 
 
 def edit_wifi_ap(db: Session, ap_id: str, data: dict, request, username: str):
+    new_aid = (data.get("ap_id") or "").strip()
+    if new_aid and new_aid != ap_id:
+        if db.query(WifiAp).filter(WifiAp.ap_id == new_aid).first():
+            raise HTTPException(status_code=400, detail=f"AP ID「{new_aid}」已存在，请使用其他ID")
     ap = repo.update_wifi_ap_repo(db, ap_id, data)
     if not ap:
         return None

@@ -13,6 +13,14 @@ export const warehouseApi = {
   // 治具借出 / 归还
   borrow: (id, data) => api.post(`/warehouse/parts/${id}/borrow`, data),
   returnBack: (id, data) => api.post(`/warehouse/parts/${id}/return`, data),
+  // 治具转维修 / 维修完成
+  toRepair: (id, data) => api.post(`/warehouse/parts/${id}/to-repair`, data),
+  finishRepair: (id, data) => api.post(`/warehouse/parts/${id}/finish-repair`, data),
+  // 治具报失 / 报损
+  loss: (id, data) => api.post(`/warehouse/parts/${id}/loss`, data),
+  damaged: (id, data) => api.post(`/warehouse/parts/${id}/damaged`, data),
+  // 借出记录列表（active_only: true 只看未归还的）
+  borrowRecords: (id, active_only = true) => api.get(`/warehouse/parts/${id}/borrow-records`, { params: { active_only } }),
   // 耗材领用 / 补货
   consume: (id, data) => api.post(`/warehouse/parts/${id}/consume`, data),
   restock: (id, data) => api.post(`/warehouse/parts/${id}/restock`, data),
@@ -23,4 +31,6 @@ export const warehouseApi = {
   }),
   // 借出/领用操作流水（全部物品）
   transactions: (params) => api.get('/warehouse/transactions', { params }),
+  // 编辑出入库记录备注
+  updateTxRemark: (txId, remark) => api.put(`/warehouse/transactions/${txId}/remark`, { remark }),
 }
