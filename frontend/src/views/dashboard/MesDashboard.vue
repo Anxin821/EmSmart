@@ -101,21 +101,21 @@
       class="bug-dialog"
     >
       <el-table :data="openBugRecords" stripe border style="width:100%;" max-height="56vh" empty-text="暂无未关闭 BUG">
-        <el-table-column prop="bug_id" label="BUG ID" width="130" align="center" show-overflow-tooltip />
+        <el-table-column prop="bug_id" label="BUG ID" width="68" align="center" show-overflow-tooltip />
         <el-table-column prop="title" label="标题" min-width="200" align="center" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.title || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="severity" label="严重等级" width="90" align="center">
+        <el-table-column prop="severity" label="严重等级" width="81" align="center">
           <template #default="s"><span :class="'status-badge ' + getStatusClass(cleanStatus(s.row.severity))">{{ cleanStatus(s.row.severity) }}</span></template>
         </el-table-column>
         <el-table-column prop="module" label="模块" width="110" align="center" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="90" align="center" />
+        <el-table-column prop="status" label="状态" width="80" align="center" />
         <el-table-column prop="discoverer" label="发现人" width="90" align="center" show-overflow-tooltip />
         <el-table-column prop="assignee" label="指派给" width="90" align="center" show-overflow-tooltip />
-        <el-table-column prop="deadline" label="截止日期" width="110" align="center" show-overflow-tooltip />
-        <el-table-column label="录入时间" width="150" align="center" show-overflow-tooltip>
+        <el-table-column prop="deadline" label="截止日期" width="100" align="center" show-overflow-tooltip />
+        <el-table-column label="录入时间" width="130" align="center" show-overflow-tooltip>
           <template #default="s">{{ formatTime(s.row.created_at) }}</template>
         </el-table-column>
       </el-table>
@@ -135,19 +135,19 @@
       class="bug-dialog"
     >
       <el-table :data="overdueReqRecords" stripe border style="width:100%;" max-height="56vh" empty-text="暂无延期需求">
-        <el-table-column prop="request_id" label="需求ID" width="130" align="center" show-overflow-tooltip />
+        <el-table-column prop="request_id" label="需求ID" width="68" align="center" show-overflow-tooltip />
         <!-- ========== 修改：延期需求标题列改为插槽 ========== -->
         <el-table-column prop="title" label="标题" min-width="200" align="center" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.title || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="priority" label="优先级" width="90" align="center" />
-        <el-table-column prop="status" label="状态" width="100" align="center" />
-        <el-table-column prop="submitter" label="提交人" width="90" align="center" show-overflow-tooltip />
+        <el-table-column prop="priority" label="优先级" width="70" align="center" />
+        <el-table-column prop="status" label="状态" width="90" align="center" />
+        <el-table-column prop="submitter" label="提交人" width="80" align="center" show-overflow-tooltip />
         <el-table-column prop="assignee" label="指派给" width="90" align="center" show-overflow-tooltip />
-        <el-table-column prop="expected_date" label="期望日期" width="110" align="center" show-overflow-tooltip />
-        <el-table-column label="录入时间" width="150" align="center" show-overflow-tooltip>
+        <el-table-column prop="expected_date" label="期望日期" width="100" align="center" show-overflow-tooltip />
+        <el-table-column label="录入时间" width="130" align="center" show-overflow-tooltip>
           <template #default="s">{{ formatTime(s.row.created_at) }}</template>
         </el-table-column>
       </el-table>
