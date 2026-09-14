@@ -311,7 +311,7 @@
             <span class="ns-test-hint">将先保存当前配置，再向钉钉群发送一条测试消息</span>
           </el-form-item>
           <el-form-item label="Ping 间隔">
-            <el-input-number v-model="settingsForm.ping_interval" :min="10" :max="3600" :step="10" controls-position="right" />
+            <el-input-number v-model="settingsForm.ping_interval" :min="1" :max="3600" :step="10" controls-position="right" />
             <span class="ns-hint">秒（后台自动巡检间隔）</span>
           </el-form-item>
 
@@ -401,9 +401,9 @@ const typeClass = (type) => {
   return ''
 }
 
-// 自动轮询：与后台 Ping 间隔保持一致，让后台巡检结果实时反映到看板
-const refreshInterval = ref(30)
-const countdown = ref(30)
+// 自动轮询：后端连续 3 次 Ping 不通才触发告警，所以看板按 3×ping 间隔刷新即可
+const refreshInterval = ref(90)
+const countdown = ref(90)
 const refreshing = ref(false)
 let tickTimer = null
 let lastOpenCount = null   // 上一次刷新时的未处理告警数，用于识别"新告警"
@@ -436,13 +436,13 @@ const loadData = async (silent = false) => {
 }
 
 const startAutoRefresh = async () => {
-  // 读取设置中的 Ping 间隔作为看板自动刷新间隔
+  // 读取设置中的 Ping 间隔 → 前端按 3 倍刷新（连续 3 次不通才触发告警）
   try {
     const res = await networkApi.getSettings()
     const sec = Number(res.data?.ping_interval)
-    if (sec >= 10) {
-      refreshInterval.value = sec
-      countdown.value = sec
+    if (sec >= 2) {
+      refreshInterval.value = sec * 3
+      countdown.value = sec * 3
     }
   } catch (e) {
     console.error(e)
@@ -630,8 +630,8 @@ const handleSaveSettings = async () => {
     ElMessage.warning('Webhook 地址需以 http(s):// 开头')
     return
   }
-  if (!settingsForm.value.ping_interval || settingsForm.value.ping_interval < 10) {
-    ElMessage.warning('Ping 间隔不能小于 10 秒')
+  if (!settingsForm.value.ping_interval || settingsForm.value.ping_interval < 2) {
+    ElMessage.warning('Ping 间隔不能小于 2 秒')
     return
   }
   settingsSaving.value = true

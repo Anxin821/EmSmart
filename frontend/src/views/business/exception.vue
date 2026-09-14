@@ -112,7 +112,7 @@
       <div class="table-wrap">
         <el-table v-loading="loading" :data="items" stripe border height="100%" style="width:100%" @row-click="openDetail" row-class-name="row-clickable">
           <el-table-column prop="exception_no" label="编号" width="60" align="center" header-align="center" show-overflow-tooltip />
-          <el-table-column prop="occurred_time" label="发生时间" width="145" align="center" header-align="center" show-overflow-tooltip>
+          <el-table-column prop="occurred_time" label="发生时间" width="130" align="center" header-align="center" show-overflow-tooltip>
             <template #default="{ row }">{{ formatTime(row.occurred_time) }}</template>
           </el-table-column>
           <el-table-column prop="exception_type" label="类型" width="80" align="center" header-align="center">
@@ -123,13 +123,13 @@
               <div class="exc-desc-cell">{{ row.phenomenon_desc }}</div>
             </template>
           </el-table-column>
-          <el-table-column prop="responsible_person" label="责任人" width="95" align="center" header-align="center" show-overflow-tooltip />
+          <el-table-column prop="responsible_person" label="责任人" width="100" align="center" header-align="center" show-overflow-tooltip />
           <el-table-column prop="status" label="状态" width="80" align="center" header-align="center">
             <template #default="{ row }">
               <span :class="'status-badge ' + statusClass(row.status)">{{ statusLabel(row.status) }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="updated_at" label="更新时间" width="155" align="center" header-align="center" show-overflow-tooltip>
+          <el-table-column prop="updated_at" label="更新时间" width="130" align="center" header-align="center" show-overflow-tooltip>
             <template #default="{ row }">{{ formatTime(row.updated_at) }}</template>
           </el-table-column>
           <el-table-column label="操作" width="120" align="center" header-align="center" fixed="right">

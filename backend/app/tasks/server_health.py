@@ -117,7 +117,7 @@ async def check_server_health(get_session) -> None:
         except Exception:
             # 本轮任何异常都吞掉，继续下一轮
             pass
-        await asyncio.sleep(max(10, interval))
+        await asyncio.sleep(interval)
 
 
 __all__ = ["check_server_health"]

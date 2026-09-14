@@ -121,6 +121,7 @@ def should_alert(parsed: dict, keywords: list[str]) -> bool:
 _PING_FAIL_COUNT: Dict[str, int] = {}         # IP → 连续失败次数
 _PING_ALERTED: Dict[str, bool] = {}           # IP → 是否已推送离线告警
 _PING_SRC_IPS: Dict[str, float] = {}          # IP → 最近一次收到 syslog 的时间
+_PING_LAST_TICK: float = 0.0                  # 上次实际执行 Ping 的时间戳
 
 
 def _ping(host: str, timeout_ms: int = 2000) -> bool:
@@ -135,28 +136,38 @@ def _ping(host: str, timeout_ms: int = 2000) -> bool:
         return False
 
 
-def _get_dingtalk_config(db) -> Tuple[str, str]:
-    """从 settings 表读取钉钉配置。"""
+def _get_ping_config(db) -> Tuple[str, str, int]:
+    """从 settings 表读取钉钉配置和 Ping 间隔。"""
     from app.services.network_service import get_settings
     cfg = get_settings(db)
-    return cfg.get("dingtalk_webhook", ""), cfg.get("dingtalk_secret", "")
+    return (
+        cfg.get("dingtalk_webhook", ""),
+        cfg.get("dingtalk_secret", ""),
+        max(2, int(cfg.get("ping_interval", 60)))   # 最小 2 秒，防止设 0/1 导致 CPU 跑满
+    )
 
 
 def _do_ping_monitor_tick(db) -> None:
-    """每 2 秒调用一次：对已知 syslog 源 IP 执行 Ping，处理连续失败告警。
+    """按 DB ping_interval 间隔执行 Ping 监控（默认 2s），处理连续失败告警。
 
     已知 IP = 过去 10 分钟内曾通过 syslog 报文的来源 IP。
+    间隔不足时直接返回，不阻塞主循环。
     """
-    from app.core.timeutil import beijing_now
+    global _PING_LAST_TICK
+    # 读取前端设置的 Ping 间隔
+    webhook, secret, interval = _get_ping_config(db)
     now = time.time()
+    if now - _PING_LAST_TICK < interval:
+        return
+    _PING_LAST_TICK = now
+
+    from app.core.timeutil import beijing_now
     # 清理超过 10 分钟未活动的 IP
     stale = [ip for ip, last_seen in _PING_SRC_IPS.items() if now - last_seen > 600]
     for ip in stale:
         _PING_SRC_IPS.pop(ip, None)
         _PING_FAIL_COUNT.pop(ip, None)
         _PING_ALERTED.pop(ip, None)
-
-    webhook, secret = _get_dingtalk_config(db)
     ts = beijing_now().strftime("%Y-%m-%d %H:%M:%S")
 
     for ip in list(_PING_SRC_IPS.keys()):
