@@ -329,7 +329,7 @@
     </el-drawer>
 
     <!-- 新增 / 编辑物品 -->
-    <el-dialog v-model="editDialog" :title="editForm.id ? '编辑物品' : '新增物品'" width="560px" destroy-on-close>
+    <el-dialog v-model="editDialog" :title="editForm.id ? '编辑物品' : '新增物品'" width="560px" destroy-on-close :close-on-click-modal="true">
       <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="92px">
         <el-form-item label="物品名称" prop="name" required>
           <el-input v-model="editForm.name" placeholder="如：测试治具A / 高温胶带" maxlength="100" />
@@ -373,7 +373,7 @@
     </el-dialog>
 
     <!-- 治具借出 -->
-    <el-dialog v-model="borrowDialog" title="治具借出" width="480px" destroy-on-close>
+    <el-dialog v-model="borrowDialog" title="治具借出" width="480px" destroy-on-close :close-on-click-modal="true">
       <div class="wh-action-info" v-if="actionRow">
         <p><b>{{ actionRow.name }}</b>（{{ actionRow.model || '无型号' }}）</p>
         <p>可用数量：<b class="ok-text">{{ actionRow.available_qty - (actionRow.repair_qty || 0) }}</b> / {{ actionRow.total_qty }}</p>
@@ -405,7 +405,7 @@
 
     <!-- 归还（治具按借出记录 / 耗材按领用记录） -->
     <el-dialog v-model="returnDialog" :title="(actionRow?.part_type === '耗材') ? '耗材归还' : '治具归还'"
-               width="800px" destroy-on-close @open="loadBorrowRecords">
+               width="800px" destroy-on-close :close-on-click-modal="true" @open="loadBorrowRecords">
       <div class="wh-action-info" v-if="actionRow">
         <p><b>{{ actionRow.name }}</b>（{{ actionRow.model || '无型号' }}）</p>
         <p v-if="actionRow.part_type === '治具'">总 {{ actionRow.total_qty }} / 可用 <b class="ok-text">{{ actionRow.available_qty }}</b> / 外借 <b class="warn-text">{{ actionRow.total_qty - actionRow.available_qty }}</b></p>
@@ -420,9 +420,14 @@
           <el-table-column label="线体" prop="line" width="60" align="center" />
           <el-table-column label="数量" prop="qty" width="60" align="center" />
           <el-table-column label="借出/领用时间" prop="borrow_time" width="140" align="center" />
-          <el-table-column label="状态" width="70" align="center">
+          <el-table-column label="状态" width="80" align="center">
             <template #default="{ row }">
-              <el-tag :type="row.status === '借出' ? 'warning' : row.status === '维修' ? 'info' : row.status === '丢失' ? 'danger' : row.status === '损坏' ? 'danger' : 'success'" size="small">
+              <!-- 耗材记录：tx_type + return_time -->
+              <el-tag v-if="row.tx_type" :type="row.return_time ? 'success' : 'primary'" size="small">
+                {{ row.return_time ? '已归还' : '已领用' }}
+              </el-tag>
+              <!-- 治具记录：status -->
+              <el-tag v-else :type="row.status === '借出' ? 'warning' : row.status === '维修' ? 'info' : row.status === '丢失' ? 'danger' : row.status === '损坏' ? 'danger' : 'success'" size="small">
                 {{ row.status }}
               </el-tag>
             </template>
@@ -430,10 +435,11 @@
           <el-table-column label="操作" min-width="280" align="center">
             <template #default="{ row }">
               <template v-if="actionRow?.part_type === '耗材'">
-                <el-button type="warning" link size="small" @click="submitReturn(row)">归还</el-button>
-                <el-button type="danger" link size="small" @click="submitToRepair(row)">转维修</el-button>
-                <el-button type="info" link size="small" @click="submitLoss(row)">报失</el-button>
-                <el-button type="danger" link size="small" @click="submitDamaged(row)">报损</el-button>
+                <el-button v-if="!row.return_time" type="warning" link size="small" @click="submitReturn(row)">归还</el-button>
+                <el-button v-if="!row.return_time" type="danger" link size="small" @click="submitToRepair(row)">转维修</el-button>
+                <el-button v-if="!row.return_time" type="info" link size="small" @click="submitLoss(row)">报失</el-button>
+                <el-button v-if="!row.return_time" type="danger" link size="small" @click="submitDamaged(row)">报损</el-button>
+                <span v-else style="color: var(--c-text-mute); font-size: 12px;">已处理</span>
               </template>
               <template v-else>
                 <!-- 治具：根据不同状态显示不同操作 -->
@@ -457,7 +463,7 @@
     </el-dialog>
 
     <!-- 耗材领用 -->
-    <el-dialog v-model="consumeDialog" title="耗材领用" width="480px" destroy-on-close>
+    <el-dialog v-model="consumeDialog" title="耗材领用" width="480px" destroy-on-close :close-on-click-modal="true">
       <div class="wh-action-info" v-if="actionRow">
         <p><b>{{ actionRow.name }}</b>（{{ actionRow.model || '无编号' }}）</p>
         <p>当前库存：<b :class="actionRow.stock_qty <= actionRow.warn_qty ? 'danger-text' : 'ok-text'">
@@ -491,7 +497,7 @@
     </el-dialog>
 
     <!-- 耗材补货 -->
-    <el-dialog v-model="restockDialog" :title="(actionRow?.part_type === '治具' ? '治具' : '耗材') + '补货'" width="480px" destroy-on-close>
+    <el-dialog v-model="restockDialog" :title="(actionRow?.part_type === '治具' ? '治具' : '耗材') + '补货'" width="480px" destroy-on-close :close-on-click-modal="true">
       <div class="wh-action-info" v-if="actionRow">
         <p><b>{{ actionRow.name }}</b>（{{ actionRow.model || '-' }}）</p>
         <template v-if="actionRow.part_type === '耗材'">
@@ -519,7 +525,7 @@
     </el-dialog>
 
     <!-- 维修完成 -->
-    <el-dialog v-model="finishRepairDialog" title="维修完成" width="420px" destroy-on-close>
+    <el-dialog v-model="finishRepairDialog" title="维修完成" width="420px" destroy-on-close :close-on-click-modal="true">
       <div class="wh-action-info" v-if="actionRow">
         <p><b>{{ actionRow.name }}</b>（{{ actionRow.model || '无型号' }}）</p>
         <p>当前维修中数量：<b class="danger-text">{{ actionRow.repair_qty || 0 }}</b></p>
@@ -539,7 +545,7 @@
     </el-dialog>
 
     <!-- 编辑备注 -->
-    <el-dialog v-model="remarkDialog" title="编辑备注" width="420px" destroy-on-close>
+    <el-dialog v-model="remarkDialog" title="编辑备注" width="420px" destroy-on-close :close-on-click-modal="true">
       <div class="wh-action-info" v-if="remarkRow">
         <p>{{ remarkRow.part_name }} - {{ remarkRow.tx_type }} {{ remarkRow.qty }}</p>
         <p>借/领人：{{ remarkRow.operator || '-' }}</p>
@@ -552,7 +558,7 @@
     </el-dialog>
 
     <!-- 批量导入 -->
-    <el-dialog v-model="importDialog" title="📥 批量导入物品" width="560px" destroy-on-close>
+    <el-dialog v-model="importDialog" title="📥 批量导入物品" width="560px" destroy-on-close :close-on-click-modal="true">
       <el-upload
         ref="uploadRef"
         drag
@@ -591,7 +597,7 @@
     </el-dialog>
 
     <!-- 物品详情（点击行打开） -->
-    <el-dialog v-model="detailDialog" title="物品详情" width="640px" destroy-on-close>
+    <el-dialog v-model="detailDialog" title="物品详情" width="640px" destroy-on-close :close-on-click-modal="true">
       <div v-if="detail" class="wh-detail">
         <div class="wh-detail-head">
           <span class="wh-detail-name">{{ detail.part.name }}</span>
@@ -789,13 +795,6 @@ const refreshAll = () => {
 
 const onSearch = () => {
   page.value = 1
-  // 在出入库记录 tab 搜索时，自动打开购物车抽屉并搜索
-  if (activeTab.value === '出入库记录' && keyword.value.trim()) {
-    scanKeyword.value = keyword.value.trim()
-    openCartDrawer()
-    nextTick(() => { if (scanKeyword.value.trim()) onScan() })
-    return
-  }
   loadData()
 }
 const onTabChange = () => {
@@ -972,10 +971,16 @@ const openDamaged = (row) => {
   returnDialog.value = true
 }
 
-const openReturnFromCart = (item) => {
-  actionRow.value = item
+const openReturnFromCart = async (item) => {
   scanKeyword.value = ''
   returnDialog.value = true
+  // 从 API 获取完整物品信息（cart item 缺少 stock_qty/total_qty 等字段）
+  try {
+    const res = await warehouseApi.detail(item.id)
+    actionRow.value = res.data.part || item
+  } catch {
+    actionRow.value = item
+  }
 }
 
 const openFinishRepair = (row) => {
@@ -1268,16 +1273,32 @@ const onScan = async () => {
   if (!kw) return
   scanLoading.value = true
   try {
-    const item = await findBestMatch(kw)
-    if (!item) {
+    // 搜索所有匹配的物品
+    const res = await warehouseApi.list({ keyword: kw, page: 1, page_size: 50 })
+    const items = res.data?.items || []
+    if (!items.length) {
       toast.error('未找到匹配物品')
-      scanKeyword.value = ''
-      focusScanInput()
       return
     }
-    addToCart(item)
+
+    // 筛选最终要添加的物品列表
+    let targetItems = items
+    // 治具：输入型号时，只添加同型号的
+    if (items.some(i => i.part_type === '治具')) {
+      const model = items.find(i => i.model === kw)?.model
+      if (model) {
+        targetItems = items.filter(i => i.model === model)
+      }
+    }
+
+    // 全部加入购物车，每个默认 1 件
+    let added = 0
+    for (const item of targetItems) {
+      addToCart(item, 1)   // 强制 qty=1，不触发库存不足提示
+      added++
+    }
     scanKeyword.value = ''
-    focusScanInput()
+    if (added > 0) toast.success(`已添加 ${added} 件到购物车`)
   } catch (e) {
     console.error(e)
     toast.error('搜索失败')
@@ -1325,7 +1346,7 @@ const findBestMatch = async (kw) => {
   return items.length > 0 ? items[0] : null
 }
 
-const addToCart = (item) => {
+const addToCart = (item, forceQty) => {
   let maxQty = 0
   if (scanMode.value === 'return') {
     maxQty = (item.total_qty || 0) - (item.available_qty || 0)
@@ -1336,6 +1357,14 @@ const addToCart = (item) => {
     } else {
       maxQty = item.stock_qty || item.total_qty || 0
     }
+  }
+  // 批量添加模式（从 onScan 自动加入）：已存在则跳过，不重复
+  if (forceQty !== undefined) {
+    const existing = cartItems.value.find(c => c.id === item.id)
+    if (existing) return
+    if (maxQty <= 0) return  // 无库存跳过
+    cartItems.value.push({ id: item.id, name: item.name, model: item.model, part_type: item.part_type, qty: forceQty, maxQty })
+    return
   }
   if (maxQty <= 0) {
     toast.error(`「${item.name}」${scanMode.value === 'return' ? '没有借出记录' : '库存不足'}`)

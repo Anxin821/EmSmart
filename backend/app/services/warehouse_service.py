@@ -241,13 +241,13 @@ def list_borrow_records(db: Session, part_id: int, active_only: bool = True) -> 
 
 
 def list_consume_records(db: Session, part_id: int, active_only: bool = True) -> List[dict]:
-    """查询耗材的领用记录（默认只看未归还的：return_time IS NULL）。"""
+    """查询耗材的领用/维修/丢失/损坏记录（默认只看未归还的：return_time IS NULL）。"""
     p = _get_part(db, part_id)
     if p.part_type != CONSUMABLE:
         raise HTTPException(status_code=400, detail="仅耗材有领用记录")
     q = db.query(PartTransaction).filter(
         PartTransaction.part_id == part_id,
-        PartTransaction.tx_type == "领用",
+        PartTransaction.tx_type.in_(["领用", "维修", "丢失", "损坏"]),
     )
     if active_only:
         q = q.filter(PartTransaction.return_time.is_(None))
@@ -471,336 +471,349 @@ def return_part(db: Session, part_id: int, data: dict, request, username: str) -
         raise HTTPException(status_code=400, detail="不支持的操作")
 
 
-def to_repair(db: Session, part_id: int, data: dict, request, username: str) -> dict:
-    """治具转维修。
-    
-    原借出流水直接改为"维修"类型，不新增单独记录。
-    """
-    p = _get_part(db, part_id)
-    if p.part_type != JIG:
-        raise HTTPException(status_code=400, detail="仅治具支持转维修操作")
-    record_id = data.get("borrow_record_id")
-    if not record_id:
-        raise HTTPException(status_code=400, detail="请选择要转维修的借出记录")
-    r = db.get(BorrowRecord, int(record_id))
-    if not r or r.part_id != p.id:
-        raise HTTPException(status_code=404, detail="借出记录不存在")
-    if r.status != "借出":
-        raise HTTPException(status_code=400, detail="该记录已归还或已转维修")
-    now = beijing_now()
-
-    # ① BorrowRecord 原地改状态
-    r.status = "维修"
-
-    # ② 原借出流水直接改为"维修"类型（不新增记录）
-    borrow_tx = db.query(PartTransaction).filter(
+def _change_tx_type(db: Session, p, from_type: str, operator, borrow_time, new_type: str, remark: str = ""):
+    """根据借出人+borrow_time 匹配 PartTransaction 并修改类型（治具用）。"""
+    tx = db.query(PartTransaction).filter(
         PartTransaction.part_id == p.id,
-        PartTransaction.tx_type == "借出",
-        PartTransaction.operator == r.borrower,
-        func.DATEDIFF(text("SECOND"), PartTransaction.borrow_time, r.borrow_time) == 0,
+        PartTransaction.tx_type == from_type,
+        PartTransaction.operator == operator,
+        func.DATEDIFF(text("SECOND"), PartTransaction.borrow_time, borrow_time) == 0,
         PartTransaction.return_time.is_(None)
     ).order_by(PartTransaction.id.desc()).first()
-    if borrow_tx:
-        borrow_tx.tx_type = "维修"
-        borrow_tx.remark = "设备维修中"
-        borrow_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
+    if tx:
+        tx.tx_type = new_type
+        tx.remark = remark or tx.remark
+        tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
 
-    # ③ repair_qty 增加
-    p.repair_qty = (p.repair_qty or 0) + r.qty
 
-    # ④ 更新最近借用人
-    next_active = (db.query(BorrowRecord)
-                     .filter(BorrowRecord.part_id == p.id,
-                             BorrowRecord.status == "借出")
-                     .order_by(BorrowRecord.id.desc()).first())
-    if next_active:
-        p.current_borrower = next_active.borrower
-        p.borrow_time = next_active.borrow_time
+def to_repair(db: Session, part_id: int, data: dict, request, username: str) -> dict:
+    """治具/耗材转维修。
+    
+    原借出/领用流水直接改为"维修"类型，不新增单独记录。
+    """
+    p = _get_part(db, part_id)
+    record_id = data.get("borrow_record_id")
+    if not record_id:
+        raise HTTPException(status_code=400, detail="请选择要转维修的记录")
+    
+    is_jig = p.part_type == JIG
+    
+    if is_jig:
+        r = db.get(BorrowRecord, int(record_id))
+        if not r or r.part_id != p.id:
+            raise HTTPException(status_code=404, detail="借出记录不存在")
+        if r.status != "借出":
+            raise HTTPException(status_code=400, detail="该记录已归还或已转维修")
+        r.status = "维修"
+        _change_tx_type(db, p, "借出", r.borrower, r.borrow_time, "维修", "设备维修中")
+        p.repair_qty = (p.repair_qty or 0) + r.qty
+        next_active = (db.query(BorrowRecord)
+                         .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
+                         .order_by(BorrowRecord.id.desc()).first())
+        if next_active:
+            p.current_borrower = next_active.borrower
+            p.borrow_time = next_active.borrow_time
+        else:
+            p.current_borrower = r.borrower
+            p.borrow_time = beijing_now()
     else:
-        p.current_borrower = r.borrower
-        p.borrow_time = now
-
+        # 耗材：PartTransaction tx_type="领用" → "维修"
+        tx = db.get(PartTransaction, int(record_id))
+        if not tx or tx.part_id != p.id:
+            raise HTTPException(status_code=404, detail="领用记录不存在")
+        if tx.tx_type != "领用":
+            raise HTTPException(status_code=400, detail="该记录不是领用状态，无法转维修")
+        tx.tx_type = "维修"
+        tx.remark = "耗材转维修中"
+    
     db.commit()
     db.refresh(p)
     write_operation_log(db, username, "REPAIR", "warehouse", str(p.id),
-                        f"治具转维修: {p.name} x{r.qty} 借用人:{r.borrower}", request)
+                        f"{p.part_type}转维修: {p.name} 记录ID:{record_id}", request)
     return _part_to_dict(p)
 
 
 def finish_repair(db: Session, part_id: int, data: dict, request, username: str) -> dict:
-    """治具维修完成：直接在原维修记录上更新归还时间和备注，不新增流水。"""
+    """治具/耗材维修完成。"""
     p = _get_part(db, part_id)
-    if p.part_type != JIG:
-        raise HTTPException(status_code=400, detail="仅治具支持维修完成操作")
-    qty = int(data.get("qty") or 0)
-    if qty <= 0:
-        qty = p.repair_qty or 0
-    if qty <= 0:
-        raise HTTPException(status_code=400, detail="该治具当前无维修中数量")
-    qty = min(qty, p.repair_qty or 0)
+    is_jig = p.part_type == JIG
     now = beijing_now()
 
-    # ① 找到当前"维修"记录，补归还时间和备注
-    repair_tx = db.query(PartTransaction).filter(
-        PartTransaction.part_id == p.id,
-        PartTransaction.tx_type == "维修",
-        PartTransaction.return_time.is_(None)
-    ).order_by(PartTransaction.id.desc()).first()
-    if repair_tx:
-        repair_tx.return_time = now
-        repair_tx.remark = "设备维修完成"
-        repair_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
+    if is_jig:
+        qty = int(data.get("qty") or 0)
+        if qty <= 0:
+            qty = p.repair_qty or 0
+        if qty <= 0:
+            raise HTTPException(status_code=400, detail="该治具当前无维修中数量")
+        qty = min(qty, p.repair_qty or 0)
 
-    # ② repair_qty 减回，available_qty 加回
-    p.repair_qty = (p.repair_qty or 0) - qty
-    p.available_qty = min(p.total_qty, p.available_qty + qty)
+        # ① 找到当前"维修"记录，补归还时间
+        repair_tx = db.query(PartTransaction).filter(
+            PartTransaction.part_id == p.id,
+            PartTransaction.tx_type == "维修",
+            PartTransaction.return_time.is_(None)
+        ).order_by(PartTransaction.id.desc()).first()
+        if repair_tx:
+            repair_tx.return_time = now
+            repair_tx.remark = "设备维修完成"
+            repair_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
 
-    # ③ 对应的 BorrowRecord 标记为已归还
-    repair_records = (db.query(BorrowRecord)
-                        .filter(BorrowRecord.part_id == p.id,
-                                BorrowRecord.status == "维修")
-                        .order_by(BorrowRecord.id.asc()).all())
-    remain = qty
-    for r in repair_records:
-        if remain <= 0:
-            break
-        if r.qty <= remain:
-            remain -= r.qty
-            r.status = "已归还"
+        # ② repair_qty 减回，available_qty 加回
+        p.repair_qty = (p.repair_qty or 0) - qty
+        p.available_qty = min(p.total_qty, p.available_qty + qty)
+
+        # ③ 对应的 BorrowRecord 标记为已归还
+        repair_records = (db.query(BorrowRecord)
+                            .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "维修")
+                            .order_by(BorrowRecord.id.asc()).all())
+        remain = qty
+        for r in repair_records:
+            if remain <= 0:
+                break
+            if r.qty <= remain:
+                remain -= r.qty
+                r.status = "已归还"
+            else:
+                r.qty -= remain
+                remain = 0
+
+        # ④ 更新最近借用人
+        next_active = (db.query(BorrowRecord)
+                         .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
+                         .order_by(BorrowRecord.id.desc()).first())
+        if next_active:
+            p.current_borrower = next_active.borrower
+            p.borrow_time = next_active.borrow_time
         else:
-            r.qty -= remain
-            remain = 0
-
-    # ④ 更新最近借用人
-    next_active = (db.query(BorrowRecord)
-                     .filter(BorrowRecord.part_id == p.id,
-                             BorrowRecord.status == "借出")
-                     .order_by(BorrowRecord.id.desc()).first())
-    if next_active:
-        p.current_borrower = next_active.borrower
-        p.borrow_time = next_active.borrow_time
+            p.current_borrower = None
+            p.borrow_time = None
     else:
-        p.current_borrower = None
-        p.borrow_time = None
+        # 耗材：PartTransaction tx_type="维修" → 补 return_time
+        record_id = data.get("borrow_record_id")
+        if not record_id:
+            raise HTTPException(status_code=400, detail="请选择要维修完成的记录")
+        tx = db.get(PartTransaction, int(record_id))
+        if not tx or tx.part_id != p.id:
+            raise HTTPException(status_code=404, detail="领用记录不存在")
+        if tx.tx_type != "维修":
+            raise HTTPException(status_code=400, detail="该记录不是维修状态")
+        if tx.return_time:
+            raise HTTPException(status_code=400, detail="该记录已处理")
+        tx.return_time = now
+        tx.remark = "耗材维修完成"
 
     db.commit()
     db.refresh(p)
     write_operation_log(db, username, "REPAIR_DONE", "warehouse", str(p.id),
-                        f"治具维修完成: {p.name} x{qty}", request)
+                        f"{p.part_type}维修完成: {p.name}", request)
     return _part_to_dict(p)
 
 
 def report_loss(db: Session, part_id: int, data: dict, request, username: str) -> dict:
-    """治具报失。
+    """治具/耗材报失。
     
-    原借出流水直接改为"丢失"类型，不新增单独记录。
+    原借出/领用流水直接改为"丢失"类型，不新增单独记录。
     """
     p = _get_part(db, part_id)
-    if p.part_type != JIG:
-        raise HTTPException(status_code=400, detail="仅治具支持报失操作")
     record_id = data.get("borrow_record_id")
     if not record_id:
-        raise HTTPException(status_code=400, detail="请选择要报失的借出记录")
-    r = db.get(BorrowRecord, int(record_id))
-    if not r or r.part_id != p.id:
-        raise HTTPException(status_code=404, detail="借出记录不存在")
-    if r.status != "借出":
-        raise HTTPException(status_code=400, detail="该记录已归还或已转维修")
-    now = beijing_now()
-
-    # ① 总数减 qty（丢失即从库存移除）
-    p.total_qty = max(0, (p.total_qty or 0) - r.qty)
-    p.available_qty = max(0, min(p.available_qty, p.total_qty))
-
-    # ② BorrowRecord 原地改状态
-    r.status = "丢失"
-
-    # ③ 原借出流水直接改为"丢失"类型（不新增记录）
-    borrow_tx = db.query(PartTransaction).filter(
-        PartTransaction.part_id == p.id,
-        PartTransaction.tx_type == "借出",
-        PartTransaction.operator == r.borrower,
-        func.DATEDIFF(text("SECOND"), PartTransaction.borrow_time, r.borrow_time) == 0,
-        PartTransaction.return_time.is_(None)
-    ).order_by(PartTransaction.id.desc()).first()
-    if borrow_tx:
-        borrow_tx.tx_type = "丢失"
-        borrow_tx.remark = "借出后丢失"
-
-    # ④ 更新最近借用人
-    next_active = (db.query(BorrowRecord)
-                     .filter(BorrowRecord.part_id == p.id,
-                             BorrowRecord.status == "借出")
-                     .order_by(BorrowRecord.id.desc()).first())
-    if next_active:
-        p.current_borrower = next_active.borrower
-        p.borrow_time = next_active.borrow_time
+        raise HTTPException(status_code=400, detail="请选择要报失的记录")
+    
+    is_jig = p.part_type == JIG
+    
+    if is_jig:
+        r = db.get(BorrowRecord, int(record_id))
+        if not r or r.part_id != p.id:
+            raise HTTPException(status_code=404, detail="借出记录不存在")
+        if r.status != "借出":
+            raise HTTPException(status_code=400, detail="该记录已归还或已转维修")
+        p.total_qty = max(0, (p.total_qty or 0) - r.qty)
+        p.available_qty = max(0, min(p.available_qty, p.total_qty))
+        r.status = "丢失"
+        _change_tx_type(db, p, "借出", r.borrower, r.borrow_time, "丢失", "借出后丢失")
+        next_active = (db.query(BorrowRecord)
+                         .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
+                         .order_by(BorrowRecord.id.desc()).first())
+        if next_active:
+            p.current_borrower = next_active.borrower
+            p.borrow_time = next_active.borrow_time
+        else:
+            p.current_borrower = None
+            p.borrow_time = None
     else:
-        p.current_borrower = None
-        p.borrow_time = None
+        # 耗材：PartTransaction tx_type="领用" → "丢失"
+        tx = db.get(PartTransaction, int(record_id))
+        if not tx or tx.part_id != p.id:
+            raise HTTPException(status_code=404, detail="领用记录不存在")
+        if tx.tx_type != "领用":
+            raise HTTPException(status_code=400, detail="该记录不是领用状态，无法报失")
+        tx.tx_type = "丢失"
+        tx.remark = "耗材报失"
 
     db.commit()
     db.refresh(p)
     write_operation_log(db, username, "LOSS", "warehouse", str(p.id),
-                        f"治具报失: {p.name} x{r.qty} 借用人:{r.borrower}", request)
+                        f"{p.part_type}报失: {p.name} 记录ID:{record_id}", request)
     return _part_to_dict(p)
 
 
 def found_back(db: Session, part_id: int, data: dict, request, username: str) -> dict:
-    """治具已找回：直接在原丢失记录上补归还时间和备注，不新增流水。"""
+    """治具/耗材已找回。"""
     p = _get_part(db, part_id)
-    if p.part_type != JIG:
-        raise HTTPException(status_code=400, detail="仅治具支持已找回操作")
     record_id = data.get("borrow_record_id")
-    if not record_id:
-        raise HTTPException(status_code=400, detail="请选择要已找回的丢失记录")
-    r = db.get(BorrowRecord, int(record_id))
-    if not r or r.part_id != p.id:
-        raise HTTPException(status_code=404, detail="借出记录不存在")
-    if r.status != "丢失":
-        raise HTTPException(status_code=400, detail="该记录不是丢失状态，无法执行已找回")
     now = beijing_now()
+    is_jig = p.part_type == JIG
 
-    # ① 总数和可用各加回 qty
-    p.total_qty = (p.total_qty or 0) + r.qty
-    p.available_qty = min(p.total_qty, (p.available_qty or 0) + r.qty)
-
-    # ② 借出记录改为"已归还"
-    r.status = "已归还"
-
-    # ③ 找到"丢失"记录，补归还时间和备注
-    loss_tx = db.query(PartTransaction).filter(
-        PartTransaction.part_id == p.id,
-        PartTransaction.tx_type == "丢失",
-        PartTransaction.return_time.is_(None)
-    ).order_by(PartTransaction.id.desc()).first()
-    if loss_tx:
-        loss_tx.return_time = now
-        loss_tx.remark = "丢失已找回"
-        loss_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
-
-    # ④ 更新最近借用人
-    next_active = (db.query(BorrowRecord)
-                     .filter(BorrowRecord.part_id == p.id,
-                             BorrowRecord.status == "借出")
-                     .order_by(BorrowRecord.id.desc()).first())
-    if next_active:
-        p.current_borrower = next_active.borrower
-        p.borrow_time = next_active.borrow_time
+    if is_jig:
+        if not record_id:
+            raise HTTPException(status_code=400, detail="请选择要已找回的丢失记录")
+        r = db.get(BorrowRecord, int(record_id))
+        if not r or r.part_id != p.id:
+            raise HTTPException(status_code=404, detail="借出记录不存在")
+        if r.status != "丢失":
+            raise HTTPException(status_code=400, detail="该记录不是丢失状态，无法执行已找回")
+        p.total_qty = (p.total_qty or 0) + r.qty
+        p.available_qty = min(p.total_qty, (p.available_qty or 0) + r.qty)
+        r.status = "已归还"
+        loss_tx = db.query(PartTransaction).filter(
+            PartTransaction.part_id == p.id,
+            PartTransaction.tx_type == "丢失",
+            PartTransaction.return_time.is_(None)
+        ).order_by(PartTransaction.id.desc()).first()
+        if loss_tx:
+            loss_tx.return_time = now
+            loss_tx.remark = "丢失已找回"
+            loss_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
+        next_active = (db.query(BorrowRecord)
+                         .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
+                         .order_by(BorrowRecord.id.desc()).first())
+        if next_active:
+            p.current_borrower = next_active.borrower
+            p.borrow_time = next_active.borrow_time
+        else:
+            p.current_borrower = None
+            p.borrow_time = None
     else:
-        p.current_borrower = None
-        p.borrow_time = None
+        # 耗材：PartTransaction tx_type="丢失" → 补 return_time
+        if not record_id:
+            raise HTTPException(status_code=400, detail="请选择要已找回的记录")
+        tx = db.get(PartTransaction, int(record_id))
+        if not tx or tx.part_id != p.id:
+            raise HTTPException(status_code=404, detail="领用记录不存在")
+        if tx.tx_type != "丢失":
+            raise HTTPException(status_code=400, detail="该记录不是丢失状态")
+        if tx.return_time:
+            raise HTTPException(status_code=400, detail="该记录已处理")
+        tx.return_time = now
+        tx.remark = "丢失已找回"
 
     db.commit()
     db.refresh(p)
     write_operation_log(db, username, "FOUND_BACK", "warehouse", str(p.id),
-                        f"治具已找回: {p.name} x{r.qty} 借用人:{r.borrower}", request)
+                        f"{p.part_type}已找回: {p.name}", request)
     return _part_to_dict(p)
 
 
 def report_damaged(db: Session, part_id: int, data: dict, request, username: str) -> dict:
-    """治具报损。
+    """治具/耗材报损。
     
-    原借出流水直接改为"损坏"类型，不新增单独记录。
+    原借出/领用流水直接改为"损坏"类型，不新增单独记录。
     """
     p = _get_part(db, part_id)
-    if p.part_type != JIG:
-        raise HTTPException(status_code=400, detail="仅治具支持报损操作")
     record_id = data.get("borrow_record_id")
     if not record_id:
-        raise HTTPException(status_code=400, detail="请选择要报损的借出记录")
-    r = db.get(BorrowRecord, int(record_id))
-    if not r or r.part_id != p.id:
-        raise HTTPException(status_code=404, detail="借出记录不存在")
-    if r.status != "借出":
-        raise HTTPException(status_code=400, detail="该记录已归还或已转维修")
-    now = beijing_now()
-
-    # ① 总数不变，可用减少
-    p.available_qty = max(0, (p.available_qty or 0) - r.qty)
-
-    # ② BorrowRecord 原地改状态
-    r.status = "损坏"
-
-    # ③ 原借出流水直接改为"损坏"类型（不新增记录）
-    borrow_tx = db.query(PartTransaction).filter(
-        PartTransaction.part_id == p.id,
-        PartTransaction.tx_type == "借出",
-        PartTransaction.operator == r.borrower,
-        func.DATEDIFF(text("SECOND"), PartTransaction.borrow_time, r.borrow_time) == 0,
-        PartTransaction.return_time.is_(None)
-    ).order_by(PartTransaction.id.desc()).first()
-    if borrow_tx:
-        borrow_tx.tx_type = "损坏"
-        borrow_tx.remark = "借出后损坏"
-
-    # ④ 更新最近借用人
-    next_active = (db.query(BorrowRecord)
-                     .filter(BorrowRecord.part_id == p.id,
-                             BorrowRecord.status == "借出")
-                     .order_by(BorrowRecord.id.desc()).first())
-    if next_active:
-        p.current_borrower = next_active.borrower
-        p.borrow_time = next_active.borrow_time
+        raise HTTPException(status_code=400, detail="请选择要报损的记录")
+    
+    is_jig = p.part_type == JIG
+    
+    if is_jig:
+        r = db.get(BorrowRecord, int(record_id))
+        if not r or r.part_id != p.id:
+            raise HTTPException(status_code=404, detail="借出记录不存在")
+        if r.status != "借出":
+            raise HTTPException(status_code=400, detail="该记录已归还或已转维修")
+        p.available_qty = max(0, (p.available_qty or 0) - r.qty)
+        r.status = "损坏"
+        _change_tx_type(db, p, "借出", r.borrower, r.borrow_time, "损坏", "借出后损坏")
+        next_active = (db.query(BorrowRecord)
+                         .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
+                         .order_by(BorrowRecord.id.desc()).first())
+        if next_active:
+            p.current_borrower = next_active.borrower
+            p.borrow_time = next_active.borrow_time
+        else:
+            p.current_borrower = None
+            p.borrow_time = None
     else:
-        p.current_borrower = None
-        p.borrow_time = None
+        # 耗材：PartTransaction tx_type="领用" → "损坏"
+        tx = db.get(PartTransaction, int(record_id))
+        if not tx or tx.part_id != p.id:
+            raise HTTPException(status_code=404, detail="领用记录不存在")
+        if tx.tx_type != "领用":
+            raise HTTPException(status_code=400, detail="该记录不是领用状态，无法报损")
+        tx.tx_type = "损坏"
+        tx.remark = "耗材报损"
 
     db.commit()
     db.refresh(p)
     write_operation_log(db, username, "DAMAGED", "warehouse", str(p.id),
-                        f"治具报损: {p.name} x{r.qty} 借用人:{r.borrower}", request)
+                        f"{p.part_type}报损: {p.name} 记录ID:{record_id}", request)
     return _part_to_dict(p)
 
 
 def repair_damaged(db: Session, part_id: int, data: dict, request, username: str) -> dict:
-    """治具已修复：直接在原损坏记录上补归还时间和备注，不新增流水。"""
+    """治具/耗材已修复。"""
     p = _get_part(db, part_id)
-    if p.part_type != JIG:
-        raise HTTPException(status_code=400, detail="仅治具支持已修复操作")
     record_id = data.get("borrow_record_id")
-    if not record_id:
-        raise HTTPException(status_code=400, detail="请选择要已修复的损坏记录")
-    r = db.get(BorrowRecord, int(record_id))
-    if not r or r.part_id != p.id:
-        raise HTTPException(status_code=404, detail="借出记录不存在")
-    if r.status != "损坏":
-        raise HTTPException(status_code=400, detail="该记录不是损坏状态，无法执行已修复")
     now = beijing_now()
+    is_jig = p.part_type == JIG
 
-    # ① 总数不变，可用加回
-    p.available_qty = min(p.total_qty, (p.available_qty or 0) + r.qty)
-
-    # ② 借出记录改为"已归还"
-    r.status = "已归还"
-
-    # ③ 找到"损坏"记录，补归还时间和备注
-    damaged_tx = db.query(PartTransaction).filter(
-        PartTransaction.part_id == p.id,
-        PartTransaction.tx_type == "损坏",
-        PartTransaction.return_time.is_(None)
-    ).order_by(PartTransaction.id.desc()).first()
-    if damaged_tx:
-        damaged_tx.return_time = now
-        damaged_tx.remark = "损坏已修复"
-        damaged_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
-
-    # ④ 更新最近借用人
-    next_active = (db.query(BorrowRecord)
-                     .filter(BorrowRecord.part_id == p.id,
-                             BorrowRecord.status == "借出")
-                     .order_by(BorrowRecord.id.desc()).first())
-    if next_active:
-        p.current_borrower = next_active.borrower
-        p.borrow_time = next_active.borrow_time
+    if is_jig:
+        if not record_id:
+            raise HTTPException(status_code=400, detail="请选择要已修复的损坏记录")
+        r = db.get(BorrowRecord, int(record_id))
+        if not r or r.part_id != p.id:
+            raise HTTPException(status_code=404, detail="借出记录不存在")
+        if r.status != "损坏":
+            raise HTTPException(status_code=400, detail="该记录不是损坏状态，无法执行已修复")
+        p.available_qty = min(p.total_qty, (p.available_qty or 0) + r.qty)
+        r.status = "已归还"
+        damaged_tx = db.query(PartTransaction).filter(
+            PartTransaction.part_id == p.id,
+            PartTransaction.tx_type == "损坏",
+            PartTransaction.return_time.is_(None)
+        ).order_by(PartTransaction.id.desc()).first()
+        if damaged_tx:
+            damaged_tx.return_time = now
+            damaged_tx.remark = "损坏已修复"
+            damaged_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
+        next_active = (db.query(BorrowRecord)
+                         .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
+                         .order_by(BorrowRecord.id.desc()).first())
+        if next_active:
+            p.current_borrower = next_active.borrower
+            p.borrow_time = next_active.borrow_time
+        else:
+            p.current_borrower = None
+            p.borrow_time = None
     else:
-        p.current_borrower = None
-        p.borrow_time = None
+        # 耗材：PartTransaction tx_type="损坏" → 补 return_time
+        if not record_id:
+            raise HTTPException(status_code=400, detail="请选择要已修复的记录")
+        tx = db.get(PartTransaction, int(record_id))
+        if not tx or tx.part_id != p.id:
+            raise HTTPException(status_code=404, detail="领用记录不存在")
+        if tx.tx_type != "损坏":
+            raise HTTPException(status_code=400, detail="该记录不是损坏状态")
+        if tx.return_time:
+            raise HTTPException(status_code=400, detail="该记录已处理")
+        tx.return_time = now
+        tx.remark = "损坏已修复"
 
     db.commit()
     db.refresh(p)
     write_operation_log(db, username, "REPAIR_DAMAGED", "warehouse", str(p.id),
-                        f"治具已修复: {p.name} x{r.qty} 借用人:{r.borrower}", request)
+                        f"{p.part_type}已修复: {p.name}", request)
     return _part_to_dict(p)
 
 
