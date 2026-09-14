@@ -65,7 +65,7 @@
             <div class="wh-table-wrap">
               <el-table :data="filteredTxRecords" v-loading="txLoading" stripe border size="small" empty-text="暂无记录"
   :header-cell-style="{ fontWeight: 600, textAlign: 'center' }" height="100%">
-                <el-table-column label="时间" prop="created_at" width="155" align="center" />
+                <el-table-column label="时间" prop="created_at" width="140" align="center" />
                 <el-table-column label="操作" width="70" align="center">
                   <template #default="{ row }">
                     <el-tag v-if="row.tx_type === '借出' && row.return_time" type="success" size="small">已归还</el-tag>
@@ -73,21 +73,21 @@
                   </template>
                 </el-table-column>
                 <el-table-column label="物品" prop="part_name" min-width="120" show-overflow-tooltip />
-                <el-table-column label="数量" prop="qty" width="60" align="center" />
-                <el-table-column label="借/领人" prop="operator" width="100" show-overflow-tooltip />
-                <el-table-column label="部门负责人" prop="department_manager" width="100" show-overflow-tooltip>
+                <el-table-column label="数量" prop="qty" width="50" align="center" />
+                <el-table-column label="借/领人" prop="operator" width="80" show-overflow-tooltip />
+                <el-table-column label="部门负责人" prop="department_manager" width="90" show-overflow-tooltip>
                   <template #default="{ row }">{{ row.department_manager || '-' }}</template>
                 </el-table-column>
-                <el-table-column label="线体" prop="line" width="80" show-overflow-tooltip>
+                <el-table-column label="线体" prop="line" width="50" show-overflow-tooltip>
                   <template #default="{ row }">{{ row.line || '-' }}</template>
                 </el-table-column>
-                <el-table-column label="借出时间" prop="borrow_time" width="155" align="center">
+                <el-table-column label="借出时间" prop="borrow_time" width="140" align="center">
                   <template #default="{ row }">{{ row.borrow_time || '-' }}</template>
                 </el-table-column>
-                <el-table-column label="归还时间" prop="return_time" width="155" align="center">
+                <el-table-column label="归还时间" prop="return_time" width="140" align="center">
                   <template #default="{ row }">{{ row.return_time || '-' }}</template>
                 </el-table-column>
-                <el-table-column label="备注" min-width="120" show-overflow-tooltip>
+                <el-table-column label="备注" min-width="100" show-overflow-tooltip>
                   <template #default="{ row }">
                     <div class="tx-remark-cell" @click.stop="userStore.canEdit && openEditRemark(row)">
                       <span>{{ row.remark || '-' }}</span>
@@ -685,23 +685,17 @@ const txFilterType = ref('')
 const txFilterPart = ref('')
 const txFilterOperator = ref('')
 
-// 筛选后的记录
+// 筛选后的记录（仅保留后端不支持的客户端筛选：操作时间 / 已归还虚拟类型）
 const filteredTxRecords = computed(() => {
   return txRecords.value.filter(r => {
     if (txFilterTime.value && !(r.created_at || '').includes(txFilterTime.value.trim())) return false
     if (txFilterType.value === '已归还') {
-      // 新格式：借出+归还时间；兼容旧格式：tx_type=归还
+      // 已归还 = 借出+有归还时间 或 tx_type=归还
       if (r.tx_type === '借出' && r.return_time) return true
       if (r.tx_type === '归还') return true
       return false
-    } else if (txFilterType.value === '借出') {
-      // 新格式：借出+未归还；旧格式没有"借出中"，忽略
-      if (r.tx_type !== '借出' || r.return_time) return false
-    } else if (txFilterType.value && r.tx_type !== txFilterType.value) {
-      return false
     }
-    if (txFilterPart.value && !(r.part_name || '').toLowerCase().includes(txFilterPart.value.trim().toLowerCase())) return false
-    if (txFilterOperator.value && !(r.operator || '').toLowerCase().includes(txFilterOperator.value.trim().toLowerCase())) return false
+    // txFilterType / txFilterPart / txFilterOperator 已由后端处理，前端不再重复过滤
     return true
   })
 })
@@ -718,6 +712,20 @@ const loadTxData = async () => {
   txLoading.value = true
   try {
     const params = { page: txPage.value, page_size: txPageSize.value }
+    // 将前端筛选条件发给后端，保证分页 total 与筛选结果一致
+    if (txFilterType.value) {
+      if (txFilterType.value === '已归还') {
+        // "已归还"是前端虚拟类型，后端不支持，暂不传 tx_type
+        // 但把 keyword 带上以支持文本搜索
+      } else {
+        params.tx_type = txFilterType.value
+      }
+    }
+    // 构造 keyword 支持物品名+借/领人同时搜索（后端 keyword 会搜 part_name, operator, remark 等）
+    const kwParts = []
+    if (txFilterPart.value?.trim()) kwParts.push(txFilterPart.value.trim())
+    if (txFilterOperator.value?.trim()) kwParts.push(txFilterOperator.value.trim())
+    if (kwParts.length) params.keyword = kwParts.join(' ')
     const res = await warehouseApi.transactions(params)
     txRecords.value = res.data?.items || []
     txTotal.value = res.data?.total || 0
@@ -731,6 +739,10 @@ const loadTxData = async () => {
 }
 
 watch([txPage, txPageSize], () => loadTxData())
+watch([txFilterType, txFilterPart, txFilterOperator], () => {
+  txPage.value = 1
+  loadTxData()
+})
 
 const statusTagType = (row) => {
   if (row.part_type === '治具') {

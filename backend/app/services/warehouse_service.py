@@ -9,7 +9,7 @@ from typing import Optional, Tuple, List, Dict, Any
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, func, text
 
 from app.core.timeutil import beijing_now
 from app.core.crud import write_operation_log
@@ -425,7 +425,7 @@ def return_part(db: Session, part_id: int, data: dict, request, username: str) -
             PartTransaction.part_id == p.id,
             PartTransaction.tx_type == "借出",
             PartTransaction.operator == r.borrower,
-            PartTransaction.borrow_time == r.borrow_time,
+            func.DATEDIFF(text("SECOND"), PartTransaction.borrow_time, r.borrow_time) == 0,
             PartTransaction.return_time.is_(None)
         ).order_by(PartTransaction.id.desc()).first()
         if borrow_tx:
@@ -498,7 +498,7 @@ def to_repair(db: Session, part_id: int, data: dict, request, username: str) -> 
         PartTransaction.part_id == p.id,
         PartTransaction.tx_type == "借出",
         PartTransaction.operator == r.borrower,
-        PartTransaction.borrow_time == r.borrow_time,
+        func.DATEDIFF(text("SECOND"), PartTransaction.borrow_time, r.borrow_time) == 0,
         PartTransaction.return_time.is_(None)
     ).order_by(PartTransaction.id.desc()).first()
     if borrow_tx:
@@ -626,7 +626,7 @@ def report_loss(db: Session, part_id: int, data: dict, request, username: str) -
         PartTransaction.part_id == p.id,
         PartTransaction.tx_type == "借出",
         PartTransaction.operator == r.borrower,
-        PartTransaction.borrow_time == r.borrow_time,
+        func.DATEDIFF(text("SECOND"), PartTransaction.borrow_time, r.borrow_time) == 0,
         PartTransaction.return_time.is_(None)
     ).order_by(PartTransaction.id.desc()).first()
     if borrow_tx:
@@ -739,7 +739,7 @@ def report_damaged(db: Session, part_id: int, data: dict, request, username: str
         PartTransaction.part_id == p.id,
         PartTransaction.tx_type == "借出",
         PartTransaction.operator == r.borrower,
-        PartTransaction.borrow_time == r.borrow_time,
+        func.DATEDIFF(text("SECOND"), PartTransaction.borrow_time, r.borrow_time) == 0,
         PartTransaction.return_time.is_(None)
     ).order_by(PartTransaction.id.desc()).first()
     if borrow_tx:
