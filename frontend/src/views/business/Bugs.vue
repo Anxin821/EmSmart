@@ -35,11 +35,11 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="title" label="标题" min-width="200" align="center" show-overflow-tooltip>
+        <el-table-column prop="title" label="标题" min-width="220" align="center" show-overflow-tooltip>
           <template #default="{ row }">{{ row.title || '-' }}</template>
         </el-table-column>
 
-        <el-table-column prop="severity" label="严重等级" width="100" align="center">
+        <el-table-column prop="severity" label="严重等级" width="80" align="center">
           <template #default="{ row }">
             <span :class="'status-badge ' + getStatusClass(cleanStatus(row.severity))">{{ cleanStatus(row.severity) }}</span>
           </template>
@@ -49,7 +49,7 @@
           <template #default="{ row }">{{ row.module || '-' }}</template>
         </el-table-column>
 
-        <el-table-column prop="status" label="状态" width="90" align="center">
+        <el-table-column prop="status" label="状态" width="85" align="center">
           <template #default="{ row }">
             <span :class="'status-badge ' + getStatusClass(cleanStatus(row.status))">{{ cleanStatus(row.status) }}</span>
           </template>
@@ -63,11 +63,11 @@
           <template #default="{ row }">{{ row.assignee || '-' }}</template>
         </el-table-column>
 
-        <el-table-column prop="deadline" label="截止日期" width="110" align="center">
+        <el-table-column prop="deadline" label="截止日期" width="100" align="center">
           <template #default="{ row }">{{ row.deadline ? row.deadline.slice(0, 10) : '-' }}</template>
         </el-table-column>
 
-        <el-table-column prop="created_at" label="录入时间" width="160" align="center">
+        <el-table-column prop="created_at" label="录入时间" width="130" align="center">
           <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
         </el-table-column>
 

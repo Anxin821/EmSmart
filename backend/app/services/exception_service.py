@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 import uuid
+import random
 
 from app.models.exception import ExceptionRecord
 from app.repositories.exception_repository import ExceptionRepository
@@ -55,18 +56,20 @@ class ExceptionService:
 
     @staticmethod
     def create(db: Session, data: ExceptionRecordCreate, username: str):
-        # 生成主键（UUID，与已有记录的字符串主键风格一致）
         dict_data = data.model_dump()
         dict_data["id"] = uuid.uuid4().hex.upper()
 
-        # 生成编号：EXC-20260908-001
-        today = beijing_now().strftime("%Y%m%d")
-        count = db.query(ExceptionRecord).filter(
-            ExceptionRecord.exception_no.like(f"EXC-{today}%")
-        ).count()
-        no = f"EXC-{today}-{str(count + 1).zfill(3)}"
+        # 生成 5 位随机编号（10000-99999），保证在 exception_no 列不重复
+        for _ in range(1000):
+            candidate = str(random.randint(10000, 99999))
+            if not db.query(ExceptionRecord).filter(
+                ExceptionRecord.exception_no == candidate
+            ).first():
+                dict_data["exception_no"] = candidate
+                break
+        else:
+            raise ValueError("无法生成唯一的 5 位编号，请稍后重试")
 
-        dict_data["exception_no"] = no
         dict_data["created_by"] = username
         record = ExceptionRepository.create(db, dict_data)
         return _to_dict(record)

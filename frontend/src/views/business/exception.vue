@@ -111,7 +111,7 @@
     <div class="page-content exc-list">
       <div class="table-wrap">
         <el-table v-loading="loading" :data="items" stripe border height="100%" style="width:100%" @row-click="openDetail" row-class-name="row-clickable">
-          <el-table-column prop="exception_no" label="编号" width="130" align="center" header-align="center" show-overflow-tooltip />
+          <el-table-column prop="exception_no" label="编号" width="60" align="center" header-align="center" show-overflow-tooltip />
           <el-table-column prop="occurred_time" label="发生时间" width="145" align="center" header-align="center" show-overflow-tooltip>
             <template #default="{ row }">{{ formatTime(row.occurred_time) }}</template>
           </el-table-column>
