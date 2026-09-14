@@ -120,6 +120,18 @@ def list_borrow_records(
     return ApiResponse(data=records)
 
 
+@router.get("/parts/{part_id}/consume-records")
+def list_consume_records(
+    part_id: int,
+    active_only: bool = Query(True),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """查询耗材的领用记录（默认只看未归还的）。"""
+    records = service.list_consume_records(db, part_id, active_only=active_only)
+    return ApiResponse(data=records)
+
+
 @router.get("/parts/{part_id}/transactions")
 def list_part_transactions(
     part_id: int,

@@ -21,6 +21,8 @@ export const warehouseApi = {
   damaged: (id, data) => api.post(`/warehouse/parts/${id}/damaged`, data),
   // 借出记录列表（active_only: true 只看未归还的）
   borrowRecords: (id, active_only = true) => api.get(`/warehouse/parts/${id}/borrow-records`, { params: { active_only } }),
+  // 耗材领用记录列表（active_only: true 只看未归还的）
+  consumeRecords: (id, active_only = true) => api.get(`/warehouse/parts/${id}/consume-records`, { params: { active_only } }),
   // 耗材领用 / 补货
   consume: (id, data) => api.post(`/warehouse/parts/${id}/consume`, data),
   restock: (id, data) => api.post(`/warehouse/parts/${id}/restock`, data),

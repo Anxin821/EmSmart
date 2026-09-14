@@ -70,6 +70,8 @@ def _tx_to_dict(t: PartTransaction) -> Dict[str, Any]:
         "part_id": t.part_id,
         "part_name": t.part_name,
         "tx_type": t.tx_type,
+        # 借出记录：有 return_time 视为已归还，无 return_time 视为借出中
+        "display_status": "已归还" if (t.tx_type in ("借出",) and t.return_time) else None,
         "qty": t.qty,
         "operator": t.operator or "",
         "department_manager": t.department_manager or "",
@@ -238,6 +240,21 @@ def list_borrow_records(db: Session, part_id: int, active_only: bool = True) -> 
     return [_borrow_to_dict(r) for r in records]
 
 
+def list_consume_records(db: Session, part_id: int, active_only: bool = True) -> List[dict]:
+    """查询耗材的领用记录（默认只看未归还的：return_time IS NULL）。"""
+    p = _get_part(db, part_id)
+    if p.part_type != CONSUMABLE:
+        raise HTTPException(status_code=400, detail="仅耗材有领用记录")
+    q = db.query(PartTransaction).filter(
+        PartTransaction.part_id == part_id,
+        PartTransaction.tx_type == "领用",
+    )
+    if active_only:
+        q = q.filter(PartTransaction.return_time.is_(None))
+    records = q.order_by(PartTransaction.id.desc()).all()
+    return [_tx_to_dict(r) for r in records]
+
+
 # ---------------- CRUD ----------------
 def create_part(db: Session, data: dict, request, username: str) -> dict:
     name = (data.get("name") or "").strip()
@@ -369,10 +386,11 @@ def borrow(db: Session, part_id: int, data: dict, request, username: str) -> dic
     p.available_qty -= qty
     p.current_borrower = borrower
     p.borrow_time = beijing_now()
-    # 创建借出记录
+    # 创建借出记录（borrow_time 与 PartTransaction 保持一致，便于归还时匹配）
     db.add(BorrowRecord(
         part_id=p.id, borrower=borrower, department_manager=dept_mgr,
-        line=line, qty=qty, remark=data.get("remark") or "",
+        line=line, qty=qty, borrow_time=p.borrow_time,
+        remark=data.get("remark") or "",
     ))
     _add_tx(db, p, "借出", qty, operator=borrower, department_manager=dept_mgr,
             line=line, remark=data.get("remark") or "",
@@ -385,42 +403,71 @@ def borrow(db: Session, part_id: int, data: dict, request, username: str) -> dic
 
 
 def return_part(db: Session, part_id: int, data: dict, request, username: str) -> dict:
-    """治具归还：按 borrow_record_id 归还指定借出记录（支持多人分别归还）。"""
+    """归还：治具按 borrow_record_id 归还；耗材按 consume_tx_id 归还（补 return_time）。"""
     p = _get_part(db, part_id)
-    if p.part_type != JIG:
-        raise HTTPException(status_code=400, detail="仅治具支持归还操作")
-    record_id = data.get("borrow_record_id")
-    if not record_id:
-        raise HTTPException(status_code=400, detail="请选择要归还的借出记录")
-    r = db.get(BorrowRecord, int(record_id))
-    if not r or r.part_id != p.id:
-        raise HTTPException(status_code=404, detail="借出记录不存在")
-    if r.status != "借出":
-        raise HTTPException(status_code=400, detail="该记录已归还或已转维修")
-    # 归还：可用+qty，记录标记已归还
-    p.available_qty += r.qty
-    r.status = "已归还"
     return_now = beijing_now()
-    # 更新最近借用人（取下一条未归还记录）
-    next_active = (db.query(BorrowRecord)
-                     .filter(BorrowRecord.part_id == p.id,
-                             BorrowRecord.status == "借出")
-                     .order_by(BorrowRecord.id.desc()).first())
-    if next_active:
-        p.current_borrower = next_active.borrower
-        p.borrow_time = next_active.borrow_time
+
+    if p.part_type == JIG:
+        # ---- 治具归还 ----
+        record_id = data.get("borrow_record_id")
+        if not record_id:
+            raise HTTPException(status_code=400, detail="请选择要归还的借出记录")
+        r = db.get(BorrowRecord, int(record_id))
+        if not r or r.part_id != p.id:
+            raise HTTPException(status_code=404, detail="借出记录不存在")
+        if r.status != "借出":
+            raise HTTPException(status_code=400, detail="该记录已归还或已转维修")
+        p.available_qty = min(p.total_qty, p.available_qty + r.qty)
+        r.status = "已归还"
+        # 找到对应的借出流水，补上归还时间
+        borrow_tx = db.query(PartTransaction).filter(
+            PartTransaction.part_id == p.id,
+            PartTransaction.tx_type == "借出",
+            PartTransaction.operator == r.borrower,
+            PartTransaction.borrow_time == r.borrow_time,
+            PartTransaction.return_time.is_(None)
+        ).order_by(PartTransaction.id.desc()).first()
+        if borrow_tx:
+            borrow_tx.return_time = return_now
+        # 更新最近借用人
+        next_active = (db.query(BorrowRecord)
+                         .filter(BorrowRecord.part_id == p.id,
+                                 BorrowRecord.status == "借出")
+                         .order_by(BorrowRecord.id.desc()).first())
+        if next_active:
+            p.current_borrower = next_active.borrower
+            p.borrow_time = next_active.borrow_time
+        else:
+            p.current_borrower = None
+            p.borrow_time = None
+        db.commit()
+        db.refresh(p)
+        write_operation_log(db, username, "RETURN", "warehouse", str(p.id),
+                            f"治具归还: {p.name} x{r.qty} 归还人:{r.borrower}", request)
+        return _part_to_dict(p)
+
+    elif p.part_type == CONSUMABLE:
+        # ---- 耗材归还 ----
+        consume_tx_id = data.get("consume_tx_id")
+        if not consume_tx_id:
+            raise HTTPException(status_code=400, detail="请选择要归还的领用记录")
+        tx = db.get(PartTransaction, int(consume_tx_id))
+        if not tx or tx.part_id != p.id:
+            raise HTTPException(status_code=404, detail="领用记录不存在")
+        if tx.tx_type != "领用":
+            raise HTTPException(status_code=400, detail="该记录不是领用记录")
+        if tx.return_time:
+            raise HTTPException(status_code=400, detail="该记录已归还")
+        tx.return_time = return_now
+        p.total_qty += tx.qty
+        db.commit()
+        db.refresh(p)
+        write_operation_log(db, username, "RETURN", "warehouse", str(p.id),
+                            f"耗材归还: {p.name} x{tx.qty} 归还人:{tx.operator}", request)
+        return _part_to_dict(p)
+
     else:
-        p.current_borrower = None
-        p.borrow_time = None
-    _add_tx(db, p, "归还", r.qty, operator=r.borrower or "",
-            department_manager=r.department_manager or "", line=r.line or "",
-            remark=data.get("remark") or "",
-            borrow_time=r.borrow_time, return_time=return_now)
-    db.commit()
-    db.refresh(p)
-    write_operation_log(db, username, "RETURN", "warehouse", str(p.id),
-                        f"治具归还: {p.name} x{r.qty} 归还人:{r.borrower}", request)
-    return _part_to_dict(p)
+        raise HTTPException(status_code=400, detail="不支持的操作")
 
 
 def to_repair(db: Session, part_id: int, data: dict, request, username: str) -> dict:

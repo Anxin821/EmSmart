@@ -59,8 +59,8 @@ class PartTransaction(Base):
     operator = Column(String(50))                       # 借用人 / 领用人
     department_manager = Column(String(50))             # 部门负责人
     line = Column(String(20))                           # 线体
-    borrow_time = Column(DateTime)                      # 借出时间
-    return_time = Column(DateTime)                      # 归还时间
+    borrow_time = Column(DateTime)                      # 借出 / 领用 时间
+    return_time = Column(DateTime)                      # 归还时间（借出/领用记录有此值 = 已归还，前端显示"已归还"）
     remark = Column(String(255))                        # 备注（可编辑）
     created_at = Column(DateTime, default=beijing_now)
 
