@@ -111,16 +111,20 @@
     <div class="page-content exc-list">
       <div class="table-wrap">
         <el-table v-loading="loading" :data="items" stripe border height="100%" style="width:100%" @row-click="openDetail" row-class-name="row-clickable">
-          <el-table-column prop="exception_no" label="编号" width="150" align="center" header-align="center" show-overflow-tooltip />
-          <el-table-column prop="occurred_time" label="发生时间" width="155" align="center" header-align="center" show-overflow-tooltip>
+          <el-table-column prop="exception_no" label="编号" width="130" align="center" header-align="center" show-overflow-tooltip />
+          <el-table-column prop="occurred_time" label="发生时间" width="145" align="center" header-align="center" show-overflow-tooltip>
             <template #default="{ row }">{{ formatTime(row.occurred_time) }}</template>
           </el-table-column>
-          <el-table-column prop="exception_type" label="类型" width="95" align="center" header-align="center">
+          <el-table-column prop="exception_type" label="类型" width="80" align="center" header-align="center">
             <template #default="{ row }"><span class="status-badge">{{ row.exception_type }}</span></template>
           </el-table-column>
-          <el-table-column prop="phenomenon_desc" label="现象描述" min-width="220" align="center" header-align="center" show-overflow-tooltip />
-          <el-table-column prop="responsible_person" label="责任人" width="85" align="center" header-align="center" show-overflow-tooltip />
-          <el-table-column prop="status" label="状态" width="90" align="center" header-align="center">
+          <el-table-column prop="phenomenon_desc" label="现象描述" min-width="260" align="left" header-align="center" show-overflow-tooltip>
+            <template #default="{ row }">
+              <div class="exc-desc-cell">{{ row.phenomenon_desc }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="responsible_person" label="责任人" width="95" align="center" header-align="center" show-overflow-tooltip />
+          <el-table-column prop="status" label="状态" width="80" align="center" header-align="center">
             <template #default="{ row }">
               <span :class="'status-badge ' + statusClass(row.status)">{{ statusLabel(row.status) }}</span>
             </template>
@@ -665,4 +669,15 @@ onMounted(() => {
 
 /* 状态徽章 - 等级染色 */
 .status-badge.danger { background: #fee2e2; color: #b91c1c; }
+
+/* 现象描述列文字换行：覆盖全局 nowrap，同时利用 show-overflow-tooltip 展示全文 */
+.exc-desc-cell {
+  white-space: pre-wrap !important;
+  word-break: break-all;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 </style>

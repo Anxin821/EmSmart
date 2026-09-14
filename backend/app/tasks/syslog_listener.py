@@ -1,6 +1,11 @@
 """Syslog UDP 监听守护线程（迁移自 wifi-monitor/syslog_listener.py）。
+
 工作流程：UDP recvfrom → UTF-8/GBK 解码 → 解析时间/等级/消息 →
 关键词或严重等级命中 → network_service.record_syslog_alert（落库 + 钉钉）。
+
+同时包含 Ping 连通监控：每 2 秒 Ping 一次 syslog 源 IP，
+连续 3 次不通则推送钉钉离线告警，恢复后推送恢复通知。
+
 设计要点：
 - 以 daemon 线程在 FastAPI lifespan 中启动，随进程退出自动结束；
 - 监听开关 / 端口 / 关键词全部读 settings 表，界面保存后下一轮自动生效，无需重启；
@@ -11,8 +16,10 @@
 from __future__ import annotations
 import re
 import socket
+import subprocess
 import threading
-from typing import TYPE_CHECKING
+import time
+from typing import TYPE_CHECKING, Dict, Tuple
 # 「日期时间 + Tab + 剩余内容」格式（旧 wifi-monitor 设备上报格式）
 _TS_TAB_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\t+(.*)")
 # H3C/标准 Syslog：<PRI>时间戳 主机名 正文（空格分隔），如
@@ -106,6 +113,85 @@ def should_alert(parsed: dict, keywords: list[str]) -> bool:
         return True
     level = (parsed.get("level") or "").strip().lower()
     return level in SYSLOG_ALERT_LEVELS
+
+
+# ============================================================
+# Ping 连通监控（追踪 syslog 源 IP，连续 3 次不通发钉钉）
+# ============================================================
+_PING_FAIL_COUNT: Dict[str, int] = {}         # IP → 连续失败次数
+_PING_ALERTED: Dict[str, bool] = {}           # IP → 是否已推送离线告警
+_PING_SRC_IPS: Dict[str, float] = {}          # IP → 最近一次收到 syslog 的时间
+
+
+def _ping(host: str, timeout_ms: int = 2000) -> bool:
+    """Windows PowerShell 下 ICMP ping，超时 2 秒。"""
+    try:
+        result = subprocess.run(
+            ["ping", "-n", "1", "-w", str(timeout_ms), host],
+            capture_output=True, text=True, timeout=3
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def _get_dingtalk_config(db) -> Tuple[str, str]:
+    """从 settings 表读取钉钉配置。"""
+    from app.services.network_service import get_settings
+    cfg = get_settings(db)
+    return cfg.get("dingtalk_webhook", ""), cfg.get("dingtalk_secret", "")
+
+
+def _do_ping_monitor_tick(db) -> None:
+    """每 2 秒调用一次：对已知 syslog 源 IP 执行 Ping，处理连续失败告警。
+
+    已知 IP = 过去 10 分钟内曾通过 syslog 报文的来源 IP。
+    """
+    from app.core.timeutil import beijing_now
+    now = time.time()
+    # 清理超过 10 分钟未活动的 IP
+    stale = [ip for ip, last_seen in _PING_SRC_IPS.items() if now - last_seen > 600]
+    for ip in stale:
+        _PING_SRC_IPS.pop(ip, None)
+        _PING_FAIL_COUNT.pop(ip, None)
+        _PING_ALERTED.pop(ip, None)
+
+    webhook, secret = _get_dingtalk_config(db)
+    ts = beijing_now().strftime("%Y-%m-%d %H:%M:%S")
+
+    for ip in list(_PING_SRC_IPS.keys()):
+        online = _ping(ip)
+        if online:
+            _PING_FAIL_COUNT[ip] = 0
+            if _PING_ALERTED.get(ip):
+                # 恢复在线 → 推送恢复通知
+                _PING_ALERTED[ip] = False
+                if webhook:
+                    from app.core.dingtalk import send_dingtalk
+                    text = (
+                        f"✅ Syslog 源 {ip} 已恢复在线\n"
+                        f"时间：{ts}\n"
+                        f"说明：Ping 恢复可达，设备已恢复正常"
+                    )
+                    send_dingtalk(webhook, secret, text)
+                    print(f"[PingMonitor] {ip} 已恢复在线，推送钉钉恢复通知")
+        else:
+            count = _PING_FAIL_COUNT.get(ip, 0) + 1
+            _PING_FAIL_COUNT[ip] = count
+            if count >= 3 and not _PING_ALERTED.get(ip):
+                _PING_ALERTED[ip] = True
+                if webhook:
+                    from app.core.dingtalk import send_dingtalk
+                    text = (
+                        f"⚠️ Syslog 源离线告警\n"
+                        f"时间：{ts}\n"
+                        f"来源IP：{ip}\n"
+                        f"说明：连续 {count} 次 Ping 不可达，设备疑似离线"
+                    )
+                    send_dingtalk(webhook, secret, text)
+                    print(f"[PingMonitor] {ip} 连续 {count} 次不通，推送钉钉离线告警")
+
+
 def syslog_listener_loop(get_session) -> None:
     """线程主循环：按 settings 动态管理 UDP socket。"""
     sock: socket.socket | None = None
@@ -150,6 +236,16 @@ def syslog_listener_loop(get_session) -> None:
                         pass
             db.close()
             db = None
+            # Ping 连通监控：无论是否绑定 socket，每轮都执行
+            ping_db = get_session()
+            try:
+                _do_ping_monitor_tick(ping_db)
+            except Exception as e:
+                print(f"[PingMonitor] tick 异常：{e}")
+            finally:
+                ping_db.close()
+                ping_db = None
+
             if sock is None:
                 time.sleep(2)
                 continue
@@ -159,6 +255,8 @@ def syslog_listener_loop(get_session) -> None:
                 print(f"[Syslog-DBG] 收到数据包，来源IP:{addr[0]}，原始字节: {data}")
                 # ==============================
                 src_ip = addr[0]
+                # 记录源 IP 供 Ping 连通监控使用
+                _PING_SRC_IPS[src_ip] = time.time()
                 parsed = parse_syslog(data)
                 if not parsed:
                     print(f"[Syslog-DBG] 报文解析失败，丢弃")
