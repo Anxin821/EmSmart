@@ -242,8 +242,20 @@ def report_loss(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("admin", "engineer")),
 ):
-    """治具报失：借出后丢失，总数不变，可用减少。"""
+    """治具报失：借出后丢失，总数-可用-。"""
     return ApiResponse(data=service.report_loss(db, part_id, data, request, current_user["username"]))
+
+
+@router.post("/parts/{part_id}/found-back")
+def found_back(
+    part_id: int,
+    data: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "engineer")),
+):
+    """治具已找回：报失的物品找回了，总数+可用+。"""
+    return ApiResponse(data=service.found_back(db, part_id, data, request, current_user["username"]))
 
 
 @router.post("/parts/{part_id}/damaged")
@@ -254,8 +266,20 @@ def report_damaged(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("admin", "engineer")),
 ):
-    """治具报损：借出后损坏，总数不变，可用减少。"""
+    """治具报损：借出后损坏，总数-可用-。"""
     return ApiResponse(data=service.report_damaged(db, part_id, data, request, current_user["username"]))
+
+
+@router.post("/parts/{part_id}/repair-damaged")
+def repair_damaged(
+    part_id: int,
+    data: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_role("admin", "engineer")),
+):
+    """治具已修复：报损的物品修好了，总数+可用+。"""
+    return ApiResponse(data=service.repair_damaged(db, part_id, data, request, current_user["username"]))
 
 
 @router.post("/parts/{part_id}/restock")

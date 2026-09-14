@@ -19,6 +19,9 @@ export const warehouseApi = {
   // 治具报失 / 报损
   loss: (id, data) => api.post(`/warehouse/parts/${id}/loss`, data),
   damaged: (id, data) => api.post(`/warehouse/parts/${id}/damaged`, data),
+  // 治具已找回 / 已修复
+  foundBack: (id, data) => api.post(`/warehouse/parts/${id}/found-back`, data),
+  repairDamaged: (id, data) => api.post(`/warehouse/parts/${id}/repair-damaged`, data),
   // 借出记录列表（active_only: true 只看未归还的）
   borrowRecords: (id, active_only = true) => api.get(`/warehouse/parts/${id}/borrow-records`, { params: { active_only } }),
   // 耗材领用记录列表（active_only: true 只看未归还的）
