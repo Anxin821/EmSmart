@@ -70,8 +70,8 @@ def _tx_to_dict(t: PartTransaction) -> Dict[str, Any]:
         "part_id": t.part_id,
         "part_name": t.part_name,
         "tx_type": t.tx_type,
-        # 借出记录：有 return_time 视为已归还，无 return_time 视为借出中
-        "display_status": "已归还" if (t.tx_type in ("借出",) and t.return_time) else None,
+        # 有 return_time 即视为已归还，无论 tx_type 是借出/损坏/丢失/维修
+        "display_status": "已归还" if t.return_time else None,
         "qty": t.qty,
         "operator": t.operator or "",
         "department_manager": t.department_manager or "",
@@ -474,8 +474,7 @@ def return_part(db: Session, part_id: int, data: dict, request, username: str) -
 def to_repair(db: Session, part_id: int, data: dict, request, username: str) -> dict:
     """治具转维修。
     
-    BorrowRecord 原地修改状态（不新增），
-    PartTransaction 新增一条维修流水（原借出流水补归还时间）。
+    原借出流水直接改为"维修"类型，不新增单独记录。
     """
     p = _get_part(db, part_id)
     if p.part_type != JIG:
@@ -493,7 +492,7 @@ def to_repair(db: Session, part_id: int, data: dict, request, username: str) -> 
     # ① BorrowRecord 原地改状态
     r.status = "维修"
 
-    # ② 原借出流水补归还时间（表示已退回库房）
+    # ② 原借出流水直接改为"维修"类型（不新增记录）
     borrow_tx = db.query(PartTransaction).filter(
         PartTransaction.part_id == p.id,
         PartTransaction.tx_type == "借出",
@@ -502,18 +501,14 @@ def to_repair(db: Session, part_id: int, data: dict, request, username: str) -> 
         PartTransaction.return_time.is_(None)
     ).order_by(PartTransaction.id.desc()).first()
     if borrow_tx:
-        borrow_tx.return_time = now
-        borrow_tx.remark = "转维修退回"
+        borrow_tx.tx_type = "维修"
+        borrow_tx.remark = "设备维修中"
+        borrow_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
 
-    # ③ 新增一条维修流水（出入库记录可见）
-    _add_tx(db, p, "维修", r.qty, operator=r.borrower or "",
-            department_manager=r.department_manager or "", line=r.line or "",
-            remark="设备维修", borrow_time=now)
-
-    # ④ repair_qty 增加
+    # ③ repair_qty 增加
     p.repair_qty = (p.repair_qty or 0) + r.qty
 
-    # ⑤ 更新最近借用人
+    # ④ 更新最近借用人
     next_active = (db.query(BorrowRecord)
                      .filter(BorrowRecord.part_id == p.id,
                              BorrowRecord.status == "借出")
@@ -598,8 +593,7 @@ def finish_repair(db: Session, part_id: int, data: dict, request, username: str)
 def report_loss(db: Session, part_id: int, data: dict, request, username: str) -> dict:
     """治具报失。
     
-    BorrowRecord 原地改状态为"丢失"，
-    PartTransaction 新增一条丢失流水（原借出流水补归还时间）。
+    原借出流水直接改为"丢失"类型，不新增单独记录。
     """
     p = _get_part(db, part_id)
     if p.part_type != JIG:
@@ -621,7 +615,7 @@ def report_loss(db: Session, part_id: int, data: dict, request, username: str) -
     # ② BorrowRecord 原地改状态
     r.status = "丢失"
 
-    # ③ 原借出流水补归还时间（表示已退回库房）
+    # ③ 原借出流水直接改为"丢失"类型（不新增记录）
     borrow_tx = db.query(PartTransaction).filter(
         PartTransaction.part_id == p.id,
         PartTransaction.tx_type == "借出",
@@ -630,15 +624,10 @@ def report_loss(db: Session, part_id: int, data: dict, request, username: str) -
         PartTransaction.return_time.is_(None)
     ).order_by(PartTransaction.id.desc()).first()
     if borrow_tx:
-        borrow_tx.return_time = now
-        borrow_tx.remark = "报失退回"
+        borrow_tx.tx_type = "丢失"
+        borrow_tx.remark = "借出后丢失"
 
-    # ④ 新增一条丢失流水（出入库记录可见）
-    _add_tx(db, p, "丢失", r.qty, operator=r.borrower or "",
-            department_manager=r.department_manager or "", line=r.line or "",
-            remark="借出后丢失", borrow_time=now)
-
-    # ⑤ 更新最近借用人
+    # ④ 更新最近借用人
     next_active = (db.query(BorrowRecord)
                      .filter(BorrowRecord.part_id == p.id,
                              BorrowRecord.status == "借出")
@@ -712,8 +701,7 @@ def found_back(db: Session, part_id: int, data: dict, request, username: str) ->
 def report_damaged(db: Session, part_id: int, data: dict, request, username: str) -> dict:
     """治具报损。
     
-    BorrowRecord 原地改状态为"损坏"，
-    PartTransaction 新增一条损坏流水（原借出流水补归还时间）。
+    原借出流水直接改为"损坏"类型，不新增单独记录。
     """
     p = _get_part(db, part_id)
     if p.part_type != JIG:
@@ -734,7 +722,7 @@ def report_damaged(db: Session, part_id: int, data: dict, request, username: str
     # ② BorrowRecord 原地改状态
     r.status = "损坏"
 
-    # ③ 原借出流水补归还时间（表示已退回库房）
+    # ③ 原借出流水直接改为"损坏"类型（不新增记录）
     borrow_tx = db.query(PartTransaction).filter(
         PartTransaction.part_id == p.id,
         PartTransaction.tx_type == "借出",
@@ -743,15 +731,10 @@ def report_damaged(db: Session, part_id: int, data: dict, request, username: str
         PartTransaction.return_time.is_(None)
     ).order_by(PartTransaction.id.desc()).first()
     if borrow_tx:
-        borrow_tx.return_time = now
-        borrow_tx.remark = "报损退回"
+        borrow_tx.tx_type = "损坏"
+        borrow_tx.remark = "借出后损坏"
 
-    # ④ 新增一条损坏流水（出入库记录可见）
-    _add_tx(db, p, "损坏", r.qty, operator=r.borrower or "",
-            department_manager=r.department_manager or "", line=r.line or "",
-            remark="借出后损坏", borrow_time=now)
-
-    # ⑤ 更新最近借用人
+    # ④ 更新最近借用人
     next_active = (db.query(BorrowRecord)
                      .filter(BorrowRecord.part_id == p.id,
                              BorrowRecord.status == "借出")
@@ -850,7 +833,8 @@ def consume(db: Session, part_id: int, data: dict, request, username: str) -> di
         raise HTTPException(status_code=400, detail="领用人和线体为必填项")
     p.total_qty -= qty
     _add_tx(db, p, "领用", qty, operator=operator, department_manager=dept_mgr,
-            line=line, remark=data.get("remark") or "")
+            line=line, remark=data.get("remark") or "",
+            borrow_time=beijing_now())
     db.commit()
     db.refresh(p)
     write_operation_log(db, username, "CONSUME", "warehouse", str(p.id),

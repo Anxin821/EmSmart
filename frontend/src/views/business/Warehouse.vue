@@ -196,7 +196,6 @@
                           type="primary" link size="small" @click.stop="openBorrow(row)">借领</el-button>
                         <el-button v-else type="info" link size="small" disabled @click.stop="toast.warn(`「${row.name}」可借数量不足`)">借领</el-button>
                         <el-button type="warning" link size="small"
-                          :disabled="!(row.status === '已借出' || row.status === '部分借出')"
                           @click.stop="openReturn(row)">归还</el-button>
                       </template>
                       <template v-else>
@@ -213,6 +212,8 @@
                             <el-dropdown-item v-if="row.part_type === '治具' && row.repair_qty > 0" command="finish_repair">维修完成</el-dropdown-item>
                             <el-dropdown-item v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')" command="loss">报失</el-dropdown-item>
                             <el-dropdown-item v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')" command="damaged">报损</el-dropdown-item>
+                            <el-dropdown-item v-if="row.part_type === '治具' && row.status === '已借出'" command="found_back">已找回</el-dropdown-item>
+                            <el-dropdown-item v-if="row.part_type === '治具' && row.status === '已借出'" command="repair_damaged">已修复</el-dropdown-item>
                             <el-dropdown-item command="edit">编辑</el-dropdown-item>
                             <el-dropdown-item v-if="userStore.isAdmin || (userStore.user?.full_name === '秦江蓉' && userStore.isEngineer)" command="delete" divided>删除</el-dropdown-item>
                           </el-dropdown-menu>
@@ -404,7 +405,7 @@
 
     <!-- 归还（治具按借出记录 / 耗材按领用记录） -->
     <el-dialog v-model="returnDialog" :title="(actionRow?.part_type === '耗材') ? '耗材归还' : '治具归还'"
-               width="640px" destroy-on-close @open="loadBorrowRecords">
+               width="800px" destroy-on-close @open="loadBorrowRecords">
       <div class="wh-action-info" v-if="actionRow">
         <p><b>{{ actionRow.name }}</b>（{{ actionRow.model || '无型号' }}）</p>
         <p v-if="actionRow.part_type === '治具'">总 {{ actionRow.total_qty }} / 可用 <b class="ok-text">{{ actionRow.available_qty }}</b> / 外借 <b class="warn-text">{{ actionRow.total_qty - actionRow.available_qty }}</b></p>
@@ -414,11 +415,11 @@
         <div v-if="!borrowRecords.length" class="tx-empty-tip">暂无记录</div>
         <el-table v-else :data="borrowRecords" border size="small" empty-text="暂无记录">
           <el-table-column :label="actionRow?.part_type === '耗材' ? '领用人' : '借用人'"
-                           :prop="actionRow?.part_type === '耗材' ? 'operator' : 'borrower'" width="90" show-overflow-tooltip />
-          <el-table-column label="部门负责人" :prop="actionRow?.part_type === '耗材' ? 'department_manager' : 'department_manager'" width="100" show-overflow-tooltip />
-          <el-table-column label="线体" prop="line" width="70" align="center" />
+                           :prop="actionRow?.part_type === '耗材' ? 'operator' : 'borrower'" width="60" show-overflow-tooltip />
+          <el-table-column label="部门负责人" :prop="actionRow?.part_type === '耗材' ? 'department_manager' : 'department_manager'" width="85" show-overflow-tooltip />
+          <el-table-column label="线体" prop="line" width="60" align="center" />
           <el-table-column label="数量" prop="qty" width="60" align="center" />
-          <el-table-column label="借出/领用时间" prop="borrow_time" width="150" align="center" />
+          <el-table-column label="借出/领用时间" prop="borrow_time" width="140" align="center" />
           <el-table-column label="状态" width="70" align="center">
             <template #default="{ row }">
               <el-tag :type="row.status === '借出' ? 'warning' : row.status === '维修' ? 'info' : row.status === '丢失' ? 'danger' : row.status === '损坏' ? 'danger' : 'success'" size="small">
@@ -426,10 +427,13 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作" :width="actionRow?.part_type === '耗材' ? '80' : '240'" align="center">
+          <el-table-column label="操作" min-width="280" align="center">
             <template #default="{ row }">
               <template v-if="actionRow?.part_type === '耗材'">
                 <el-button type="warning" link size="small" @click="submitReturn(row)">归还</el-button>
+                <el-button type="danger" link size="small" @click="submitToRepair(row)">转维修</el-button>
+                <el-button type="info" link size="small" @click="submitLoss(row)">报失</el-button>
+                <el-button type="danger" link size="small" @click="submitDamaged(row)">报损</el-button>
               </template>
               <template v-else>
                 <!-- 治具：根据不同状态显示不同操作 -->
@@ -439,7 +443,7 @@
                   <el-button type="info" link size="small" @click="submitLoss(row)">报失</el-button>
                   <el-button type="danger" link size="small" @click="submitDamaged(row)">报损</el-button>
                 </template>
-                <el-button v-else-if="row.status === '维修'" type="warning" link size="small" @click="openFinishRepair(actionRow.value, row)">维修完成</el-button>
+                <el-button v-else-if="row.status === '维修'" type="warning" link size="small" @click="openFinishRepair(row)">维修完成</el-button>
                 <el-button v-else-if="row.status === '丢失'" type="success" link size="small" @click="submitFoundBack(row)">已找回</el-button>
                 <el-button v-else-if="row.status === '损坏'" type="success" link size="small" @click="submitRepairDamaged(row)">已修复</el-button>
               </template>
@@ -632,7 +636,7 @@
             <el-table-column label="时间" prop="created_at" width="150" />
             <el-table-column label="操作" width="70" align="center">
               <template #default="{ row }">
-                <el-tag v-if="row.tx_type === '借出' && row.return_time" type="success" size="small">已归还</el-tag>
+                <el-tag v-if="row.return_time" type="success" size="small">已归还</el-tag>
                 <el-tag v-else :type="txTagType(row.tx_type)" size="small">{{ row.tx_type }}</el-tag>
               </template>
             </el-table-column>
@@ -955,6 +959,7 @@ const handleMoreCommand = (cmd, row) => {
   else if (cmd === 'delete') handleDelete(row)
   else if (cmd === 'loss') openLoss(row)
   else if (cmd === 'damaged') openDamaged(row)
+  else if (cmd === 'repair_damaged' || cmd === 'found_back') openReturn(row)
 }
 
 const openLoss = (row) => {
@@ -974,7 +979,7 @@ const openReturnFromCart = (item) => {
 }
 
 const openFinishRepair = (row) => {
-  actionRow.value = row
+  // row 可能是物品数据或借出记录，不要覆盖 actionRow.value（需要 part_id）
   resetActionForms()
   finishRepairForm.qty = row.repair_qty || 1
   finishRepairDialog.value = true
@@ -1263,28 +1268,61 @@ const onScan = async () => {
   if (!kw) return
   scanLoading.value = true
   try {
-    const params = { keyword: kw, page: 1, page_size: 5 }
-    if (activeTab.value === '治具' || activeTab.value === '耗材') params.part_type = activeTab.value
-    const res = await warehouseApi.list(params)
-    const found = res.data?.items || []
-    if (!found.length) {
+    const item = await findBestMatch(kw)
+    if (!item) {
       toast.error('未找到匹配物品')
-    } else if (found.length === 1) {
-      addToCart(found[0])
       scanKeyword.value = ''
       focusScanInput()
-    } else {
-      addToCart(found[0])
-      toast.info(`匹配到 ${found.length} 条，已添加第一条「${found[0].name}」`)
-      scanKeyword.value = ''
-      focusScanInput()
+      return
     }
+    addToCart(item)
+    scanKeyword.value = ''
+    focusScanInput()
   } catch (e) {
     console.error(e)
     toast.error('搜索失败')
   } finally {
     scanLoading.value = false
   }
+}
+
+/**
+ * 智能搜索最佳匹配物品：
+ * - 耗材：按名称精确匹配，找不到则模糊搜索取第一条
+ * - 治具：先按型号精确匹配，找不到再按名称精确/模糊匹配
+ * - 始终只返回 1 条最佳结果
+ */
+const findBestMatch = async (kw) => {
+  const doSearch = async (params) => {
+    const res = await warehouseApi.list({ ...params, keyword: kw, page: 1, page_size: 10 })
+    return res.data?.items || []
+  }
+
+  // 1. 精确名称匹配
+  let items = await doSearch({})
+  let exact = items.find(i => i.name === kw)
+  if (exact) return exact
+
+  // 2. 对治具：尝试型号精确匹配
+  if (items.some(i => i.part_type === '治具')) {
+    const modelMatch = items.find(i => i.model === kw)
+    if (modelMatch) return modelMatch
+  }
+
+  // 3. 返回第一条有效结果
+  const valid = items.filter(i => {
+    if (scanMode.value === 'return') {
+      return (i.total_qty || 0) - (i.available_qty || 0) > 0
+    }
+    if (i.part_type === '治具') {
+      return (i.available_qty || 0) - (i.repair_qty || 0) > 0
+    }
+    return (i.stock_qty || i.total_qty || 0) > 0
+  })
+  if (valid.length) return valid[0]
+
+  // 4. 无有效结果，返回第一条（让 addToCart 提示库存不足）
+  return items.length > 0 ? items[0] : null
 }
 
 const addToCart = (item) => {
@@ -1336,22 +1374,41 @@ const submitBatch = async () => {
       try {
         const payload = { qty: item.qty, remark: scanForm.remark }
         if (scanMode.value === 'return') {
-          // 扫码归还：查该物品第一条"借出"记录，自动归还
+          // 扫码归还：根据物品的第一条活跃记录自动处理
           const type = item.part_type
           const records = type === '耗材'
             ? (await warehouseApi.consumeRecords(item.id, true)).data || []
             : (await warehouseApi.borrowRecords(item.id, true)).data || []
-          // 只取 status='借出' 的记录（排除丢失/损坏/维修）
-          const borrowRecord = records.find(r => r.status === '借出')
-          if (!borrowRecord) {
-            results.errors.push(`${item.name}: 没有可归还的借出记录，请点击「处理」按钮操作`)
+          // 按优先级查找可处理的记录：借出→损坏→维修→丢失
+          const statusPriority = ['借出', '损坏', '维修', '丢失']
+          const activeRecord = records.find(r => statusPriority.includes(r.status))
+          if (!activeRecord) {
+            results.errors.push(`${item.name}: 没有可处理的记录`)
             results.fail++
             continue
           }
-          const retPayload = type === '耗材'
-            ? { consume_tx_id: borrowRecord.id }
-            : { borrow_record_id: borrowRecord.id }
-          await warehouseApi.returnBack(item.id, retPayload)
+          // 根据状态自动处理
+          switch (activeRecord.status) {
+            case '借出': {
+              const retPayload = type === '耗材'
+                ? { consume_tx_id: activeRecord.id }
+                : { borrow_record_id: activeRecord.id }
+              await warehouseApi.returnBack(item.id, retPayload)
+              break
+            }
+            case '损坏': {
+              await warehouseApi.repairDamaged(item.id, { borrow_record_id: activeRecord.id })
+              break
+            }
+            case '维修': {
+              await warehouseApi.finishRepair(item.id, { qty: activeRecord.qty })
+              break
+            }
+            case '丢失': {
+              await warehouseApi.foundBack(item.id, { borrow_record_id: activeRecord.id })
+              break
+            }
+          }
         } else {
           payload.operator = scanForm.operator
           payload.department_manager = scanForm.department_manager
