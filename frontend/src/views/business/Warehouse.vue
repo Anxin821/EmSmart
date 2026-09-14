@@ -1215,6 +1215,9 @@ const detailDialog = ref(false)
 const detail = ref(null)
 
 const openDetail = async (row) => {
+  // 选中文本时（复制操作）不弹详情
+  const sel = window.getSelection()
+  if (sel && sel.toString().trim()) return
   try {
     const res = await warehouseApi.detail(row.id)
     detail.value = res.data
