@@ -298,7 +298,7 @@
       </div>
     </div>
 
-    <!-- 出库栏抽屉（扫码 + 借出/领用/归还 一站式） -->
+    <!-- 出入库抽屉抽屉（扫码 + 借出/领用/归还 一站式） -->
     <el-drawer
       v-model="cartDrawer"
       direction="rtl"
@@ -1387,7 +1387,7 @@ onUnmounted(() => {
   stopStatsPolling()
 })
 
-// ---------------- 扫码出库栏（抽屉模式） ----------------
+// ---------------- 扫码出入库抽屉（抽屉模式） ----------------
 const cartDrawer = ref(false)
 const scanMode = ref('borrow')             // 'borrow' | 'return' | 'consume'
 const scanKeyword = ref('')
@@ -1447,14 +1447,14 @@ const onScan = async () => {
       }
     }
 
-    // 首页加入出库栏，每个默认 1 件
+    // 首页加入出入库抽屉，每个默认 1 件
     let added = 0
     for (const item of targetItems) {
       addToCart(item, 1)   // 强制 qty=1，不触发库存不足提示
       added++
     }
     scanKeyword.value = ''
-    if (added > 0) toast.success(`已添加 ${added} 件到出库栏`)
+    if (added > 0) toast.success(`已添加 ${added} 件到出入库抽屉`)
   } catch (e) {
     console.error(e)
     toast.error('搜索失败')
@@ -1873,7 +1873,7 @@ const submitBatch = async () => {
   border-radius: 9px; padding: 0 5px;
 }
 
-/* 出库栏抽屉 */
+/* 出入库抽屉抽屉 */
 .cart-drawer :deep(.el-drawer__body) {
   padding: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden;
 }
