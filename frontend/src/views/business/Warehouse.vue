@@ -79,7 +79,7 @@
                         </template>
                       </el-dropdown>
                     </div>
-                    <el-tag v-else-if="row.tx_type === '借出' && row.return_time" type="success" size="small">归还</el-tag>
+                    <el-tag v-else-if="(row.tx_type === '借出' || row.tx_type === '领用') && row.return_time" type="success" size="small">归还</el-tag>
                     <el-tag v-else :type="txTagType(row.tx_type)" size="small">{{ row.tx_type }}</el-tag>
                   </template>
                 </el-table-column>
