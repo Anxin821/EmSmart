@@ -215,7 +215,7 @@ def antivirus_dashboard(db: Session) -> Dict[str, Any]:
         if total > 0:
             ratio = round(row["done"] / total * 100)
         else:
-            ratio = 0
+            ratio = 100  # 0台设备 = 100%完成
         row["progress"] = ratio
         if total == 0:
             row["level"] = "muted"

@@ -50,8 +50,8 @@
             <div class="tx-filter-row">
               <el-date-picker v-model="txFilterTimeRange" type="daterange" range-separator="至"
                 start-placeholder="开始日期" end-placeholder="结束日期" size="small"
-                style="width: 240px;" clearable @change="() => { txPage=1; loadTxData() }" />
-              <el-select v-model="txFilterType" placeholder="操作" clearable size="small" style="width: 110px;">
+                style="width: 200px;" clearable @change="() => { txPage=1; loadTxData() }" />
+              <el-select v-model="txFilterType" placeholder="操作" clearable size="small" style="width: 100px;">
                 <el-option label="借出中" value="借出" />
                 <el-option label="已归还" value="已归还" />
                 <el-option label="领用" value="领用" />
@@ -60,8 +60,9 @@
                 <el-option label="丢失" value="丢失" />
                 <el-option label="损坏" value="损坏" />
               </el-select>
-              <el-input v-model="txFilterPart" placeholder="物品" clearable size="small" style="width: 140px;" />
-              <el-input v-model="txFilterOperator" placeholder="借/领人" clearable size="small" style="width: 120px;" />
+              <el-input v-model="txFilterPart" placeholder="物品" clearable size="small" style="width: 120px;" />
+              <el-input v-model="txFilterOperator" placeholder="借/领人" clearable size="small" style="width: 110px;" />
+              <el-input v-model="txFilterRemark" placeholder="备注" clearable size="small" style="width: 120px;" />
               <el-button size="small" @click="resetTxFilter">重置</el-button>
             </div>
             <div class="wh-table-wrap">
@@ -74,13 +75,13 @@
                     <el-tag v-else :type="txTagType(row.tx_type)" size="small">{{ row.tx_type }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="物品" prop="part_name" min-width="160" show-overflow-tooltip />
+                <el-table-column label="物品" prop="part_name" min-width="120" show-overflow-tooltip />
                 <el-table-column label="数量" prop="qty" width="50" align="center" />
-                <el-table-column label="借/领人" prop="operator" width="80" show-overflow-tooltip />
-                <el-table-column label="部门负责人" prop="department_manager" width="90" show-overflow-tooltip>
+                <el-table-column label="借/领人" prop="operator" width="80" align="center" show-overflow-tooltip />
+                <el-table-column label="部门负责人" prop="department_manager" width="90" align="center" show-overflow-tooltip>
                   <template #default="{ row }">{{ row.department_manager || '-' }}</template>
                 </el-table-column>
-                <el-table-column label="线体" prop="line" width="50" show-overflow-tooltip>
+                <el-table-column label="线体" prop="line" width="50" align="center" show-overflow-tooltip>
                   <template #default="{ row }">{{ row.line || '-' }}</template>
                 </el-table-column>
                 <el-table-column label="借出时间" prop="borrow_time" width="140" align="center">
@@ -222,8 +223,8 @@
                 </el-table-column>
 
                 <template v-if="activeTab === '治具'">
-                  <el-table-column label="总数" prop="total_qty" width="80" align="center" />
-                  <el-table-column label="可用" width="80" align="center">
+                  <el-table-column label="总数" prop="total_qty" width="60" align="center" />
+                  <el-table-column label="可用" width="60" align="center">
                     <template #default="{ row }"><b class="ok-text">{{ row.available_qty }}</b></template>
                   </el-table-column>
                 </template>
@@ -242,7 +243,7 @@
                   <template #default="{ row }">{{ row.location || '-' }}</template>
                 </el-table-column>
 
-                <el-table-column label="状态" min-width="100" align="center">
+                <el-table-column label="状态" min-width="60" align="center">
                   <template #default="{ row }">
                     <el-tag :type="statusTagType(row)" size="small">{{ row.status }}</el-tag>
                   </template>
@@ -394,7 +395,7 @@
     <el-dialog v-model="editDialog" :title="editForm.id ? '编辑物品' : '新增物品'" width="560px" destroy-on-close :close-on-click-modal="true">
       <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="92px">
         <el-form-item label="物品名称" prop="name" required>
-          <el-input v-model="editForm.name" placeholder="如：测试治具A / 高温胶带" maxlength="100" />
+          <el-input v-model="editForm.name" placeholder="如：测试治具A/高温胶带" maxlength="100" />
         </el-form-item>
         <el-form-item v-if="editForm.part_type !== '耗材'" label="型号">
           <el-input v-model="editForm.model" placeholder="设备型号" maxlength="100" />
@@ -409,12 +410,14 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item v-if="editForm.part_type === '治具'" label="总数">
-          <el-input-number v-model="editForm.total_qty" :min="0" :max="9999" controls-position="right" />
+          <el-input-number v-if="!editForm.id" v-model="editForm.total_qty" :min="0" :max="9999" controls-position="right" />
+          <span v-else class="wh-form-static">{{ editForm.total_qty }}</span>
           <span class="wh-form-hint">治具总数量（新增时可用数=总数）</span>
         </el-form-item>
         <template v-if="editForm.part_type === '耗材'">
           <el-form-item :label="editForm.id ? '库存数量' : '初始库存'">
-            <el-input-number v-model="editForm.total_qty" :min="0" :max="999999" controls-position="right" />
+            <el-input-number v-if="!editForm.id" v-model="editForm.total_qty" :min="0" :max="999999" controls-position="right" />
+            <span v-else class="wh-form-static">{{ editForm.total_qty }} {{ editForm.unit }}</span>
           </el-form-item>
           <el-form-item label="单位">
             <el-input v-model="editForm.unit" placeholder="个 / 卷 / 包 / 瓶…" maxlength="20" style="width: 160px;" />
@@ -781,6 +784,7 @@ const txFilterTimeRange = ref(null)          // [start, end] Date 数组
 const txFilterType = ref('')
 const txFilterPart = ref('')
 const txFilterOperator = ref('')
+const txFilterRemark = ref('')
 
 // 筛选后的记录（仅保留后端不支持的客户端筛选：操作时间 / 已归还虚拟类型）
 const filteredTxRecords = computed(() => {
@@ -809,6 +813,7 @@ const resetTxFilter = () => {
   txFilterType.value = ''
   txFilterPart.value = ''
   txFilterOperator.value = ''
+  txFilterRemark.value = ''
 }
 
 const loadTxData = async () => {
@@ -824,10 +829,11 @@ const loadTxData = async () => {
         params.tx_type = txFilterType.value
       }
     }
-    // 构造 keyword 支持物品名+借/领人同时搜索（后端 keyword 会搜 part_name, operator, remark 等）
+    // 构造 keyword 支持物品名+借/领人+备注同时搜索（后端 keyword 会搜 part_name, operator, remark 等）
     const kwParts = []
     if (txFilterPart.value?.trim()) kwParts.push(txFilterPart.value.trim())
     if (txFilterOperator.value?.trim()) kwParts.push(txFilterOperator.value.trim())
+    if (txFilterRemark.value?.trim()) kwParts.push(txFilterRemark.value.trim())
     if (kwParts.length) params.keyword = kwParts.join(' ')
     const res = await warehouseApi.transactions(params)
     txRecords.value = res.data?.items || []
@@ -842,7 +848,7 @@ const loadTxData = async () => {
 }
 
 watch([txPage, txPageSize], () => loadTxData())
-watch([txFilterType, txFilterPart, txFilterOperator], () => {
+watch([txFilterType, txFilterPart, txFilterOperator, txFilterRemark], () => {
   txPage.value = 1
   loadTxData()
 })
@@ -1786,6 +1792,7 @@ const submitBatch = async () => {
 .wh-name { font-weight: 600; color: var(--c-text); }
 
 .wh-form-hint { margin-left: 10px; font-size: 12px; color: var(--c-text-mute); }
+.wh-form-static { font-size: 14px; font-weight: 600; color: var(--c-text, #0B1120); line-height: 32px; }
 .ok-text { color: #059669; }
 .warn-text { color: #D97706; }
 .danger-text { color: #DC2626; }
