@@ -104,7 +104,7 @@
                     <span v-else>{{ row.qty }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="借/领人" width="70" align="center" show-overflow-tooltip>
+                <el-table-column label="借/领人" width="85" align="center" show-overflow-tooltip>
                   <template #default="{ row }">
                     <div v-if="row._isFilter" class="jig-fbr-cell">
                       <el-input v-model="txFilterOperator" size="small" placeholder="搜索" clearable
