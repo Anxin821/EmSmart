@@ -2072,11 +2072,14 @@ const submitBatch = async () => {
 .jig-fbr-cell :deep(.el-select) { width: 100%; min-width: 0; }
 .jig-fbr-cell :deep(.el-select__wrapper) { justify-content: center; height: 28px; }
 .jig-fbr-cell :deep(.el-date-editor) { width: 100% !important; min-width: 0 !important; flex-wrap: nowrap; }
-.jig-fbr-cell :deep(.el-date-editor .el-input__wrapper) { height: 28px; }
-.jig-fbr-cell :deep(.el-date-editor .el-range-input) { font-size: 11px; }
+.jig-fbr-cell :deep(.el-date-editor .el-input__wrapper) { height: 28px; justify-content: center; }
+.jig-fbr-cell :deep(.el-date-editor .el-input__inner) { text-align: center; }
+.jig-fbr-cell :deep(.el-date-editor .el-range-input) { font-size: 12px; text-align: center; }
 /* 防止 daterange 内部的 separator / 图标撑大容器 */
 .jig-fbr-cell :deep(.el-date-editor .el-range-separator) { font-size: 11px; padding: 0 2px; }
 .jig-fbr-cell :deep(.el-date-editor .el-range__icon) { display: none; }
+/* 下拉筛选菜单选项居中 */
+.jig-fbr-cell :deep(.el-dropdown-menu__item) { justify-content: center; }
 
 /* 治具/耗材/出入库记录数量排序按钮（单箭头循环 ⇅ → ↑ → ↓） */
 .part-sort-btn {
