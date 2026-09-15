@@ -319,9 +319,7 @@
           <el-form-item label="启用监听">
             <el-switch v-model="settingsForm.syslog_enabled" active-text="接收设备 Syslog 并自动告警" />
           </el-form-item>
-          <el-form-item label="监听端口">
-            <el-input-number v-model="settingsForm.syslog_port" :min="1" :max="65535" controls-position="right" :disabled="!settingsForm.syslog_enabled" />
-          </el-form-item>
+          <!-- 监听端口默认 514，不在前端显示 -->
           <el-form-item label="告警关键词">
             <el-input
               v-model="settingsForm.syslog_keywords"

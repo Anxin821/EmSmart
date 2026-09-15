@@ -155,6 +155,27 @@ def _ensure_extra_columns():
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE warehouse_parts ADD code VARCHAR(100) NULL"))
                 print("[Startup] 已为 warehouse_parts 补充 code 列")
+        # servers 补 fail_count / last_latency_ms / last_online_time（防抖）
+        if "servers" in existing_tables:
+            cols = {c["name"] for c in insp.get_columns("servers")}
+            if "fail_count" not in cols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE servers ADD fail_count INT DEFAULT 0"))
+                    # SQL Server 对已存在行不填 DEFAULT，需显式归零
+                    conn.execute(text("UPDATE servers SET fail_count = 0 WHERE fail_count IS NULL"))
+                print("[Startup] 已为 servers 补充 fail_count 列")
+            else:
+                # 已有列但可能有旧 NULL 数据，幂等归零
+                with engine.begin() as conn:
+                    conn.execute(text("UPDATE servers SET fail_count = 0 WHERE fail_count IS NULL"))
+            if "last_latency_ms" not in cols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE servers ADD last_latency_ms INT NULL"))
+                print("[Startup] 已为 servers 补充 last_latency_ms 列")
+            if "last_online_time" not in cols:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE servers ADD last_online_time DATETIME NULL"))
+                print("[Startup] 已为 servers 补充 last_online_time 列")
     except Exception as e:
         print(f"[Startup] 列迁移检查失败（不影响启动）: {e}")
 

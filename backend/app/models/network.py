@@ -22,6 +22,9 @@ class Server(Base):
     disk_usage = Column(Float, default=0)
     responsible_person = Column(String(50))
     last_check_time = Column(DateTime)
+    fail_count = Column(Integer, default=0)           # 连续探测失败次数（防抖用）
+    last_latency_ms = Column(Integer, nullable=True)   # 最近一次 RTT（毫秒）
+    last_online_time = Column(DateTime, nullable=True) # 最近一次在线时间戳
     created_at = Column(DateTime, default=beijing_now)
     updated_at = Column(DateTime, default=beijing_now, onupdate=beijing_now)
 

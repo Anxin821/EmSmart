@@ -11,6 +11,11 @@ from app.core.timeutil import beijing_now
 from app.core.dingtalk import send_dingtalk
 from app.models import Server, AgingRack, WifiAp, NetworkAlert, Setting
 from app.core.ping_util import ping_device
+import time
+
+# ── 告警冷却机制 ──────────────────────────────────────────────
+ALERT_COOLDOWN = 1800          # 同一设备两次离线告警的最小间隔（秒）= 30 分钟
+_LAST_ALERT_TIME: Dict[str, float] = {}   # device_key → 上次推离线告警的时间戳
 
 
 def _server_to_dict(d) -> Dict[str, Any]:
@@ -112,7 +117,7 @@ def _ping_and_update_all(db: Session):
 
     def _probe(target):
         device_type, obj, name, ip, line = target
-        return target, ping_device(ip)
+        return target, ping_device(ip) is not None
 
     if targets:
         from concurrent.futures import ThreadPoolExecutor
@@ -286,9 +291,9 @@ DEFAULT_SETTINGS = {
     # Syslog UDP 日志监听（迁移自 wifi-monitor/syslog_listener.py）
     "syslog_enabled": "0",            # 默认关闭：Windows 绑定 514 需管理员权限
     "syslog_port": "514",
-    # 关键词覆盖登录/退出（用户要求监控），同时保留真正的异常词。
+    # 关键词覆盖登录/退出（用户要求监控）+ H3C 交换机端口/环路/硬件事件实时捕获。
     # 防轰炸靠 _SYSLOG_DEDUP（同 IP + 同消息 60 秒内只发一次）+ 移除 notice 级别告警。
-    "syslog_keywords": "登录,退出,失败,攻击,非法,error,warning,critical,异常,故障,断开,down",
+    "syslog_keywords": "登录,退出,失败,攻击,非法,error,warning,critical,异常,故障,断开,down,状态变为DOWN,link down,Line protocol,环路,温度过高,风扇,端口防雷",
 }
 
 # Syslog 严重等级（不依赖关键词，命中即告警）
@@ -301,6 +306,7 @@ SYSLOG_ALERT_LEVELS = {"warning", "error", "critical", "emergency", "alert"}
 _LEGACY_SYSLOG_KEYWORDS = {
     "登录,退出,error,失败,攻击,非法,警告,warning,critical",   # 原始版
     "失败,攻击,非法,error,warning,critical,异常,故障,断开,down",  # 中间版（曾短暂使用）
+    "登录,退出,失败,攻击,非法,error,warning,critical,异常,故障,断开,down",  # 当前版（→ 升级到新默认值）
 }
 
 
@@ -474,7 +480,20 @@ def _format_alert_text(title: str, ts: str, level_cn: str, ip: str, detail: str)
 def _build_alert_text(device_type: str, name: str, line: str, ip: str, ts: str) -> str:
     """设备离线告警文案。"""
     title = _device_alert_title(device_type, name, line, ip)
-    return _format_alert_text(title, ts, "严重", ip, "设备离线（Ping 不可达）")
+    return _format_alert_text(title, ts, "严重", ip, "设备离线（ICMP 与 TCP 均无响应）")
+
+
+def _build_aggregated_alert_text(line: str, devices: List[Tuple[str, str, str]], ts: str) -> str:
+    """同线体多设备离线 → 合并成一条告警，避免刷屏。
+
+    devices: [(device_type, name, ip), ...]
+    """
+    parts = [f"- {dt} {nm}（{ip}）" for dt, nm, ip in devices]
+    return (
+        f"⚠️ {line} 网络异常\n"
+        f"时间：{ts}\n"
+        f"受影响设备：{len(devices)} 台\n" + "\n".join(parts)
+    )
 
 
 def _build_recover_text(device_type: str, name: str, line: str, ip: str, ts: str) -> str:
@@ -586,21 +605,31 @@ def sync_alerts(db: Session, notify: bool = True) -> Dict[str, int]:
     new_count = resolved_count = 0
     now = beijing_now()
     ts = now.strftime("%Y-%m-%d %H:%M:%S")
+    # 同线体离线设备聚合：line → [(device_type, name, ip), ...]
+    line_offline: Dict[str, List[Tuple[str, str, str]]] = {}
     for device_type, key, name, line, ip, offline in _network_device_states(db):
         if not ip:
             continue
         if offline:
             if key not in open_map:
+                # 告警冷却：同一设备 30 分钟内不重复推钉钉（但告警记录仍落库）
+                now_ts = time.time()
+                in_cooldown = (now_ts - _LAST_ALERT_TIME.get(key, 0)) < ALERT_COOLDOWN
+                if in_cooldown:
+                    continue  # 静默跳过，不下发钉钉、不建新告警
                 db.add(NetworkAlert(
                     device_type=device_type, device_name=name, device_key=key,
                     production_line=line, ip_address=ip,
                     alert_type="离线告警", level="critical",
-                    message=f"{device_type} [{name}] Ping 不可达，判定离线（IP：{ip}）",
+                    message=f"{device_type} [{name}] ICMP 与 TCP 均无响应，判定离线（IP：{ip}）",
                 ))
                 new_count += 1
-                if cfg and cfg.get("dingtalk_webhook"):
-                    send_dingtalk(cfg["dingtalk_webhook"], cfg["dingtalk_secret"],
-                                  _build_alert_text(device_type, name, line, ip, ts))
+                _LAST_ALERT_TIME[key] = now_ts
+                # 收集到线体桶中，后面统一推钉钉（同线体合并）
+                _line = line or "_none"
+                if _line not in line_offline:
+                    line_offline[_line] = []
+                line_offline[_line].append((device_type, name, ip))
         elif key in open_map:
             # 设备恢复在线：自动关闭未处理告警，并推送「恢复在线」钉钉通知
             # （否则用户体感是「ping 通了也不通知」，必须先点开告警抽屉刷新才感知到）
@@ -615,6 +644,20 @@ def sync_alerts(db: Session, notify: bool = True) -> Dict[str, int]:
                     pass
     if new_count or resolved_count:
         db.commit()
+    # ── 推送聚合告警（同线体合并，减少刷屏） ──
+    if cfg and cfg.get("dingtalk_webhook") and line_offline:
+        for _line, devices in line_offline.items():
+            try:
+                if len(devices) == 1:
+                    dt, nm, ip_ = devices[0]
+                    text = _build_alert_text(dt, nm, _line if _line != "_none" else "", ip_, ts)
+                else:
+                    text = _build_aggregated_alert_text(
+                        _line if _line != "_none" else "未归类", devices, ts
+                    )
+                send_dingtalk(cfg["dingtalk_webhook"], cfg["dingtalk_secret"], text)
+            except Exception:
+                pass
     return {"new_alerts": new_count, "resolved_alerts": resolved_count}
 
 
@@ -625,10 +668,10 @@ def monitor_tick(db: Session) -> int:
     """
     for r in db.query(AgingRack).all():
         if r.ip_address and r.status != "维护":
-            r.status = "在线" if ping_device(r.ip_address) else "离线"
+            r.status = "在线" if ping_device(r.ip_address) is not None else "离线"
     for ap in db.query(WifiAp).all():
         if ap.ip_address and ap.status != "维护":
-            ap.status = "在线" if ping_device(ap.ip_address) else "离线"
+            ap.status = "在线" if ping_device(ap.ip_address) is not None else "离线"
     tick_row = db.query(Setting).filter(Setting.key == "last_monitor_tick").first()
     if tick_row:
         tick_row.value = beijing_now().strftime("%Y-%m-%d %H:%M:%S")

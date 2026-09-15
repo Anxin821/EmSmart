@@ -16,10 +16,12 @@
 from __future__ import annotations
 import re
 import socket
-import subprocess
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Dict, Tuple
+
+from app.core.ping_util import ping_device
 # 「日期时间 + Tab + 剩余内容」格式（旧 wifi-monitor 设备上报格式）
 _TS_TAB_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\t+(.*)")
 # H3C/标准 Syslog：<PRI>时间戳 主机名 正文（空格分隔），如
@@ -122,18 +124,16 @@ _PING_FAIL_COUNT: Dict[str, int] = {}         # IP → 连续失败次数
 _PING_ALERTED: Dict[str, bool] = {}           # IP → 是否已推送离线告警
 _PING_SRC_IPS: Dict[str, float] = {}          # IP → 最近一次收到 syslog 的时间
 _PING_LAST_TICK: float = 0.0                  # 上次实际执行 Ping 的时间戳
+_PING_OK_COUNT: Dict[str, int] = {}           # IP → 连续成功次数（恢复防抖）
+_PING_ALERT_TIME: Dict[str, float] = {}       # IP → 上次推离线告警的时间戳（冷却用）
+_PING_ALERT_COOLDOWN = 1800                   # 同一 IP 两次离线告警的最小间隔（秒）= 30 分钟
+# 模块级单例线程池，避免每轮创建/销毁
+_PING_POOL = ThreadPoolExecutor(max_workers=20, thread_name_prefix="ping")
 
 
 def _ping(host: str, timeout_ms: int = 2000) -> bool:
-    """Windows PowerShell 下 ICMP ping，超时 2 秒。"""
-    try:
-        result = subprocess.run(
-            ["ping", "-n", "1", "-w", str(timeout_ms), host],
-            capture_output=True, text=True, timeout=3
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
+    """复用 ping_device 统一实现（含日志记录），返回是否可达。"""
+    return ping_device(host, timeout_ms) is not None
 
 
 def _get_ping_config(db) -> Tuple[str, str, int]:
@@ -143,40 +143,60 @@ def _get_ping_config(db) -> Tuple[str, str, int]:
     return (
         cfg.get("dingtalk_webhook", ""),
         cfg.get("dingtalk_secret", ""),
-        max(2, int(cfg.get("ping_interval", 60)))   # 最小 2 秒，防止设 0/1 导致 CPU 跑满
+        max(15, int(cfg.get("ping_interval", 60)))   # 至少 15s（80 IP 并发下完全跑得动）
     )
 
 
 def _do_ping_monitor_tick(db) -> None:
-    """按 DB ping_interval 间隔执行 Ping 监控（默认 2s），处理连续失败告警。
+    """按 DB ping_interval 间隔并发 Ping（默认 60s），处理连续失败告警。
 
-    已知 IP = 过去 10 分钟内曾通过 syslog 报文的来源 IP。
-    间隔不足时直接返回，不阻塞主循环。
+    设计要点：
+    - ThreadPoolExecutor 单例池，worker 只跑 _ping()，字典更新回主线程串行，无竞态；
+    - 离线告警：连续 >= 3 次不通；
+    - 恢复通知：连续 >= 2 次通（防抖，避免闪断刷屏）；
+    - _PING_LAST_TICK 在轮次结束时更新，确保实际间隔 ≈ interval；
+    - worker 异常 → 跳过该 IP，不改状态（保守安全）。
     """
     global _PING_LAST_TICK
-    # 读取前端设置的 Ping 间隔
     webhook, secret, interval = _get_ping_config(db)
-    now = time.time()
-    if now - _PING_LAST_TICK < interval:
+    if time.time() - _PING_LAST_TICK < interval:
         return
-    _PING_LAST_TICK = now
 
     from app.core.timeutil import beijing_now
+    now = time.time()
     # 清理超过 10 分钟未活动的 IP
     stale = [ip for ip, last_seen in _PING_SRC_IPS.items() if now - last_seen > 600]
     for ip in stale:
         _PING_SRC_IPS.pop(ip, None)
         _PING_FAIL_COUNT.pop(ip, None)
+        _PING_OK_COUNT.pop(ip, None)
         _PING_ALERTED.pop(ip, None)
+        _PING_ALERT_TIME.pop(ip, None)
+
+    ips = list(_PING_SRC_IPS.keys())
+    if not ips:
+        _PING_LAST_TICK = now
+        return
     ts = beijing_now().strftime("%Y-%m-%d %H:%M:%S")
 
-    for ip in list(_PING_SRC_IPS.keys()):
-        online = _ping(ip)
+    # ★ 并发 ping（worker 只跑 ping，不碰字典）
+    futures = {_PING_POOL.submit(_ping, ip): ip for ip in ips}
+    for future in as_completed(futures):
+        ip = futures[future]
+        try:
+            online = future.result()
+        except Exception as e:
+            # worker 异常：保守跳过，不改状态
+            print(f"[PingMonitor] {ip} ping worker 异常: {e}")
+            continue
+
+        # ── 主线程串行更新字典（无竞态） ──
         if online:
             _PING_FAIL_COUNT[ip] = 0
-            if _PING_ALERTED.get(ip):
-                # 恢复在线 → 推送恢复通知
+            _PING_OK_COUNT[ip] = _PING_OK_COUNT.get(ip, 0) + 1
+            if _PING_ALERTED.get(ip) and _PING_OK_COUNT[ip] >= 2:
                 _PING_ALERTED[ip] = False
+                _PING_OK_COUNT[ip] = 0
                 if webhook:
                     from app.core.dingtalk import send_dingtalk
                     text = (
@@ -185,12 +205,17 @@ def _do_ping_monitor_tick(db) -> None:
                         f"说明：Ping 恢复可达，设备已恢复正常"
                     )
                     send_dingtalk(webhook, secret, text)
-                    print(f"[PingMonitor] {ip} 已恢复在线，推送钉钉恢复通知")
+                    print(f"[PingMonitor] {ip} 已恢复在线（连续2次通），推送钉钉恢复通知")
         else:
+            _PING_OK_COUNT[ip] = 0
             count = _PING_FAIL_COUNT.get(ip, 0) + 1
             _PING_FAIL_COUNT[ip] = count
             if count >= 3 and not _PING_ALERTED.get(ip):
                 _PING_ALERTED[ip] = True
+                # 告警冷却：同一 IP 30 分钟内不重复推钉钉
+                if time.time() - _PING_ALERT_TIME.get(ip, 0) < _PING_ALERT_COOLDOWN:
+                    continue
+                _PING_ALERT_TIME[ip] = time.time()
                 if webhook:
                     from app.core.dingtalk import send_dingtalk
                     text = (
@@ -201,6 +226,9 @@ def _do_ping_monitor_tick(db) -> None:
                     )
                     send_dingtalk(webhook, secret, text)
                     print(f"[PingMonitor] {ip} 连续 {count} 次不通，推送钉钉离线告警")
+
+    # ★ 轮次结束时更新计时器，确保实际间隔 ≈ interval
+    _PING_LAST_TICK = time.time()
 
 
 def syslog_listener_loop(get_session) -> None:
@@ -268,6 +296,11 @@ def syslog_listener_loop(get_session) -> None:
                 src_ip = addr[0]
                 # 记录源 IP 供 Ping 连通监控使用
                 _PING_SRC_IPS[src_ip] = time.time()
+                # ★ 收到 syslog 报文 = 设备在线，重置 ping 监控计数（很多设备禁 Ping）
+                _PING_FAIL_COUNT.pop(src_ip, None)
+                _PING_ALERTED.pop(src_ip, None)
+                _PING_OK_COUNT.pop(src_ip, None)
+                _PING_ALERT_TIME.pop(src_ip, None)
                 parsed = parse_syslog(data)
                 if not parsed:
                     print(f"[Syslog-DBG] 报文解析失败，丢弃")
