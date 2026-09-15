@@ -9,7 +9,7 @@ from typing import Optional, Tuple, List, Dict, Any
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_, func, text
+from sqlalchemy import or_, and_, func, text, asc, desc
 
 from app.core.timeutil import beijing_now
 from app.core.crud import write_operation_log
@@ -108,7 +108,9 @@ def _get_part(db: Session, part_id: int) -> WarehousePart:
 def list_parts(db: Session, page: int = 1, page_size: int = 20,
                keyword: Optional[str] = None, part_type: Optional[str] = None,
                low_stock: bool = False,
-               stock_status: Optional[str] = None) -> Tuple[List[dict], int]:
+               stock_status: Optional[str] = None,
+               sort_by: Optional[str] = None,
+               sort_order: Optional[str] = None) -> Tuple[List[dict], int]:
     q = db.query(WarehousePart)
     if part_type in (JIG, CONSUMABLE):
         q = q.filter(WarehousePart.part_type == part_type)
@@ -148,8 +150,21 @@ def list_parts(db: Session, page: int = 1, page_size: int = 20,
             ),
         ))
     total = q.count()
-    items = (q.order_by(WarehousePart.part_type.asc(), WarehousePart.id.desc())
-              .offset((page - 1) * page_size).limit(page_size).all())
+    # 排序
+    sort_map = {
+        'total_qty': WarehousePart.total_qty,
+        'available_qty': WarehousePart.available_qty,
+        'stock_qty': WarehousePart.total_qty,
+        'warn_qty': WarehousePart.warn_qty,
+    }
+    col = sort_map.get(sort_by)
+    if col and sort_order in ('asc', 'desc'):
+        order = asc(col) if sort_order == 'asc' else desc(col)
+        items = (q.order_by(order, WarehousePart.id.desc())
+                  .offset((page - 1) * page_size).limit(page_size).all())
+    else:
+        items = (q.order_by(WarehousePart.part_type.asc(), WarehousePart.id.desc())
+                  .offset((page - 1) * page_size).limit(page_size).all())
     return [_part_to_dict(p) for p in items], total
 
 
@@ -281,8 +296,13 @@ def get_operators(db: Session, limit: int = 50) -> List[str]:
 
 def list_transactions(db: Session, page: int = 1, page_size: int = 50,
                       tx_type: Optional[str] = None,
-                      keyword: Optional[str] = None) -> Tuple[List[dict], int]:
+                      keyword: Optional[str] = None,
+                      borrow_date: Optional[str] = None,
+                      return_date: Optional[str] = None,
+                      sort_by: Optional[str] = None,
+                      sort_order: Optional[str] = None) -> Tuple[List[dict], int]:
     """查询所有物品的借出/领用/归还/补货流水（按时间倒序）。"""
+    from datetime import datetime
     q = db.query(PartTransaction)
     if tx_type in ("借出", "归还", "领用", "补货", "维修", "丢失", "损坏"):
         q = q.filter(PartTransaction.tx_type == tx_type)
@@ -293,10 +313,34 @@ def list_transactions(db: Session, page: int = 1, page_size: int = 50,
             PartTransaction.operator.like(kw),
             PartTransaction.remark.like(kw),
             PartTransaction.department_manager.like(kw),
+            PartTransaction.line.like(kw),
         ))
+    if borrow_date:
+        try:
+            d = datetime.strptime(borrow_date.strip(), "%Y-%m-%d")
+            d_end = d.replace(hour=23, minute=59, second=59)
+            q = q.filter(PartTransaction.borrow_time >= d,
+                         PartTransaction.borrow_time <= d_end)
+        except ValueError:
+            pass
+    if return_date:
+        try:
+            d = datetime.strptime(return_date.strip(), "%Y-%m-%d")
+            d_end = d.replace(hour=23, minute=59, second=59)
+            q = q.filter(PartTransaction.return_time >= d,
+                         PartTransaction.return_time <= d_end)
+        except ValueError:
+            pass
     total = q.count()
-    items = (q.order_by(PartTransaction.id.desc())
-              .offset((page - 1) * page_size).limit(page_size).all())
+    # 排序
+    if sort_by == 'qty' and sort_order in ('asc', 'desc'):
+        col = PartTransaction.qty
+        order = asc(col) if sort_order == 'asc' else desc(col)
+        items = (q.order_by(order, PartTransaction.id.desc())
+                  .offset((page - 1) * page_size).limit(page_size).all())
+    else:
+        items = (q.order_by(PartTransaction.id.desc())
+                  .offset((page - 1) * page_size).limit(page_size).all())
     return [_tx_to_dict(t) for t in items], total
 
 

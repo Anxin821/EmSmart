@@ -4,12 +4,11 @@
       <h1 class="page-title"><span class="emoji">📦</span> 库房管理</h1>
 
       <div class="ph-right-group">
-        <el-input v-model="keyword" placeholder="名称 / 型号 / 借用人（支持扫码）" clearable
-          style="width: 300px;" @keyup.enter="onSearch" @clear="onSearch">
+        <el-input v-model="borrowKeyword" placeholder="扫码搜索物品，回车添加至借领/归还列表" clearable
+          style="width: 320px;" @keyup.enter="onBorrowSearch">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
-        <el-button @click="onSearch">搜索</el-button>
-        <el-button v-if="userStore.canEdit" type="warning" @click="openCartDrawer">
+        <el-button v-if="userStore.canEdit" type="warning" @click="openBorrowDialog">
           <el-icon><ShoppingCart /></el-icon>
           借领/归还<span v-if="cartItems.length" class="cart-badge">{{ cartTotalQty }}</span>
         </el-button>
@@ -47,52 +46,111 @@
         <!-- ── 出入库记录 Tab ── -->
         <template v-if="activeTab === '出入库记录'">
           <div class="wh-table-section">
-            <div class="tx-filter-row">
-              <el-date-picker v-model="txFilterTimeRange" type="daterange" range-separator="至"
-                start-placeholder="开始日期" end-placeholder="结束日期" size="small"
-                style="width: 200px;" clearable @change="() => { txPage=1; loadTxData() }" />
-              <el-select v-model="txFilterType" placeholder="操作" clearable size="small" style="width: 100px;">
-                <el-option label="借出" value="借出" />
-                <el-option label="归还" value="归还" />
-                <el-option label="领用" value="领用" />
-                <el-option label="补货" value="补货" />
-                <el-option label="维修" value="维修" />
-                <el-option label="丢失" value="丢失" />
-                <el-option label="损坏" value="损坏" />
-              </el-select>
-              <el-input v-model="txFilterPart" placeholder="物品" clearable size="small" style="width: 120px;" />
-              <el-input v-model="txFilterOperator" placeholder="借/领人" clearable size="small" style="width: 110px;" />
-              <el-input v-model="txFilterRemark" placeholder="备注" clearable size="small" style="width: 120px;" />
-              <el-button size="small" @click="resetTxFilter">重置</el-button>
-            </div>
             <div class="wh-table-wrap">
               <el-table :data="filteredTxRecords" v-loading="txLoading" stripe border size="small" empty-text="暂无记录"
-  :header-cell-style="{ fontWeight: 600, textAlign: 'center' }" height="100%">
-                <el-table-column label="时间" prop="created_at" width="140" align="center" />
-                <el-table-column label="操作" width="70" align="center">
+  :header-cell-style="{ fontWeight: 600, textAlign: 'center' }" height="100%"
+  :row-class-name="tableRowClassName">
+                <el-table-column label="时间" width="160" align="center">
                   <template #default="{ row }">
-                    <el-tag v-if="row.tx_type === '借出' && row.return_time" type="success" size="small">已归还</el-tag>
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <el-date-picker v-model="txFilterTimeRange" type="daterange" range-separator="至"
+                        start-placeholder="开始" end-placeholder="结束" size="small" style="width:100%;"
+                        clearable @change="txPage=1;loadTxData()" />
+                    </div>
+                    <span v-else>{{ row.created_at }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="60" align="center">
+                  <template #default="{ row }">
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <el-select v-model="txFilterType" placeholder="操作" clearable size="small"
+                        style="width:100%;" @change="txPage=1;loadTxData()">
+                        <el-option label="借出" value="借出" />
+                        <el-option label="归还" value="归还" />
+                        <el-option label="领用" value="领用" />
+                        <el-option label="补货" value="补货" />
+                        <el-option label="维修" value="维修" />
+                        <el-option label="丢失" value="丢失" />
+                        <el-option label="损坏" value="损坏" />
+                      </el-select>
+                    </div>
+                    <el-tag v-else-if="row.tx_type === '借出' && row.return_time" type="success" size="small">已归还</el-tag>
                     <el-tag v-else :type="txTagType(row.tx_type)" size="small">{{ row.tx_type }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="物品" prop="part_name" min-width="180" show-overflow-tooltip />
-                <el-table-column label="数量" prop="qty" width="50" align="center" />
-                <el-table-column label="借/领人" prop="operator" width="80" align="center" show-overflow-tooltip />
-                <el-table-column label="部门负责人" prop="department_manager" width="90" align="center" show-overflow-tooltip>
-                  <template #default="{ row }">{{ row.department_manager || '-' }}</template>
+                <el-table-column label="物品" prop="part_name" min-width="160" show-overflow-tooltip>
+                  <template #default="{ row }">
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <el-input v-model="txFilterPart" size="small" placeholder="搜索" clearable
+                        @change="txPage=1;loadTxData()" />
+                    </div>
+                    <span v-else>{{ row.part_name }}</span>
+                  </template>
                 </el-table-column>
-                <el-table-column label="线体" prop="line" width="50" align="center" show-overflow-tooltip>
-                  <template #default="{ row }">{{ row.line || '-' }}</template>
+                <el-table-column label="数量" width="60" align="center">
+                  <template #default="{ row }">
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <span class="part-sort-btn" :class="{ active: !!txSortOrder }"
+                        :data-order="txSortOrder || 'off'"
+                        @click.stop="toggleTxSort(txSortOrder)">
+                        {{ txSortOrder === 'asc' ? '↑' : txSortOrder === 'desc' ? '↓' : '⇅' }}
+                      </span>
+                    </div>
+                    <span v-else>{{ row.qty }}</span>
+                  </template>
                 </el-table-column>
-                <el-table-column label="借出时间" prop="borrow_time" width="140" align="center">
-                  <template #default="{ row }">{{ row.borrow_time || '-' }}</template>
+                <el-table-column label="借/领人" width="70" align="center" show-overflow-tooltip>
+                  <template #default="{ row }">
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <el-input v-model="txFilterOperator" size="small" placeholder="搜索" clearable
+                        @change="txPage=1;loadTxData()" />
+                    </div>
+                    <span v-else>{{ row.operator }}</span>
+                  </template>
                 </el-table-column>
-                <el-table-column label="归还时间" prop="return_time" width="140" align="center">
-                  <template #default="{ row }">{{ row.return_time || '-' }}</template>
+                <el-table-column label="部门负责人" width="85" align="center" show-overflow-tooltip>
+                  <template #default="{ row }">
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <el-input v-model="txFilterDepartmentManager" size="small" placeholder="搜索" clearable
+                        @change="txPage=1;loadTxData()" />
+                    </div>
+                    <span v-else>{{ row.department_manager || '-' }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="线体" width="60" align="center" show-overflow-tooltip>
+                  <template #default="{ row }">
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <el-input v-model="txFilterLine" size="small" placeholder="搜索" clearable
+                        @change="txPage=1;loadTxData()" />
+                    </div>
+                    <span v-else>{{ row.line || '-' }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="借出时间" width="130" align="center">
+                  <template #default="{ row }">
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <el-date-picker v-model="txFilterBorrowDate" type="date" placeholder="筛选日期" size="small"
+                        style="width:100%;" clearable @change="txPage=1;loadTxData()" />
+                    </div>
+                    <span v-else>{{ row.borrow_time || '-' }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="归还时间" width="130" align="center">
+                  <template #default="{ row }">
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <el-date-picker v-model="txFilterReturnDate" type="date" placeholder="筛选日期" size="small"
+                        style="width:100%;" clearable @change="txPage=1;loadTxData()" />
+                    </div>
+                    <span v-else>{{ row.return_time || '-' }}</span>
+                  </template>
                 </el-table-column>
                 <el-table-column label="备注" min-width="60" show-overflow-tooltip>
                   <template #default="{ row }">
-                    <div class="tx-remark-cell" @click.stop="userStore.canEdit && openEditRemark(row)">
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <el-input v-model="txFilterRemark" size="small" placeholder="搜索" clearable
+                        @change="txPage=1;loadTxData()" />
+                    </div>
+                    <div v-else class="tx-remark-cell" @click.stop="userStore.canEdit && openEditRemark(row)">
                       <span>{{ row.remark || '-' }}</span>
                       <el-icon v-if="userStore.canEdit" class="tx-remark-edit"><EditPen /></el-icon>
                     </div>
@@ -190,6 +248,7 @@
         <!-- ── 治具 / 耗材 Tab：物品列表 ── -->
         <template v-else>
           <div class="wh-table-section">
+            <!-- 筛选行已嵌入表格内部第一行 -->
             <div class="wh-table-wrap">
               <el-table
                 :data="items"
@@ -199,89 +258,179 @@
                 style="width: 100%"
                 empty-text="暂无数据"
                 :header-cell-style="{ fontWeight: 600, textAlign: 'center' }"
-                @row-click="openDetail"
+                @row-click="onTableRowClick"
+                :row-class-name="tableRowClassName"
                 >
                 <el-table-column label="物品名称" min-width="180" align="center" show-overflow-tooltip>
                   <template #default="{ row }">
-                    <span class="wh-name">{{ row.name }}</span>
+                    <div v-if="row._isFilter && activeTab === '治具'" class="jig-fbr-cell">
+                      <el-input v-model="jigFilterName" size="small" placeholder="搜索名称" clearable
+                        @change="page=1;loadData()" />
+                    </div>
+                    <div v-else-if="row._isFilter && activeTab === '耗材'" class="jig-fbr-cell">
+                      <el-input v-model="consFilterName" size="small" placeholder="搜索名称" clearable
+                        @change="page=1;loadData()" />
+                    </div>
+                    <span v-else class="wh-name">{{ row.name }}</span>
                   </template>
                 </el-table-column>
 
                 <el-table-column label="型号" prop="model" min-width="130" align="center" show-overflow-tooltip
                   v-if="activeTab !== '耗材'">
                   <template #default="{ row }">
-                    <span v-if="row.model" class="wh-model">{{ row.model }}</span>
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <el-input v-model="jigFilterModel" size="small" placeholder="搜索型号" clearable
+                        @change="page=1;loadData()" />
+                    </div>
+                    <span v-else-if="row.model" class="wh-model">{{ row.model }}</span>
                     <span v-else class="wh-model-empty">-</span>
                   </template>
                 </el-table-column>
                 <el-table-column label="编号" prop="code" min-width="130" align="center" show-overflow-tooltip
                   v-if="activeTab !== '耗材'">
                   <template #default="{ row }">
-                    <span v-if="row.code" class="wh-model">{{ row.code }}</span>
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <el-input v-model="jigFilterCode" size="small" placeholder="搜索编号" clearable
+                        @change="page=1;loadData()" />
+                    </div>
+                    <span v-else-if="row.code" class="wh-model">{{ row.code }}</span>
                     <span v-else class="wh-model-empty">-</span>
                   </template>
                 </el-table-column>
 
                 <template v-if="activeTab === '治具'">
-                  <el-table-column label="总数" prop="total_qty" width="60" align="center" />
-                  <el-table-column label="可用" width="60" align="center">
-                    <template #default="{ row }"><b class="ok-text">{{ row.available_qty }}</b></template>
+                  <el-table-column label="总数" prop="total_qty" width="70" align="center">
+                    <template #default="{ row }">
+                      <div v-if="row._isFilter" class="jig-fbr-cell">
+                        <span class="part-sort-btn" :class="{ active: !!jigSortTotal }"
+                          :data-order="jigSortTotal || 'off'"
+                          @click.stop="togglePartSort('jigSortTotal')">
+                          {{ jigSortTotal === 'asc' ? '↑' : jigSortTotal === 'desc' ? '↓' : '⇅' }}
+                        </span>
+                      </div>
+                      <span v-else>{{ row.total_qty }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="可用" width="70" align="center">
+                    <template #default="{ row }">
+                      <div v-if="row._isFilter" class="jig-fbr-cell">
+                        <span class="part-sort-btn" :class="{ active: !!jigSortAvailable }"
+                          :data-order="jigSortAvailable || 'off'"
+                          @click.stop="togglePartSort('jigSortAvailable')">
+                          {{ jigSortAvailable === 'asc' ? '↑' : jigSortAvailable === 'desc' ? '↓' : '⇅' }}
+                        </span>
+                      </div>
+                      <b v-else class="ok-text">{{ row.available_qty }}</b>
+                    </template>
                   </el-table-column>
                 </template>
 
                 <template v-else>
                   <el-table-column label="库存" width="100" align="center">
                     <template #default="{ row }">
-                      <b :style="{ color: row.status === '缺货' ? '#DC2626' : 'var(--c-text)' }">{{ row.stock_qty }}</b>
-                      <span style="font-size:12px;color:var(--c-text-mute)"> {{ row.unit }}</span>
+                      <div v-if="row._isFilter" class="jig-fbr-cell">
+                        <span class="part-sort-btn" :class="{ active: !!consSortStock }"
+                          :data-order="consSortStock || 'off'"
+                          @click.stop="togglePartSort('consSortStock')">
+                          {{ consSortStock === 'asc' ? '↑' : consSortStock === 'desc' ? '↓' : '⇅' }}
+                        </span>
+                      </div>
+                      <b v-else :style="{ color: row.status === '缺货' ? '#DC2626' : 'var(--c-text)' }">{{ row.stock_qty }}</b>
+                      <span v-if="!row._isFilter" style="font-size:12px;color:var(--c-text-mute)"> {{ row.unit }}</span>
                     </template>
                   </el-table-column>
-                  <el-table-column label="预警值" prop="warn_qty" width="80" align="center" />
+                  <el-table-column label="预警值" prop="warn_qty" width="80" align="center">
+                    <template #default="{ row }">
+                      <div v-if="row._isFilter" class="jig-fbr-cell">
+                        <span class="part-sort-btn" :class="{ active: !!consSortWarn }"
+                          :data-order="consSortWarn || 'off'"
+                          @click.stop="togglePartSort('consSortWarn')">
+                          {{ consSortWarn === 'asc' ? '↑' : consSortWarn === 'desc' ? '↓' : '⇅' }}
+                        </span>
+                      </div>
+                      <span v-else>{{ row.warn_qty }}</span>
+                    </template>
+                  </el-table-column>
                 </template>
 
-                <el-table-column label="货位" prop="location" width="100" align="center">
-                  <template #default="{ row }">{{ row.location || '-' }}</template>
-                </el-table-column>
-
-                <el-table-column label="状态" min-width="60" align="center">
+                <el-table-column label="货位" prop="location" width="120" align="center">
                   <template #default="{ row }">
-                    <el-tag :type="statusTagType(row)" size="small">{{ row.status }}</el-tag>
+                    <div v-if="row._isFilter && activeTab === '治具'" class="jig-fbr-cell">
+                      <el-input v-model="jigFilterLocation" size="small" placeholder="搜索货位" clearable
+                        @change="page=1;loadData()" />
+                    </div>
+                    <div v-else-if="row._isFilter && activeTab === '耗材'" class="jig-fbr-cell">
+                      <el-input v-model="consFilterLocation" size="small" placeholder="搜索货位" clearable
+                        @change="page=1;loadData()" />
+                    </div>
+                    <span v-else>{{ row.location || '-' }}</span>
                   </template>
                 </el-table-column>
 
-                <el-table-column label="操作" width="200" align="center" fixed="right">
+                <el-table-column label="状态" min-width="80" align="center">
                   <template #default="{ row }">
-                    <template v-if="userStore.canEdit">
-                      <template v-if="row.part_type === '治具'">
-                        <el-button v-if="row.available_qty - (row.repair_qty || 0) > 0"
-                          type="primary" link size="small" @click.stop="openBorrow(row)">借领</el-button>
-                        <el-button v-else type="info" link size="small" disabled @click.stop="toast.warn(`「${row.name}」可借数量不足`)">借领</el-button>
-                        <el-button type="warning" link size="small"
-                          @click.stop="openReturn(row)">归还</el-button>
-                      </template>
-                      <template v-else>
-                        <el-button v-if="row.stock_qty > 0"
-                          type="primary" link size="small" @click.stop="openConsume(row)">借领</el-button>
-                        <el-button v-else type="info" link size="small" disabled @click.stop="toast.warn(`「${row.name}」库存不足`)">借领</el-button>
-                        <el-button type="warning" link size="small" @click.stop="openReturn(row)">归还</el-button>
-                      </template>
-                      <el-dropdown @command="(cmd) => handleMoreCommand(cmd, row)" trigger="click">
-                        <el-button type="info" link size="small" @click.stop>更多<el-icon style="margin-left:2px"><ArrowDown /></el-icon></el-button>
-                        <template #dropdown>
-                          <el-dropdown-menu>
-                            <el-dropdown-item command="restock">补货</el-dropdown-item>
-                            <el-dropdown-item v-if="row.part_type === '治具' && row.repair_qty > 0" command="finish_repair">维修完成</el-dropdown-item>
-                            <el-dropdown-item v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')" command="loss">报失</el-dropdown-item>
-                            <el-dropdown-item v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')" command="damaged">报损</el-dropdown-item>
-                            <el-dropdown-item v-if="row.part_type === '治具' && row.status === '已借出'" command="found_back">已找回</el-dropdown-item>
-                            <el-dropdown-item v-if="row.part_type === '治具' && row.status === '已借出'" command="repair_damaged">已修复</el-dropdown-item>
-                            <el-dropdown-item command="edit">编辑</el-dropdown-item>
-                            <el-dropdown-item v-if="userStore.isAdmin || (userStore.user?.full_name === '秦江蓉' && userStore.isEngineer)" command="delete" divided>删除</el-dropdown-item>
-                          </el-dropdown-menu>
+                    <div v-if="row._isFilter && activeTab === '治具'" class="jig-fbr-cell">
+                      <el-select v-model="jigFilterStatus" placeholder="状态" clearable size="small"
+                        style="width:100%;" @change="page=1;loadData()">
+                        <el-option label="全部" value="" />
+                        <el-option label="在库" value="在库" />
+                        <el-option label="已借出" value="已借出" />
+                        <el-option label="部分借出" value="部分借出" />
+                        <el-option label="维修中" value="维修中" />
+                      </el-select>
+                    </div>
+                    <div v-else-if="row._isFilter && activeTab === '耗材'" class="jig-fbr-cell">
+                      <el-select v-model="consFilterStatus" placeholder="状态" clearable size="small"
+                        style="width:100%;" @change="page=1;loadData()">
+                        <el-option label="全部" value="" />
+                        <el-option label="正常" value="正常" />
+                        <el-option label="低于预警" value="低于预警" />
+                        <el-option label="缺货" value="缺货" />
+                      </el-select>
+                    </div>
+                    <el-tag v-else :type="statusTagType(row)" size="small">{{ row.status }}</el-tag>
+                  </template>
+                </el-table-column>
+
+                <el-table-column label="操作" width="210" align="center" fixed="right">
+                  <template #default="{ row }">
+                    <div v-if="row._isFilter" class="jig-fbr-cell">
+                      <el-button size="small"
+                        @click.stop="activeTab === '治具' ? resetJigFilters() : resetConsFilters()">重置</el-button>
+                    </div>
+                    <template v-else>
+                      <template v-if="userStore.canEdit">
+                        <template v-if="row.part_type === '治具'">
+                          <el-button v-if="row.available_qty - (row.repair_qty || 0) > 0"
+                            type="primary" link size="small" @click.stop="openBorrow(row)">借领</el-button>
+                          <el-button v-else type="info" link size="small" disabled @click.stop="toast.warn(`「${row.name}」可借数量不足`)">借领</el-button>
+                          <el-button type="warning" link size="small"
+                            @click.stop="openReturn(row)">归还</el-button>
                         </template>
-                      </el-dropdown>
+                        <template v-else>
+                          <el-button v-if="row.stock_qty > 0"
+                            type="primary" link size="small" @click.stop="openConsume(row)">借领</el-button>
+                          <el-button v-else type="info" link size="small" disabled @click.stop="toast.warn(`「${row.name}」库存不足`)">借领</el-button>
+                          <el-button type="warning" link size="small" @click.stop="openReturn(row)">归还</el-button>
+                        </template>
+                        <el-dropdown @command="(cmd) => handleMoreCommand(cmd, row)" trigger="click">
+                          <el-button type="info" link size="small" @click.stop>更多<el-icon style="margin-left:2px"><ArrowDown /></el-icon></el-button>
+                          <template #dropdown>
+                            <el-dropdown-menu>
+                              <el-dropdown-item command="restock">补货</el-dropdown-item>
+                              <el-dropdown-item v-if="row.part_type === '治具' && row.repair_qty > 0" command="finish_repair">维修完成</el-dropdown-item>
+                              <el-dropdown-item v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')" command="loss">报失</el-dropdown-item>
+                              <el-dropdown-item v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')" command="damaged">报损</el-dropdown-item>
+                              <el-dropdown-item v-if="row.part_type === '治具' && row.status === '已借出'" command="found_back">已找回</el-dropdown-item>
+                              <el-dropdown-item v-if="row.part_type === '治具' && row.status === '已借出'" command="repair_damaged">已修复</el-dropdown-item>
+                              <el-dropdown-item command="edit">编辑</el-dropdown-item>
+                              <el-dropdown-item v-if="userStore.isAdmin || (userStore.user?.full_name === '秦江蓉' && userStore.isEngineer)" command="delete" divided>删除</el-dropdown-item>
+                            </el-dropdown-menu>
+                          </template>
+                        </el-dropdown>
+                      </template>
+                      <span v-else style="color: var(--c-text-mute); font-size: 12px;">点击行查看详情</span>
                     </template>
-                    <span v-else style="color: var(--c-text-mute); font-size: 12px;">点击行查看详情</span>
                   </template>
                 </el-table-column>
 
@@ -298,25 +447,10 @@
       </div>
     </div>
 
-    <!-- 出入库抽屉抽屉（扫码 + 借出/领用/归还 一站式） -->
-    <el-drawer
-      v-model="cartDrawer"
-      direction="rtl"
-      size="480px"
-      destroy-on-close
-      class="cart-drawer"
-      :with-header="false"
-    >
+    <!-- 借领 / 归还 弹框 -->
+    <el-dialog v-model="cartDialog" :title="scanModeName" width="520px" destroy-on-close
+      :close-on-click-modal="false" @opened="focusScanInput" class="cart-dialog">
       <div class="cd-wrap">
-        <header class="cd-header">
-          <div class="cd-title">
-            <el-icon><ShoppingCart /></el-icon>
-            <span>{{ scanModeName }}</span>
-            <span v-if="cartItems.length" class="cd-count">{{ cartTotalQty }} 件</span>
-          </div>
-          <el-button text @click="cartDrawer = false"><el-icon><Close /></el-icon></el-button>
-        </header>
-
         <div class="cd-mode-bar">
           <el-radio-group v-model="scanMode" size="small">
             <el-radio-button label="borrow">借领</el-radio-button>
@@ -389,7 +523,7 @@
           </div>
         </footer>
       </div>
-    </el-drawer>
+    </el-dialog>
 
     <!-- 新增 / 编辑物品 -->
     <el-dialog v-model="editDialog" :title="editForm.id ? '编辑物品' : '新增物品'" width="560px" destroy-on-close :close-on-click-modal="true">
@@ -769,9 +903,34 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
-const keyword = ref('')
+const borrowKeyword = ref('')   // 顶部搜索，仅用于借领/归还
 const activeTab = ref('首页')
 const lowItems = ref([])
+
+// 治具 Tab 筛选
+const jigFilterName = ref('')
+const jigFilterModel = ref('')
+const jigFilterCode = ref('')
+const jigFilterLocation = ref('')
+const jigFilterStatus = ref('')
+const resetJigFilters = () => {
+  jigFilterName.value = ''
+  jigFilterModel.value = ''
+  jigFilterCode.value = ''
+  jigFilterLocation.value = ''
+  jigFilterStatus.value = ''
+  page.value = 1; loadData()
+}
+// 耗材 Tab 筛选
+const consFilterName = ref('')
+const consFilterLocation = ref('')
+const consFilterStatus = ref('')
+const resetConsFilters = () => {
+  consFilterName.value = ''
+  consFilterLocation.value = ''
+  consFilterStatus.value = ''
+  page.value = 1; loadData()
+}
 
 // 出入库记录（右侧常驻表格）
 const txRecords = ref([])
@@ -785,10 +944,21 @@ const txFilterType = ref('')
 const txFilterPart = ref('')
 const txFilterOperator = ref('')
 const txFilterRemark = ref('')
+const txFilterDepartmentManager = ref('')
+const txFilterLine = ref('')
+const txFilterBorrowDate = ref(null)         // Date 对象
+const txFilterReturnDate = ref(null)         // Date 对象
+const txSortOrder = ref('')                  // '' / 'asc' / 'desc'
+
+// 治具/耗材排序状态
+const jigSortTotal = ref('')       // '' / 'asc' / 'desc'
+const jigSortAvailable = ref('')
+const consSortStock = ref('')
+const consSortWarn = ref('')
 
 // 筛选后的记录（仅保留后端不支持的客户端筛选：操作时间 / 已归还虚拟类型）
 const filteredTxRecords = computed(() => {
-  return txRecords.value.filter(r => {
+  const filtered = txRecords.value.filter(r => {
     // 日期范围筛选
     if (txFilterTimeRange.value) {
       const [d0, d1] = txFilterTimeRange.value
@@ -806,6 +976,8 @@ const filteredTxRecords = computed(() => {
     // txFilterType / txFilterPart / txFilterOperator 已由后端处理，前端不再重复过滤
     return true
   })
+  // 在表头与数据之间插入筛选行
+  return [{ id: -1, _isFilter: true }, ...filtered]
 })
 
 const resetTxFilter = () => {
@@ -814,6 +986,11 @@ const resetTxFilter = () => {
   txFilterPart.value = ''
   txFilterOperator.value = ''
   txFilterRemark.value = ''
+  txFilterDepartmentManager.value = ''
+  txFilterLine.value = ''
+  txFilterBorrowDate.value = null
+  txFilterReturnDate.value = null
+  txSortOrder.value = ''
 }
 
 const loadTxData = async () => {
@@ -829,12 +1006,28 @@ const loadTxData = async () => {
         params.tx_type = txFilterType.value
       }
     }
-    // 构造 keyword 支持物品名+借/领人+备注同时搜索（后端 keyword 会搜 part_name, operator, remark 等）
+    // 构造 keyword 支持物品名+借/领人+备注+部门负责人+线体同时搜索
     const kwParts = []
     if (txFilterPart.value?.trim()) kwParts.push(txFilterPart.value.trim())
     if (txFilterOperator.value?.trim()) kwParts.push(txFilterOperator.value.trim())
     if (txFilterRemark.value?.trim()) kwParts.push(txFilterRemark.value.trim())
+    if (txFilterDepartmentManager.value?.trim()) kwParts.push(txFilterDepartmentManager.value.trim())
+    if (txFilterLine.value?.trim()) kwParts.push(txFilterLine.value.trim())
     if (kwParts.length) params.keyword = kwParts.join(' ')
+    // 日期筛选作为单独参数传给后端
+    if (txFilterBorrowDate.value) {
+      const d = txFilterBorrowDate.value
+      params.borrow_date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    }
+    if (txFilterReturnDate.value) {
+      const d = txFilterReturnDate.value
+      params.return_date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    }
+    // 数量排序
+    if (txSortOrder.value) {
+      params.sort_by = 'qty'
+      params.sort_order = txSortOrder.value
+    }
     const res = await warehouseApi.transactions(params)
     txRecords.value = res.data?.items || []
     txTotal.value = res.data?.total || 0
@@ -847,8 +1040,29 @@ const loadTxData = async () => {
   }
 }
 
+const toggleTxSort = (cur) => {
+  // 单箭头循环：'' → 'asc' → 'desc' → ''
+  if (!cur) { txSortOrder.value = 'asc' }
+  else if (cur === 'asc') { txSortOrder.value = 'desc' }
+  else { txSortOrder.value = '' }
+  txPage.value = 1
+  loadTxData()
+}
+
+// 治具/耗材通用排序切换（单箭头循环）
+const togglePartSort = (refName) => {
+  const cur = eval(refName).value
+  if (!cur) { eval(refName).value = 'asc' }
+  else if (cur === 'asc') { eval(refName).value = 'desc' }
+  else { eval(refName).value = '' }
+  page.value = 1
+  loadData()
+}
+
 watch([txPage, txPageSize], () => loadTxData())
-watch([txFilterType, txFilterPart, txFilterOperator, txFilterRemark], () => {
+watch([txFilterType, txFilterPart, txFilterOperator, txFilterRemark,
+       txFilterDepartmentManager, txFilterLine,
+       txFilterBorrowDate, txFilterReturnDate], () => {
   txPage.value = 1
   loadTxData()
 })
@@ -903,16 +1117,51 @@ const stopStatsPolling = () => {
 }
 
 const loadData = async () => {
-  // 出入库记录 tab 不加载物品列表（但搜索时仍然搜索物品）
-  if (activeTab.value === '出入库记录' && !keyword.value) { items.value = []; total.value = 0; return }
+  // 出入库记录 tab 不加载物品列表
+  if (activeTab.value === '出入库记录') { items.value = []; total.value = 0; return }
   loading.value = true
   try {
     const params = { page: page.value, page_size: pageSize.value }
-    if (keyword.value) params.keyword = keyword.value
-    if (activeTab.value !== '首页' && activeTab.value !== '出入库记录') params.part_type = activeTab.value
+    if (activeTab.value !== '首页') params.part_type = activeTab.value
+
+    // 组合 tab 筛选条件为 keyword（后端搜索 name/model/location 等）
+    let kw = ''
+    if (activeTab.value === '治具') {
+      const parts = [jigFilterName.value, jigFilterModel.value, jigFilterCode.value, jigFilterLocation.value]
+        .filter(Boolean)
+      if (parts.length) kw = parts.join(' ')
+    } else if (activeTab.value === '耗材') {
+      const parts = [consFilterName.value, consFilterLocation.value].filter(Boolean)
+      if (parts.length) kw = parts.join(' ')
+    }
+    if (kw) params.keyword = kw
+
+    // 治具/耗材排序
+    const sortFieldMap = {
+      jigSortTotal: 'total_qty', jigSortAvailable: 'available_qty',
+      consSortStock: 'stock_qty', consSortWarn: 'warn_qty',
+    }
+    for (const [refName, field] of Object.entries(sortFieldMap)) {
+      const val = eval(refName).value
+      if (val) { params.sort_by = field; params.sort_order = val; break }
+    }
+
     const res = await warehouseApi.list(params)
-    items.value = res.data?.items || []
+    let loaded = res.data?.items || []
     total.value = res.data?.total || 0
+
+    // 客户端状态筛选（状态由后端计算，不在 keyword 搜索范围）
+    if (activeTab.value === '治具' && jigFilterStatus.value) {
+      loaded = loaded.filter(i => i.status === jigFilterStatus.value)
+    } else if (activeTab.value === '耗材' && consFilterStatus.value) {
+      loaded = loaded.filter(i => i.status === consFilterStatus.value)
+    }
+    items.value = loaded
+
+    // 治具/耗材 Tab：在表头与数据之间插入筛选行（仅 page 1）
+    if (page.value === 1 && (activeTab.value === '治具' || activeTab.value === '耗材')) {
+      items.value = [{ id: -1, _isFilter: true }, ...loaded]
+    }
   } catch (e) {
     console.error(e)
   } finally {
@@ -926,10 +1175,9 @@ const refreshAll = () => {
   loadData(); loadStats(); loadTxData()
 }
 
-const onSearch = () => {
-  page.value = 1
-  loadData()
-}
+// 此 search 按钮已移除（顶部搜索改为 borrowKeyword），保留空函数避免引用报错
+const onSearch = () => {}
+
 const onTabChange = () => {
   if (activeTab.value === '出入库记录') {
     stopStatsPolling()
@@ -1381,6 +1629,17 @@ const openDetail = async (row) => {
   }
 }
 
+// 筛选行：在 el-table 内作为第一行数据（位于表头与实际数据之间）
+const onTableRowClick = (row) => {
+  if (row._isFilter) return
+  showDetail(row)
+}
+
+// 筛选行添加特殊 className，用于 CSS 粘性定位
+const tableRowClassName = ({ row }) => {
+  return row._isFilter ? 'filter-row' : ''
+}
+
 onMounted(() => {
   if (activeTab.value === '首页') {
     loadStats()
@@ -1397,8 +1656,8 @@ onUnmounted(() => {
   stopStatsPolling()
 })
 
-// ---------------- 扫码出入库抽屉（抽屉模式） ----------------
-const cartDrawer = ref(false)
+// ---------------- 扫码出入库弹框 ----------------
+const cartDialog = ref(false)
 const scanMode = ref('borrow')             // 'borrow' | 'return' | 'consume'
 const scanKeyword = ref('')
 const scanLoading = ref(false)
@@ -1429,8 +1688,24 @@ watch(activeTab, () => {
   cartItems.value = []
 })
 
-const openCartDrawer = () => {
-  cartDrawer.value = true
+/** 顶部搜索：搜索物品并直接加入购物车，同时打开弹框 */
+const onBorrowSearch = async () => {
+  const kw = borrowKeyword.value.trim()
+  if (!kw) return
+  // 自动打开弹框
+  if (!cartDialog.value) {
+    cartDialog.value = true
+    await nextTick()
+  }
+  // 把关键词填入弹框搜索框并执行搜索
+  scanKeyword.value = kw
+  await onScan()
+  scanKeyword.value = ''
+  borrowKeyword.value = ''
+}
+
+const openBorrowDialog = () => {
+  cartDialog.value = true
   nextTick(focusScanInput)
 }
 
@@ -1716,14 +1991,6 @@ const submitBatch = async () => {
   margin-top: 10px;
   overflow: hidden;
 }
-.tx-filter-row {
-  display: flex;
-  gap: 8px;
-  padding: 0 0 10px;
-  flex-wrap: wrap;
-  align-items: center;
-  flex-shrink: 0;
-}
 .wh-table-section {
   flex: 1;
   min-width: 0;
@@ -1736,21 +2003,50 @@ const submitBatch = async () => {
   min-height: 0;
 }
 .wh-table-wrap :deep(.el-table) { height: 100%; }
-
-.tx-filter-row {
-  flex-shrink: 0;
-  display: flex;
-  gap: 6px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--c-divider);
-  flex-wrap: wrap;
-  align-items: center;
+/* 治具 / 耗材 / 出入库 Tab 筛选行：防止输入框撑大单元格 */
+/* 筛选行粘性定位：紧贴表头下方，垂直滚动时不消失 */
+.wh-table-wrap :deep(.filter-row) {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--el-fill-color-light, #fff);
 }
-.tx-table-wrap {
-  flex: 1;
-  min-height: 0;
+.jig-fbr-cell {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
 }
+.jig-fbr-cell :deep(.el-input) { width: 100%; min-width: 0; }
+.jig-fbr-cell :deep(.el-input__wrapper) { padding: 0 4px; height: 28px; }
+.jig-fbr-cell :deep(.el-input__inner) { text-align: center; height: 28px; font-size: 12px; }
+.jig-fbr-cell :deep(.el-select) { width: 100%; min-width: 0; }
+.jig-fbr-cell :deep(.el-select__wrapper) { justify-content: center; height: 28px; }
+.jig-fbr-cell :deep(.el-date-editor) { width: 100% !important; min-width: 0 !important; flex-wrap: nowrap; }
+.jig-fbr-cell :deep(.el-date-editor .el-input__wrapper) { height: 28px; }
+.jig-fbr-cell :deep(.el-date-editor .el-range-input) { font-size: 11px; }
+/* 防止 daterange 内部的 separator / 图标撑大容器 */
+.jig-fbr-cell :deep(.el-date-editor .el-range-separator) { font-size: 11px; padding: 0 2px; }
+.jig-fbr-cell :deep(.el-date-editor .el-range__icon) { display: none; }
+
+/* 治具/耗材/出入库记录数量排序按钮（单箭头循环 ⇅ → ↑ → ↓） */
+.part-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--c-text-mute);
+  user-select: none;
+  transition: background .15s;
+}
+.part-sort-btn:hover { background: var(--c-bg-mute); }
+.part-sort-btn.active { background: var(--el-color-primary); color: #fff; }
 
 .tx-remark-cell {
   display: flex;
@@ -1883,9 +2179,15 @@ const submitBatch = async () => {
   border-radius: 9px; padding: 0 5px;
 }
 
-/* 出入库抽屉抽屉 */
-.cart-drawer :deep(.el-drawer__body) {
-  padding: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden;
+/* 出入库弹框 */
+.cart-dialog :deep(.el-dialog__body) {
+  padding: 0; overflow: hidden;
+}
+.cart-dialog .cd-wrap {
+  max-height: 520px; display: flex; flex-direction: column;
+}
+.cart-dialog .cd-body {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 10px 20px;
 }
 .cd-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .cd-header {
