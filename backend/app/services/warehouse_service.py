@@ -547,13 +547,14 @@ def finish_repair(db: Session, part_id: int, data: dict, request, username: str)
             raise HTTPException(status_code=400, detail="该治具当前无维修中数量")
         qty = min(qty, p.repair_qty or 0)
 
-        # ① 找到当前"维修"记录，补归还时间
+        # ① 找到当前"维修"记录，类型改为"归还"，补归还时间，备注更新
         repair_tx = db.query(PartTransaction).filter(
             PartTransaction.part_id == p.id,
             PartTransaction.tx_type == "维修",
             PartTransaction.return_time.is_(None)
         ).order_by(PartTransaction.id.desc()).first()
         if repair_tx:
+            repair_tx.tx_type = "归还"
             repair_tx.return_time = now
             repair_tx.remark = "设备维修完成"
             repair_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
@@ -588,7 +589,7 @@ def finish_repair(db: Session, part_id: int, data: dict, request, username: str)
             p.current_borrower = None
             p.borrow_time = None
     else:
-        # 耗材：PartTransaction tx_type="维修" → 补 return_time
+        # 耗材：PartTransaction tx_type="维修" → 改为"归还"，补 return_time
         record_id = data.get("borrow_record_id")
         if not record_id:
             raise HTTPException(status_code=400, detail="请选择要维修完成的记录")
@@ -599,6 +600,7 @@ def finish_repair(db: Session, part_id: int, data: dict, request, username: str)
             raise HTTPException(status_code=400, detail="该记录不是维修状态")
         if tx.return_time:
             raise HTTPException(status_code=400, detail="该记录已处理")
+        tx.tx_type = "归还"
         tx.return_time = now
         tx.remark = "耗材维修完成"
 
@@ -681,8 +683,9 @@ def found_back(db: Session, part_id: int, data: dict, request, username: str) ->
             PartTransaction.return_time.is_(None)
         ).order_by(PartTransaction.id.desc()).first()
         if loss_tx:
+            loss_tx.tx_type = "归还"
             loss_tx.return_time = now
-            loss_tx.remark = "丢失已找回"
+            loss_tx.remark = "设备已找回"
             loss_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
         next_active = (db.query(BorrowRecord)
                          .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
@@ -694,7 +697,7 @@ def found_back(db: Session, part_id: int, data: dict, request, username: str) ->
             p.current_borrower = None
             p.borrow_time = None
     else:
-        # 耗材：PartTransaction tx_type="丢失" → 补 return_time
+        # 耗材：PartTransaction tx_type="丢失" → 改为"归还"，补 return_time
         if not record_id:
             raise HTTPException(status_code=400, detail="请选择要已找回的记录")
         tx = db.get(PartTransaction, int(record_id))
@@ -704,8 +707,9 @@ def found_back(db: Session, part_id: int, data: dict, request, username: str) ->
             raise HTTPException(status_code=400, detail="该记录不是丢失状态")
         if tx.return_time:
             raise HTTPException(status_code=400, detail="该记录已处理")
+        tx.tx_type = "归还"
         tx.return_time = now
-        tx.remark = "丢失已找回"
+        tx.remark = "耗材已找回"
 
     db.commit()
     db.refresh(p)
@@ -784,8 +788,9 @@ def repair_damaged(db: Session, part_id: int, data: dict, request, username: str
             PartTransaction.return_time.is_(None)
         ).order_by(PartTransaction.id.desc()).first()
         if damaged_tx:
+            damaged_tx.tx_type = "归还"
             damaged_tx.return_time = now
-            damaged_tx.remark = "损坏已修复"
+            damaged_tx.remark = "设备已修复"
             damaged_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
         next_active = (db.query(BorrowRecord)
                          .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
@@ -797,7 +802,7 @@ def repair_damaged(db: Session, part_id: int, data: dict, request, username: str
             p.current_borrower = None
             p.borrow_time = None
     else:
-        # 耗材：PartTransaction tx_type="损坏" → 补 return_time
+        # 耗材：PartTransaction tx_type="损坏" → 改为"归还"，补 return_time
         if not record_id:
             raise HTTPException(status_code=400, detail="请选择要已修复的记录")
         tx = db.get(PartTransaction, int(record_id))
@@ -807,8 +812,9 @@ def repair_damaged(db: Session, part_id: int, data: dict, request, username: str
             raise HTTPException(status_code=400, detail="该记录不是损坏状态")
         if tx.return_time:
             raise HTTPException(status_code=400, detail="该记录已处理")
+        tx.tx_type = "归还"
         tx.return_time = now
-        tx.remark = "损坏已修复"
+        tx.remark = "耗材已修复"
 
     db.commit()
     db.refresh(p)

@@ -422,9 +422,18 @@
           <el-table-column label="借出/领用时间" prop="borrow_time" width="140" align="center" />
           <el-table-column label="状态" width="80" align="center">
             <template #default="{ row }">
-              <!-- 耗材记录：tx_type + return_time -->
-              <el-tag v-if="row.tx_type" :type="row.return_time ? 'success' : 'primary'" size="small">
-                {{ row.return_time ? '已归还' : '已领用' }}
+              <!-- 耗材记录：根据 tx_type 和 return_time 显示状态 -->
+              <el-tag v-if="row.tx_type" :type="
+                row.return_time ? 'success' :
+                row.tx_type === '维修' ? 'info' :
+                row.tx_type === '丢失' ? 'danger' :
+                row.tx_type === '损坏' ? 'danger' :
+                'primary'
+              " size="small">
+                {{ row.return_time ? '已归还' :
+                   row.tx_type === '维修' ? '维修中' :
+                   row.tx_type === '丢失' ? '已丢失' :
+                   row.tx_type === '损坏' ? '已损坏' : '已领用' }}
               </el-tag>
               <!-- 治具记录：status -->
               <el-tag v-else :type="row.status === '借出' ? 'warning' : row.status === '维修' ? 'info' : row.status === '丢失' ? 'danger' : row.status === '损坏' ? 'danger' : 'success'" size="small">
@@ -435,10 +444,16 @@
           <el-table-column label="操作" min-width="280" align="center">
             <template #default="{ row }">
               <template v-if="actionRow?.part_type === '耗材'">
-                <el-button v-if="!row.return_time" type="warning" link size="small" @click="submitReturn(row)">归还</el-button>
-                <el-button v-if="!row.return_time" type="danger" link size="small" @click="submitToRepair(row)">转维修</el-button>
-                <el-button v-if="!row.return_time" type="info" link size="small" @click="submitLoss(row)">报失</el-button>
-                <el-button v-if="!row.return_time" type="danger" link size="small" @click="submitDamaged(row)">报损</el-button>
+                <!-- 耗材：根据 tx_type 显示不同操作 -->
+                <template v-if="!row.return_time && row.tx_type === '领用'">
+                  <el-button type="warning" link size="small" @click="submitReturn(row)">归还</el-button>
+                  <el-button type="danger" link size="small" @click="submitToRepair(row)">转维修</el-button>
+                  <el-button type="info" link size="small" @click="submitLoss(row)">报失</el-button>
+                  <el-button type="danger" link size="small" @click="submitDamaged(row)">报损</el-button>
+                </template>
+                <el-button v-else-if="!row.return_time && row.tx_type === '维修'" type="warning" link size="small" @click="openFinishRepair(row)">维修完成</el-button>
+                <el-button v-else-if="!row.return_time && row.tx_type === '丢失'" type="success" link size="small" @click="submitFoundBack(row)">已找回</el-button>
+                <el-button v-else-if="!row.return_time && row.tx_type === '损坏'" type="success" link size="small" @click="submitRepairDamaged(row)">已修复</el-button>
                 <span v-else style="color: var(--c-text-mute); font-size: 12px;">已处理</span>
               </template>
               <template v-else>
