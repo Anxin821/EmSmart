@@ -64,7 +64,7 @@
                   <template #default="{ row }">
                     <div v-if="row._isFilter" class="jig-fbr-cell">
                       <el-dropdown trigger="click" @command="v => { txFilterType=v; txPage=1; loadTxData() }">
-                        <span class="tx-filter-trigger">∨</span>
+                        <span class="tx-filter-trigger">{{ txFilterType || '全部' }}</span>
                         <template #dropdown>
                           <el-dropdown-menu>
                             <el-dropdown-item command="">全部</el-dropdown-item>
@@ -79,7 +79,7 @@
                         </template>
                       </el-dropdown>
                     </div>
-                    <el-tag v-else-if="row.tx_type === '借出' && row.return_time" type="success" size="small">已归还</el-tag>
+                    <el-tag v-else-if="row.tx_type === '借出' && row.return_time" type="success" size="small">归还</el-tag>
                     <el-tag v-else :type="txTagType(row.tx_type)" size="small">{{ row.tx_type }}</el-tag>
                   </template>
                 </el-table-column>
@@ -122,11 +122,18 @@
                     <span v-else>{{ row.department_manager || '-' }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="线体" width="60" align="center" show-overflow-tooltip>
+                <el-table-column label="线体" width="70" align="center" show-overflow-tooltip>
                   <template #default="{ row }">
                     <div v-if="row._isFilter" class="jig-fbr-cell">
-                      <el-input v-model="txFilterLine" size="small" placeholder="搜索" clearable
-                        @change="txPage=1;loadTxData()" />
+                      <el-dropdown popper-class="tx-line-popper" trigger="click" @command="v => { txFilterLine=v; txPage=1; loadTxData() }">
+                        <span class="tx-filter-trigger">{{ txFilterLine || '全部' }}</span>
+                        <template #dropdown>
+                          <el-dropdown-menu class="tx-line-menu">
+                            <el-dropdown-item command="">全部</el-dropdown-item>
+                            <el-dropdown-item v-for="l in lines" :key="l" :command="l">{{ l }}</el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
                     </div>
                     <span v-else>{{ row.line || '-' }}</span>
                   </template>
@@ -488,7 +495,7 @@
                 <span class="cd-row-name">{{ item.name }}</span>
                 <span class="cd-row-model">{{ item.model || '-' }}</span>
               </div>
-              <template v-if="scanMode === 'return' && item.part_type === '治具'">
+              <template v-if="scanMode === 'return'">
                 <el-button type="warning" size="small" @click="openReturnFromCart(item)">处理</el-button>
               </template>
               <template v-else>
@@ -636,7 +643,7 @@
                 row.tx_type === '损坏' ? 'danger' :
                 'primary'
               " size="small">
-                {{ row.return_time ? '已归还' :
+                {{ row.return_time ? '归还' :
                    row.tx_type === '维修' ? '维修中' :
                    row.tx_type === '丢失' ? '已丢失' :
                    row.tx_type === '损坏' ? '已损坏' : '已领用' }}
@@ -865,7 +872,7 @@
             <el-table-column label="时间" prop="created_at" width="150" />
             <el-table-column label="操作" width="70" align="center">
               <template #default="{ row }">
-                <el-tag v-if="row.return_time" type="success" size="small">已归还</el-tag>
+                <el-tag v-if="row.return_time" type="success" size="small">归还</el-tag>
                 <el-tag v-else :type="txTagType(row.tx_type)" size="small">{{ row.tx_type }}</el-tag>
               </template>
             </el-table-column>
@@ -961,7 +968,7 @@ const jigSortAvailable = ref('')
 const consSortStock = ref('')
 const consSortWarn = ref('')
 
-// 筛选后的记录（仅保留后端不支持的客户端筛选：操作时间 / 已归还虚拟类型）
+// 筛选后的记录（仅保留后端不支持的客户端筛选：操作时间 / 归还虚拟类型）
 const filteredTxRecords = computed(() => {
   const filtered = txRecords.value.filter(r => {
     // 日期范围筛选
@@ -1005,7 +1012,7 @@ const loadTxData = async () => {
     // 将前端筛选条件发给后端，保证分页 total 与筛选结果一致
     if (txFilterType.value) {
       if (txFilterType.value === '归还') {
-        // "归还"是前端组合类型（含 归还 及 已归还的借出/领用），后端只传"归还"
+        // "归还"是前端组合类型（含 归还 及 归还的借出/领用），后端只传"归还"
         params.tx_type = '归还'
       } else {
         params.tx_type = txFilterType.value
@@ -1426,6 +1433,7 @@ const submitReturn = async (record) => {
       : { borrow_record_id: record.id }
     await warehouseApi.returnBack(actionRow.value.id, payload)
     toast.success('归还成功')
+    removeFromCart(actionRow.value.id)
     // 刷新借出记录列表和物品状态
     await loadBorrowRecords()
     refreshAll()
@@ -1443,6 +1451,7 @@ const submitToRepair = async (record) => {
   try {
     await warehouseApi.toRepair(actionRow.value.id, { borrow_record_id: record.id })
     toast.success('已转维修')
+    removeFromCart(actionRow.value.id)
     await loadBorrowRecords()
     refreshAll()
     if (!borrowRecords.value.length) {
@@ -1462,6 +1471,7 @@ const submitLoss = async (record) => {
     actionLoading.value = true
     await warehouseApi.loss(actionRow.value.id, { borrow_record_id: record.id, remark: value || '' })
     toast.success('已报失')
+    removeFromCart(actionRow.value.id)
     await loadBorrowRecords()
     refreshAll()
     if (!borrowRecords.value.length) {
@@ -1483,6 +1493,7 @@ const submitDamaged = async (record) => {
     actionLoading.value = true
     await warehouseApi.damaged(actionRow.value.id, { borrow_record_id: record.id, remark: value || '' })
     toast.success('已报损')
+    removeFromCart(actionRow.value.id)
     await loadBorrowRecords()
     refreshAll()
     if (!borrowRecords.value.length) {
@@ -1509,6 +1520,7 @@ const submitFoundBack = async (record) => {
     if (!partId) { toast.error('无法获取物品信息'); return }
     await warehouseApi.foundBack(partId, { borrow_record_id: borrowRecordId })
     toast.success('已找回')
+    removeFromCart(partId)
     await loadBorrowRecords()
     refreshAll()
     if (!borrowRecords.value.length) {
@@ -1535,6 +1547,7 @@ const submitRepairDamaged = async (record) => {
     if (!partId) { toast.error('无法获取物品信息'); return }
     await warehouseApi.repairDamaged(partId, { borrow_record_id: borrowRecordId })
     toast.success('已修复')
+    removeFromCart(partId)
     await loadBorrowRecords()
     refreshAll()
     if (!borrowRecords.value.length) {
@@ -1849,46 +1862,39 @@ const submitBatch = async () => {
       try {
         const payload = { qty: item.qty, remark: scanForm.remark }
         if (scanMode.value === 'return') {
-          // 扫码归还：根据物品的第一条活跃记录自动处理
-          const type = item.part_type
-          const records = type === '耗材'
+          // 归还模式：根据物品类型获取活跃记录，自动处理
+          const isConsumable = item.part_type === '耗材'
+          const records = isConsumable
             ? (await warehouseApi.consumeRecords(item.id, true)).data || []
             : (await warehouseApi.borrowRecords(item.id, true)).data || []
-          // 按优先级查找可处理的记录：借出→损坏→维修→丢失
-          const statusPriority = ['借出', '损坏', '维修', '丢失']
-          const activeRecord = records.find(r => statusPriority.includes(r.status))
+          // 耗材用 tx_type，治具用 status
+          const statusField = isConsumable ? 'tx_type' : 'status'
+          // 按优先级查找可处理的记录
+          const priority = isConsumable
+            ? ['领用', '损坏', '维修', '丢失']
+            : ['借出', '损坏', '维修', '丢失']
+          const activeRecord = records.find(r => priority.includes(r[statusField]))
           if (!activeRecord) {
             results.errors.push(`${item.name}: 没有可处理的记录`)
             results.fail++
             continue
           }
-          // 根据状态自动处理
-          switch (activeRecord.status) {
-            case '借出': {
-              const retPayload = type === '耗材'
-                ? { consume_tx_id: activeRecord.id }
-                : { borrow_record_id: activeRecord.id }
-              await warehouseApi.returnBack(item.id, retPayload)
-              break
-            }
-            case '损坏': {
-              await warehouseApi.repairDamaged(item.id, { borrow_record_id: activeRecord.id })
-              break
-            }
-            case '维修': {
-              await warehouseApi.finishRepair(item.id, { qty: activeRecord.qty })
-              break
-            }
-            case '丢失': {
-              await warehouseApi.foundBack(item.id, { borrow_record_id: activeRecord.id })
-              break
-            }
+          const curStatus = activeRecord[statusField]
+          if (curStatus === '领用' || curStatus === '借出') {
+            const retPayload = isConsumable
+              ? { consume_tx_id: activeRecord.id }
+              : { borrow_record_id: activeRecord.id }
+            await warehouseApi.returnBack(item.id, retPayload)
+          } else {
+            // 损坏 / 维修 / 丢失 → 需要用户在弹框中手动处理
+            results.errors.push(`${item.name}: 当前状态为"${curStatus}"，请点击右侧"处理"按钮手动操作`)
+            results.fail++
+            continue
           }
         } else {
           payload.operator = scanForm.operator
           payload.department_manager = scanForm.department_manager
           payload.line = scanForm.line
-          // 借领模式：治具=借出，耗材=领用
           if (item.part_type === '治具') {
             await warehouseApi.borrow(item.id, payload)
           } else {
@@ -1902,8 +1908,9 @@ const submitBatch = async () => {
       }
     }
     if (results.fail === 0) {
-      toast.success(`首页成功（${results.ok} 件）`)
+      toast.success(`提交成功（${results.ok} 件）`)
       clearCart()
+      cartDialog.value = false
     } else {
       toast.error(`成功 ${results.ok} 件，失败 ${results.fail} 件：\n${results.errors.join('\n')}`)
       cartItems.value = cartItems.value.filter(item => {
@@ -2032,6 +2039,17 @@ const submitBatch = async () => {
   transition: background .15s;
 }
 .tx-filter-trigger:hover { background: var(--c-bg-mute); }
+/* 线体筛选下拉菜单：滚动显示，防止截断，提升层级避免和 sticky 行冲突 */
+.tx-line-popper {
+  z-index: 9999 !important;
+}
+.tx-line-menu {
+  max-height: 280px;
+  overflow-y: auto;
+}
+.tx-line-menu .el-dropdown-menu__item {
+  justify-content: center;
+}
 .jig-fbr-cell {
   height: 100%;
   display: flex;
