@@ -50,7 +50,7 @@
               <el-table :data="filteredTxRecords" v-loading="txLoading" stripe border size="small" empty-text="暂无记录"
   :header-cell-style="{ fontWeight: 600, textAlign: 'center' }" height="100%"
   :row-class-name="tableRowClassName">
-                <el-table-column label="时间" width="160" align="center">
+                <el-table-column label="时间" width="140" align="center">
                   <template #default="{ row }">
                     <div v-if="row._isFilter" class="jig-fbr-cell">
                       <el-date-picker v-model="txFilterTimeRange" type="daterange" range-separator="至"
@@ -83,7 +83,7 @@
                     <el-tag v-else :type="txTagType(row.tx_type)" size="small">{{ row.tx_type }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="物品" prop="part_name" min-width="160" show-overflow-tooltip>
+                <el-table-column label="物品" prop="part_name" min-width="140" show-overflow-tooltip>
                   <template #default="{ row }">
                     <div v-if="row._isFilter" class="jig-fbr-cell">
                       <el-input v-model="txFilterPart" size="small" placeholder="搜索" clearable
@@ -92,7 +92,7 @@
                     <span v-else>{{ row.part_name }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="数量" width="60" align="center">
+                <el-table-column label="数量" width="50" align="center">
                   <template #default="{ row }">
                     <div v-if="row._isFilter" class="jig-fbr-cell">
                       <span class="part-sort-btn" :class="{ active: !!txSortOrder }"
@@ -131,7 +131,7 @@
                     <span v-else>{{ row.line || '-' }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="借出时间" width="130" align="center">
+                <el-table-column label="借出时间" width="135" align="center">
                   <template #default="{ row }">
                     <div v-if="row._isFilter" class="jig-fbr-cell">
                       <el-date-picker v-model="txFilterBorrowDate" type="date" placeholder="筛选日期" size="small"
@@ -140,7 +140,7 @@
                     <span v-else>{{ row.borrow_time || '-' }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="归还时间" width="130" align="center">
+                <el-table-column label="归还时间" width="135" align="center">
                   <template #default="{ row }">
                     <div v-if="row._isFilter" class="jig-fbr-cell">
                       <el-date-picker v-model="txFilterReturnDate" type="date" placeholder="筛选日期" size="small"
@@ -1640,7 +1640,7 @@ const onTableRowClick = (row) => {
   showDetail(row)
 }
 
-// 筛选行添加特殊 className，用于 CSS 粘性定位
+// 筛选行固定跟随表头
 const tableRowClassName = ({ row }) => {
   return row._isFilter ? 'filter-row' : ''
 }
@@ -2009,12 +2009,12 @@ const submitBatch = async () => {
 }
 .wh-table-wrap :deep(.el-table) { height: 100%; }
 /* 治具 / 耗材 / 出入库 Tab 筛选行：防止输入框撑大单元格 */
-/* 筛选行粘性定位：紧贴表头下方，垂直滚动时不消失 */
+/* 筛选行固定跟随表头 */
 .wh-table-wrap :deep(.filter-row) {
   position: sticky;
   top: 0;
   z-index: 3;
-  background: var(--el-fill-color-light, #fff);
+  background: var(--el-bg-color, #fff);
 }
 /* 操作筛选下拉触发按钮 */
 .tx-filter-trigger {
