@@ -72,7 +72,7 @@
                     <el-tag v-else :type="txTagType(row.tx_type)" size="small">{{ row.tx_type }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="物品" prop="part_name" min-width="120" show-overflow-tooltip />
+                <el-table-column label="物品" prop="part_name" min-width="160" show-overflow-tooltip />
                 <el-table-column label="数量" prop="qty" width="50" align="center" />
                 <el-table-column label="借/领人" prop="operator" width="80" show-overflow-tooltip />
                 <el-table-column label="部门负责人" prop="department_manager" width="90" show-overflow-tooltip>
@@ -87,7 +87,7 @@
                 <el-table-column label="归还时间" prop="return_time" width="140" align="center">
                   <template #default="{ row }">{{ row.return_time || '-' }}</template>
                 </el-table-column>
-                <el-table-column label="备注" min-width="100" show-overflow-tooltip>
+                <el-table-column label="备注" min-width="60" show-overflow-tooltip>
                   <template #default="{ row }">
                     <div class="tx-remark-cell" @click.stop="userStore.canEdit && openEditRemark(row)">
                       <span>{{ row.remark || '-' }}</span>
