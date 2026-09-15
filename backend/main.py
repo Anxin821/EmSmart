@@ -176,6 +176,17 @@ def _ensure_extra_columns():
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE servers ADD last_online_time DATETIME NULL"))
                 print("[Startup] 已为 servers 补充 last_online_time 列")
+        # part_transactions 型号在名称前：将 "名称 - 型号" 改为 "型号 - 名称"
+        if "part_transactions" in existing_tables:
+            with engine.begin() as conn:
+                result = conn.execute(
+                    text("UPDATE part_transactions SET part_name = "
+                         "CONCAT(SUBSTRING(part_name, CHARINDEX(' - ', part_name) + 3, LEN(part_name)), ' - ', "
+                         "LEFT(part_name, CHARINDEX(' - ', part_name) - 1)) "
+                         "WHERE part_name LIKE '% - %'")
+                )
+                if result.rowcount > 0:
+                    print(f"[Startup] part_transactions part_name 已更新 {result.rowcount} 条（型号 - 名称）")
     except Exception as e:
         print(f"[Startup] 列迁移检查失败（不影响启动）: {e}")
 

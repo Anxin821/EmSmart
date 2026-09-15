@@ -198,11 +198,19 @@ def get_stats(db: Session, part_type: Optional[str] = None) -> Dict[str, Any]:
     for br in lost_rows:
         info = part_map.get(br.part_id)
         if info:
-            lost_items.append({**info, "borrower": br.borrower, "borrow_time": str(br.borrow_time)[:10] if br.borrow_time else ""})
+            lost_items.append({**info,
+                "borrower": br.borrower,
+                "borrow_time": str(br.borrow_time)[:10] if br.borrow_time else "",
+                "borrow_record_id": br.id,
+            })
     for br in damaged_rows:
         info = part_map.get(br.part_id)
         if info:
-            damaged_items.append({**info, "borrower": br.borrower, "borrow_time": str(br.borrow_time)[:10] if br.borrow_time else ""})
+            damaged_items.append({**info,
+                "borrower": br.borrower,
+                "borrow_time": str(br.borrow_time)[:10] if br.borrow_time else "",
+                "borrow_record_id": br.id,
+            })
 
     # 外借回收率 = 归还transaction数 / 借出transaction数
     borrow_tx = db.query(PartTransaction).filter(PartTransaction.tx_type == "借出").count()
@@ -415,7 +423,7 @@ def delete_part(db: Session, part_id: int, request, username: str) -> bool:
 def _add_tx(db, p: WarehousePart, tx_type: str, qty: int,
             operator: str = "", department_manager: str = "", line: str = "",
             remark: str = "", borrow_time=None, return_time=None):
-    display_name = f"{p.name} - {p.model}" if p.model else p.name
+    display_name = f"{p.model} - {p.name}" if p.model else p.name
     db.add(PartTransaction(
         part_id=p.id, part_name=display_name, tx_type=tx_type, qty=qty,
         operator=operator, department_manager=department_manager,
@@ -547,7 +555,7 @@ def _change_tx_type(db: Session, p, from_type: str, operator, borrow_time, new_t
     if tx:
         tx.tx_type = new_type
         tx.remark = remark or tx.remark
-        tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
+        tx.part_name = f"{p.model} - {p.name}" if p.model else p.name
 
 
 def to_repair(db: Session, part_id: int, data: dict, request, username: str) -> dict:
@@ -621,7 +629,7 @@ def finish_repair(db: Session, part_id: int, data: dict, request, username: str)
             repair_tx.tx_type = "归还"
             repair_tx.return_time = now
             repair_tx.remark = "设备维修完成"
-            repair_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
+            repair_tx.part_name = f"{p.model} - {p.name}" if p.model else p.name
 
         # ② repair_qty 减回，available_qty 加回
         p.repair_qty = (p.repair_qty or 0) - qty
@@ -750,7 +758,7 @@ def found_back(db: Session, part_id: int, data: dict, request, username: str) ->
             loss_tx.tx_type = "归还"
             loss_tx.return_time = now
             loss_tx.remark = "设备已找回"
-            loss_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
+            loss_tx.part_name = f"{p.model} - {p.name}" if p.model else p.name
         next_active = (db.query(BorrowRecord)
                          .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
                          .order_by(BorrowRecord.id.desc()).first())
@@ -855,7 +863,7 @@ def repair_damaged(db: Session, part_id: int, data: dict, request, username: str
             damaged_tx.tx_type = "归还"
             damaged_tx.return_time = now
             damaged_tx.remark = "设备已修复"
-            damaged_tx.part_name = f"{p.name} - {p.model}" if p.model else p.name
+            damaged_tx.part_name = f"{p.model} - {p.name}" if p.model else p.name
         next_active = (db.query(BorrowRecord)
                          .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
                          .order_by(BorrowRecord.id.desc()).first())

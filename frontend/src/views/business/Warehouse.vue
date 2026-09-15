@@ -52,8 +52,8 @@
                 start-placeholder="开始日期" end-placeholder="结束日期" size="small"
                 style="width: 200px;" clearable @change="() => { txPage=1; loadTxData() }" />
               <el-select v-model="txFilterType" placeholder="操作" clearable size="small" style="width: 100px;">
-                <el-option label="借出中" value="借出" />
-                <el-option label="已归还" value="已归还" />
+                <el-option label="借出" value="借出" />
+                <el-option label="归还" value="归还" />
                 <el-option label="领用" value="领用" />
                 <el-option label="补货" value="补货" />
                 <el-option label="维修" value="维修" />
@@ -75,7 +75,7 @@
                     <el-tag v-else :type="txTagType(row.tx_type)" size="small">{{ row.tx_type }}</el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="物品" prop="part_name" min-width="120" show-overflow-tooltip />
+                <el-table-column label="物品" prop="part_name" min-width="180" show-overflow-tooltip />
                 <el-table-column label="数量" prop="qty" width="50" align="center" />
                 <el-table-column label="借/领人" prop="operator" width="80" align="center" show-overflow-tooltip />
                 <el-table-column label="部门负责人" prop="department_manager" width="90" align="center" show-overflow-tooltip>
@@ -797,10 +797,10 @@ const filteredTxRecords = computed(() => {
       d1.setHours(23, 59, 59, 999) // 包含结束日期全天
       if (t < d0 || t > d1) return false
     }
-    if (txFilterType.value === '已归还') {
-      // 已归还 = 借出+有归还时间 或 tx_type=归还
-      if (r.tx_type === '借出' && r.return_time) return true
+    if (txFilterType.value === '归还') {
+      // 归还 = 匹配 tx_type='归还' 或 借出/领用且有归还时间
       if (r.tx_type === '归还') return true
+      if ((r.tx_type === '借出' || r.tx_type === '领用') && r.return_time) return true
       return false
     }
     // txFilterType / txFilterPart / txFilterOperator 已由后端处理，前端不再重复过滤
@@ -822,9 +822,9 @@ const loadTxData = async () => {
     const params = { page: txPage.value, page_size: txPageSize.value }
     // 将前端筛选条件发给后端，保证分页 total 与筛选结果一致
     if (txFilterType.value) {
-      if (txFilterType.value === '已归还') {
-        // "已归还"是前端虚拟类型，后端不支持，暂不传 tx_type
-        // 但把 keyword 带上以支持文本搜索
+      if (txFilterType.value === '归还') {
+        // "归还"是前端组合类型（含 归还 及 已归还的借出/领用），后端只传"归还"
+        params.tx_type = '归还'
       } else {
         params.tx_type = txFilterType.value
       }
@@ -1249,7 +1249,12 @@ const submitFoundBack = async (record) => {
       confirmButtonText: '确认', cancelButtonText: '取消', type: 'success',
     })
     actionLoading.value = true
-    await warehouseApi.foundBack(actionRow.value.id, { borrow_record_id: record.id })
+    // 看板首页调用：record.borrow_record_id 存在；借出记录弹框调用：record.id = borrow_record_id
+    const borrowRecordId = record.borrow_record_id || record.id
+    // 看板首页调用：record.id = part_id；借出记录弹框调用：actionRow.value.id = part_id
+    const partId = record.borrow_record_id ? record.id : actionRow.value?.id
+    if (!partId) { toast.error('无法获取物品信息'); return }
+    await warehouseApi.foundBack(partId, { borrow_record_id: borrowRecordId })
     toast.success('已找回')
     await loadBorrowRecords()
     refreshAll()
@@ -1270,7 +1275,12 @@ const submitRepairDamaged = async (record) => {
       confirmButtonText: '确认', cancelButtonText: '取消', type: 'success',
     })
     actionLoading.value = true
-    await warehouseApi.repairDamaged(actionRow.value.id, { borrow_record_id: record.id })
+    // 看板首页调用：record.borrow_record_id 存在；借出记录弹框调用：record.id = borrow_record_id
+    const borrowRecordId = record.borrow_record_id || record.id
+    // 看板首页调用：record.id = part_id；借出记录弹框调用：actionRow.value.id = part_id
+    const partId = record.borrow_record_id ? record.id : actionRow.value?.id
+    if (!partId) { toast.error('无法获取物品信息'); return }
+    await warehouseApi.repairDamaged(partId, { borrow_record_id: borrowRecordId })
     toast.success('已修复')
     await loadBorrowRecords()
     refreshAll()
@@ -1892,7 +1902,7 @@ const submitBatch = async () => {
 .cd-scan-bar { flex-shrink: 0; padding: 10px 20px; border-bottom: 1px solid var(--c-divider); }
 
 .cd-body {
-  flex: 1; min-height: 0; overflow-y: auto; padding: 12px 16px;
+  flex: 1; min-height: 0; overflow: hidden; padding: 12px 16px;
   display: flex; flex-direction: column; gap: 8px;
 }
 .cd-empty {
@@ -1902,7 +1912,12 @@ const submitBatch = async () => {
 .cd-empty p { margin: 0; font-size: 14px; }
 .cd-empty-sub { font-size: 12px; }
 
-.cd-list { display: flex; flex-direction: column; gap: 8px; }
+.cd-list {
+  display: flex; flex-direction: column; gap: 8px;
+  overflow-y: auto; min-height: 0;
+  /* 利用 flex: 1 撑满 .cd-body 剩余空间，超出时内部滚动，不影响底部按钮 */
+  flex: 1;
+}
 .cd-row {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 12px; border: 1px solid var(--c-divider); border-radius: 8px;
