@@ -22,7 +22,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="SSID" prop="ssid" min-width="140" align="center" show-overflow-tooltip>
+        <el-table-column label="MAC地址" prop="ssid" min-width="140" align="center" show-overflow-tooltip>
           <template #default="s"><span class="fw-semibold" style="color: var(--c-text);">{{ s.row.ssid }}</span></template>
         </el-table-column>
 
@@ -34,12 +34,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="MAC" prop="mac_address" min-width="140" align="center" show-overflow-tooltip>
-          <template #default="s">
-            <span v-if="s.row.mac_address" style="font-family: Consolas, 'Courier New', monospace; font-size: var(--fn-sm);">{{ s.row.mac_address }}</span>
-            <span v-else style="color: var(--c-text-mute);">-</span>
-          </template>
-        </el-table-column>
+        
 
         <el-table-column label="位置" prop="location" min-width="140" align="center" show-overflow-tooltip>
           <template #default="s">{{ s.row.location || '-' }}</template>
@@ -115,11 +110,7 @@
               <el-input v-model="form.ip_address" clearable placeholder="192.168.x.x" maxlength="39" />
             </el-form-item>
           </div>
-          <div class="col-6">
-            <el-form-item label="MAC地址">
-              <el-input v-model="form.mac_address" clearable placeholder="如：00:1A:2B:3C:4D:5E" maxlength="17" />
-            </el-form-item>
-          </div>
+          
           <div class="col-6">
             <el-form-item label="位置">
               <el-input v-model="form.location" clearable placeholder="如：C栋3楼东区" maxlength="64" />
@@ -193,7 +184,7 @@ const formMode = ref('create')
 const saving = ref(false)
 const editRow = ref(null)
 const form = ref({
-  ap_id: '', ssid: '', production_line: '1线', ip_address: '', mac_address: '',
+  ap_id: '', ssid: '', production_line: '1线', ip_address: '',
   location: '', channel: 6, connected_devices: 0, status: '在线', responsible_person: ''
 })
 
@@ -204,7 +195,7 @@ const filterFields = computed(() => [
     type: 'input',
     key: 'keyword',
     label: '',
-    placeholder: 'AP ID / SSID / IP / MAC / 负责人',
+    placeholder: 'AP ID/MAC/IP/负责人',
     minWidth: 245,
     showSearchIcon: true,
     autoSearch: false
@@ -304,7 +295,6 @@ const openEditModal = (row) => {
     ssid: row.ssid ?? '',
     production_line: row.production_line ?? '1线',
     ip_address: row.ip_address ?? '',
-    mac_address: row.mac_address ?? '',
     location: row.location ?? '',
     channel: typeof row.channel === 'number' ? row.channel : 6,
     connected_devices: typeof row.connected_devices === 'number' ? row.connected_devices : 0,
@@ -378,7 +368,7 @@ onUnmounted(() => {
   // 清理引用
   items.value = []
   form.value = {
-    ap_id: '', ssid: '', production_line: '1线', ip_address: '', mac_address: '',
+    ap_id: '', ssid: '', production_line: '1线', ip_address: '',
     location: '', channel: 6, connected_devices: 0, status: '在线', responsible_person: ''
   }
   filters.value = { keyword:'', line:'', status:'' }

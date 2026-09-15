@@ -370,9 +370,10 @@ const fmtTime = (iso) => {
 const activeLines = computed(() =>
   (data.value?.lines ?? [])
     .map((line) => {
-      const servers = line.servers ?? []
-      const racks   = line.aging_racks ?? []
-      const aps     = line.wifi_aps ?? []
+      // 过滤掉维护中的设备，不参与在线率计算
+      const servers = (line.servers ?? []).filter(s => s.status !== '维护')
+      const racks   = (line.aging_racks ?? []).filter(a => a.status !== '维护')
+      const aps     = (line.wifi_aps ?? []).filter(ap => ap.status !== '维护')
       const sOff = servers.filter(s => s.status !== '在线').length
       const rOff = racks.filter(a => a.status !== '在线').length
       const aOff = aps.filter(ap => ap.status !== '在线').length

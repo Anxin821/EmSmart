@@ -500,7 +500,12 @@ def network_dashboard(db: Session) -> Dict[str, Any]:
     online_total = online_servers + online_aging + online_aps
     offline_total = offline_servers + offline_aging + offline_aps
     total_devices = len(servers) + len(aging_racks) + len(wifi_aps)
-    online_rate = round(online_total / total_devices * 100, 1) if total_devices > 0 else 100.0
+    # 维护中的设备不参与在线率计算
+    maint_servers = sum(1 for s in servers if s.status == "维护")
+    maint_aging = sum(1 for a in aging_racks if a.status == "维护")
+    maint_aps = sum(1 for ap in wifi_aps if ap.status == "维护")
+    active_total = total_devices - maint_servers - maint_aging - maint_aps
+    online_rate = round(online_total / active_total * 100, 1) if active_total > 0 else 100.0
 
     offline_list = []
     for s in servers:

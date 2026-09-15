@@ -43,6 +43,14 @@ def _rack_to_dict(d) -> Dict[str, Any]:
     }
 
 
+def _as_int(v) -> int:
+    """将字符串安全转 int，失败时返回 0。"""
+    try:
+        return int(v)
+    except (ValueError, TypeError):
+        return 0
+
+
 def _ap_to_dict(d) -> Dict[str, Any]:
     return {
         "id": d.id, "ap_id": d.ap_id, "ssid": d.ssid,
@@ -253,8 +261,14 @@ def add_wifi_ap(db: Session, data: dict, request, username: str):
 
 
 def edit_wifi_ap(db: Session, ap_id: str, data: dict, request, username: str):
+    # 先定位当前 AP（ap_id 可能是 AP 标识字符串也可能是数据库主键）
+    current = db.query(WifiAp).filter(
+        (WifiAp.ap_id == ap_id) | (WifiAp.id == _as_int(ap_id))
+    ).first()
+    if current is None:
+        return None
     new_aid = (data.get("ap_id") or "").strip()
-    if new_aid and new_aid != ap_id:
+    if new_aid and new_aid != current.ap_id:
         if db.query(WifiAp).filter(WifiAp.ap_id == new_aid).first():
             raise HTTPException(status_code=400, detail=f"AP ID「{new_aid}」已存在，请使用其他ID")
     ap = repo.update_wifi_ap_repo(db, ap_id, data)

@@ -13,9 +13,6 @@
           <template v-if="userStore.canEdit">
             <el-button type="success" @click="showModal()"><el-icon><Plus /></el-icon>新增服务器</el-button>
           </template>
-          <template v-if="userStore.isAdmin && userStore.canEdit">
-            <el-button type="warning" @click="checkAll"><el-icon><Monitor /></el-icon>心跳检测</el-button>
-          </template>
         </template>
       </CommonFilterBar>
     </div>
@@ -144,7 +141,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { networkApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, Edit, Delete, RefreshRight, Plus, Monitor } from '@element-plus/icons-vue'
+import { Search, Edit, Delete, RefreshRight, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
@@ -232,15 +229,6 @@ const handleDelete = async (id) => {
     loadData()
   } catch (e) {
     if (e !== 'cancel') ElMessage.error(e?.response?.data?.detail || '删除失败')
-  }
-}
-const checkAll = async () => {
-  try {
-    await networkApi.checkAll()
-    ElMessage.success('检测完成')
-    loadData()
-  } catch (e) {
-    ElMessage.error('检测失败')
   }
 }
 const onPagerChange = () => loadData()
