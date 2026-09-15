@@ -23,15 +23,15 @@
     <div class="page-content wh-content">
       <div class="wh-tabs-row">
         <el-tabs v-model="activeTab" @tab-change="onTabChange" class="wh-tabs">
-          <el-tab-pane label="全部" name="全部" />
+          <el-tab-pane label="首页" name="首页" />
           <el-tab-pane label="治具" name="治具" />
           <el-tab-pane label="耗材" name="耗材" />
           <el-tab-pane label="出入库记录" name="出入库记录" />
         </el-tabs>
       </div>
 
-      <!-- 低库存预警条 -->
-      <div v-if="lowItems.length && activeTab !== '出入库记录'" class="wh-warn-bar">
+      <!-- 低库存预警条（治具/耗材Tab时显示，首页Tab看板内已包含） -->
+      <div v-if="lowItems.length && (activeTab === '治具' || activeTab === '耗材')" class="wh-warn-bar">
         <span class="wh-warn-title"><el-icon><WarningFilled /></el-icon> 低库存预警：</span>
         <div class="wh-warn-items">
           <span v-for="it in lowItems" :key="it.id" class="wh-warn-chip">
@@ -44,7 +44,7 @@
 
             <!-- 主区域：Tab 切换 -->
       <div class="wh-main">
-        <!-- 出入库记录 Tab -->
+        <!-- ── 出入库记录 Tab ── -->
         <template v-if="activeTab === '出入库记录'">
           <div class="wh-table-section">
             <div class="tx-filter-row">
@@ -103,7 +103,90 @@
           </div>
         </template>
 
-        <!-- 物品列表 Tab（全部 / 治具 / 耗材） -->
+        <!-- ── 首页 Tab：看板仪表盘 ── -->
+        <template v-else-if="activeTab === '首页'">
+          <div class="wh-dashboard">
+            <!-- 4 大 KPI 卡片 -->
+            <div class="wh-kpi-row">
+              <div class="wh-kpi-card" style="--accent: #059669">
+                <div class="wh-kpi-label">资产完好率</div>
+                <div class="wh-kpi-value">{{ sd.good_rate }}%</div>
+                <div class="wh-kpi-sub">除去丢损</div>
+              </div>
+              <div class="wh-kpi-card" style="--accent: #2563EB">
+                <div class="wh-kpi-label">外借回收率</div>
+                <div class="wh-kpi-value">{{ sd.return_rate }}%</div>
+                <div class="wh-kpi-sub">归还/借出</div>
+              </div>
+              <div class="wh-kpi-card" style="--accent: #7C3AED">
+                <div class="wh-kpi-label">库存达标率</div>
+                <div class="wh-kpi-value">{{ sd.stock_rate }}%</div>
+                <div class="wh-kpi-sub">未低于预警</div>
+              </div>
+              <div class="wh-kpi-card" style="--accent: #DC2626">
+                <div class="wh-kpi-label">待办总数</div>
+                <div class="wh-kpi-value warn">{{ sd.pending_total }}</div>
+                <div class="wh-kpi-sub">需关注事项</div>
+              </div>
+            </div>
+
+            <!-- 2×2 面板网格 -->
+            <div class="wh-panel-grid">
+              <!-- 低库存 -->
+              <div class="wh-panel" style="--accent: #DC2626">
+                <div class="wh-panel-title">低库存 · <b>{{ sd.low_stock }}</b></div>
+                <div v-if="!sd.low_stock_items?.length" class="wh-panel-empty">暂无低库存物品</div>
+                <div v-else class="wh-panel-list">
+                  <div v-for="it in sd.low_stock_items" :key="it.id" class="wh-panel-item">
+                    <span class="pi-name">{{ it.name }}</span>
+                    <span class="pi-num">{{ it.stock_qty }}/{{ it.warn_qty }}{{ it.unit }}</span>
+                    <el-button v-if="userStore.canEdit" type="danger" size="small" plain @click.stop="openRestock(it)">补货</el-button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 维修中 -->
+              <div class="wh-panel" style="--accent: #F59E0B">
+                <div class="wh-panel-title">维修中 · <b>{{ sd.repair_count }}</b></div>
+                <div v-if="!sd.repair_items?.length" class="wh-panel-empty">暂无维修中物品</div>
+                <div v-else class="wh-panel-list">
+                  <div v-for="it in sd.repair_items" :key="it.id" class="wh-panel-item">
+                    <span class="pi-name">{{ it.name }}</span>
+                    <el-button v-if="userStore.canEdit" type="warning" size="small" plain @click.stop="openFinishRepair(it)">维修完成</el-button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 丢失 -->
+              <div class="wh-panel" style="--accent: #8B5CF6">
+                <div class="wh-panel-title">丢失 · <b>{{ sd.lost_count }}</b></div>
+                <div v-if="!sd.lost_items?.length" class="wh-panel-empty">暂无丢失物品</div>
+                <div v-else class="wh-panel-list">
+                  <div v-for="it in sd.lost_items" :key="it.id" class="wh-panel-item">
+                    <span class="pi-name">{{ it.name }}</span>
+                    <span class="pi-info">{{ it.borrower || '-' }}</span>
+                    <el-button v-if="userStore.canEdit" type="success" size="small" plain @click.stop="submitFoundBack(it)">已找回</el-button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 损坏 -->
+              <div class="wh-panel" style="--accent: #0891B2">
+                <div class="wh-panel-title">损坏 · <b>{{ sd.damaged_count }}</b></div>
+                <div v-if="!sd.damaged_items?.length" class="wh-panel-empty">暂无损坏物品</div>
+                <div v-else class="wh-panel-list">
+                  <div v-for="it in sd.damaged_items" :key="it.id" class="wh-panel-item">
+                    <span class="pi-name">{{ it.name }}</span>
+                    <span class="pi-info">{{ it.borrower || '-' }}</span>
+                    <el-button v-if="userStore.canEdit" type="success" size="small" plain @click.stop="submitRepairDamaged(it)">已修复</el-button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- ── 治具 / 耗材 Tab：物品列表 ── -->
         <template v-else>
           <div class="wh-table-section">
             <div class="wh-table-wrap">
@@ -117,12 +200,6 @@
                 :header-cell-style="{ fontWeight: 600, textAlign: 'center' }"
                 @row-click="openDetail"
                 >
-                <el-table-column v-if="activeTab === '全部'" label="类型" width="70" align="center">
-                  <template #default="{ row }">
-                    <el-tag :type="row.part_type === '治具' ? 'warning' : 'primary'" size="small">{{ row.part_type }}</el-tag>
-                  </template>
-                </el-table-column>
-
                 <el-table-column label="物品名称" min-width="180" align="center" show-overflow-tooltip>
                   <template #default="{ row }">
                     <span class="wh-name">{{ row.name }}</span>
@@ -149,19 +226,9 @@
                   <el-table-column label="可用" width="80" align="center">
                     <template #default="{ row }"><b class="ok-text">{{ row.available_qty }}</b></template>
                   </el-table-column>
-                  <el-table-column label="外借" width="80" align="center">
-                    <template #default="{ row }">
-                      <b :class="row.total_qty - row.available_qty - (row.repair_qty || 0) > 0 ? 'warn-text' : ''">{{ row.total_qty - row.available_qty - (row.repair_qty || 0) }}</b>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="维修" width="80" align="center">
-                    <template #default="{ row }">
-                      <b :class="row.repair_qty > 0 ? 'danger-text' : ''">{{ row.repair_qty || 0 }}</b>
-                    </template>
-                  </el-table-column>
                 </template>
 
-                <template v-else-if="activeTab === '耗材'">
+                <template v-else>
                   <el-table-column label="库存" width="100" align="center">
                     <template #default="{ row }">
                       <b :style="{ color: row.status === '缺货' ? '#DC2626' : 'var(--c-text)' }">{{ row.stock_qty }}</b>
@@ -169,15 +236,6 @@
                     </template>
                   </el-table-column>
                   <el-table-column label="预警值" prop="warn_qty" width="80" align="center" />
-                </template>
-
-                <template v-else>
-                  <el-table-column label="数量" min-width="100" align="center">
-                    <template #default="{ row }">
-                      <span v-if="row.part_type === '治具'">{{ row.available_qty }}/{{ row.total_qty }}</span>
-                      <span v-else><b>{{ row.stock_qty }}</b> {{ row.unit }}</span>
-                    </template>
-                  </el-table-column>
                 </template>
 
                 <el-table-column label="货位" prop="location" width="100" align="center">
@@ -311,15 +369,15 @@
 
         <footer class="cd-footer">
           <div class="cd-form-row" v-if="scanMode !== 'return'">
-            <el-select v-model="scanForm.operator" filterable allow-create clearable placeholder="借用人/领用人姓名 *" style="width:150px;">
+            <el-select v-model="scanForm.operator" filterable allow-create clearable placeholder="借领人姓名" style="width:150px;">
               <el-option v-for="o in operatorOptions" :key="o" :label="o" :value="o" />
             </el-select>
             <el-input v-model="scanForm.department_manager" placeholder="部门负责人" maxlength="50" style="width:130px;" />
-            <el-select v-model="scanForm.line" placeholder="线体 *" style="width:110px;">
+            <el-select v-model="scanForm.line" placeholder="线体" style="width:110px;">
               <el-option v-for="l in lines" :key="l" :label="l" :value="l" />
             </el-select>
           </div>
-          <el-input v-model="scanForm.remark" placeholder="备注（选填）" maxlength="255" />
+          <el-input v-model="scanForm.remark" placeholder="备注" maxlength="255" />
           <div class="cd-submit-row">
             <el-button text type="danger" :disabled="!cartItems.length" @click="clearCart">清空</el-button>
             <el-button type="primary" size="large" :loading="scanSubmitting"
@@ -683,7 +741,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch, computed, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { warehouseApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, RefreshRight, Plus, ArrowDown, Upload, UploadFilled, WarningFilled,
@@ -709,7 +767,7 @@ const page = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
 const keyword = ref('')
-const activeTab = ref('出入库记录')
+const activeTab = ref('首页')
 const lowItems = ref([])
 
 // 出入库记录（右侧常驻表格）
@@ -797,12 +855,45 @@ const statusTagType = (row) => {
 }
 const txTagType = (t) => ({ '借出': 'primary', '归还': 'success', '领用': 'primary', '补货': 'success', '维修': 'info', '丢失': 'danger', '损坏': 'danger' }[t] || 'info')
 
+// ---------------- 看板统计（首页Tab） ----------------
+const sd = ref({
+  total: 0, in_stock: 0, borrowed_out: 0,
+  repair_count: 0, lost_count: 0, damaged_count: 0,
+  low_stock: 0, pending_total: 0,
+  good_rate: 0, return_rate: 0, stock_rate: 0,
+  low_stock_items: [], repair_items: [], lost_items: [], damaged_items: [],
+})
+const statsUpdateTime = ref('')
+
+const pct = (n, total) => {
+  if (!total || total <= 0) return '0.0'
+  return (n / total * 100).toFixed(1)
+}
+
 const loadStats = async () => {
   if (activeTab.value === '出入库记录') return
   try {
-    const res = await warehouseApi.stats({ part_type: activeTab.value === '全部' ? null : activeTab.value })
+    const res = await warehouseApi.stats({ part_type: activeTab.value === '首页' ? null : activeTab.value })
+    sd.value = res.data || sd.value
     lowItems.value = res.data?.low_stock_items || []
+    statsUpdateTime.value = new Date().toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   } catch (e) { console.error(e) }
+}
+
+// ── 看板定时轮询（每15秒自动刷新） ──
+const STATS_POLL_INTERVAL = 15000
+const statsTimer = ref(null)
+const startStatsPolling = () => {
+  stopStatsPolling()
+  statsTimer.value = setInterval(() => {
+    if (activeTab.value === '首页') loadStats()
+  }, STATS_POLL_INTERVAL)
+}
+const stopStatsPolling = () => {
+  if (statsTimer.value) {
+    clearInterval(statsTimer.value)
+    statsTimer.value = null
+  }
 }
 
 const loadData = async () => {
@@ -812,7 +903,7 @@ const loadData = async () => {
   try {
     const params = { page: page.value, page_size: pageSize.value }
     if (keyword.value) params.keyword = keyword.value
-    if (activeTab.value !== '全部' && activeTab.value !== '出入库记录') params.part_type = activeTab.value
+    if (activeTab.value !== '首页' && activeTab.value !== '出入库记录') params.part_type = activeTab.value
     const res = await warehouseApi.list(params)
     items.value = res.data?.items || []
     total.value = res.data?.total || 0
@@ -825,6 +916,7 @@ const loadData = async () => {
 
 const refreshAll = () => {
   if (activeTab.value === '出入库记录') { loadTxData(); return }
+  if (activeTab.value === '首页') { loadStats(); loadTxData(); return }
   loadData(); loadStats(); loadTxData()
 }
 
@@ -834,9 +926,15 @@ const onSearch = () => {
 }
 const onTabChange = () => {
   if (activeTab.value === '出入库记录') {
+    stopStatsPolling()
     txPage.value = 1
     loadTxData()
+  } else if (activeTab.value === '首页') {
+    loadStats()
+    loadTxData()
+    startStatsPolling()
   } else {
+    stopStatsPolling()
     page.value = 1
     loadStats()
     loadData()
@@ -899,7 +997,7 @@ const submitEdit = async () => {
 }
 
 const handleDelete = async (row) => {
-  const ok = await confirmDelete('库房物品', `将删除「${row.name}」及其全部流水记录`)
+  const ok = await confirmDelete('库房物品', `将删除「${row.name}」及其首页流水记录`)
   if (!ok) return
   try {
     await warehouseApi.delete(row.id)
@@ -1268,10 +1366,19 @@ const openDetail = async (row) => {
 }
 
 onMounted(() => {
-  loadData()
-  loadStats()
+  if (activeTab.value === '首页') {
+    loadStats()
+    startStatsPolling()
+  } else {
+    loadData()
+    loadStats()
+  }
   loadTxData()
   loadOperators()
+})
+
+onUnmounted(() => {
+  stopStatsPolling()
 })
 
 // ---------------- 扫码购物车（抽屉模式） ----------------
@@ -1334,7 +1441,7 @@ const onScan = async () => {
       }
     }
 
-    // 全部加入购物车，每个默认 1 件
+    // 首页加入购物车，每个默认 1 件
     let added = 0
     for (const item of targetItems) {
       addToCart(item, 1)   // 强制 qty=1，不触发库存不足提示
@@ -1499,7 +1606,7 @@ const submitBatch = async () => {
       }
     }
     if (results.fail === 0) {
-      toast.success(`全部成功（${results.ok} 件）`)
+      toast.success(`首页成功（${results.ok} 件）`)
       clearCart()
     } else {
       toast.error(`成功 ${results.ok} 件，失败 ${results.fail} 件：\n${results.errors.join('\n')}`)
@@ -1526,20 +1633,27 @@ const submitBatch = async () => {
 .page-header {
   display: flex;
   align-items: center;
+  min-height: 52px;
   gap: 10px;
-  padding: 0 4px var(--sp-2, 12px);
+  padding: var(--sp-1, 6px) 4px;
   border-bottom: 1px solid var(--c-divider);
   flex-wrap: wrap;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 .page-title {
   font-size: 18px;
   font-weight: 700;
   margin: 0;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 6px;
-  white-space: nowrap;
+  line-height: 1.2;
+  height: 32px;
+}
+.page-title .emoji {
+  line-height: 1;
 }
 .ph-right-group {
   margin-left: auto;
@@ -1578,12 +1692,13 @@ const submitBatch = async () => {
 }
 .wh-warn-bar { flex-shrink: 0; }
 
-/* 主区域：左物品列表 + 右出入库记录 */
+/* 主区域：看板 / 列表 / 出入库记录 */
 .wh-main {
   display: flex;
   flex: 1;
   min-height: 0;
   margin-top: 10px;
+  overflow: hidden;
 }
 .tx-filter-row {
   display: flex;
@@ -1802,4 +1917,183 @@ const submitBatch = async () => {
 }
 .cd-form-row { display: flex; gap: 8px; }
 .cd-submit-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+/* ============ 首页Tab：看板仪表盘 ============ */
+.wh-dashboard {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+/* ── 4 大 KPI 卡片（高级现代风格） ── */
+.wh-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  flex-shrink: 0;
+}
+.wh-kpi-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 20px 20px;
+  background: #ffffff;
+  border: none;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 2px 8px rgba(0,0,0,.04);
+  transition: all .3s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  overflow: hidden;
+  cursor: default;
+}
+.wh-kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 12px; right: 12px;
+  height: 3px;
+  background: var(--accent, #059669);
+  border-radius: 0 0 3px 3px;
+}
+.wh-kpi-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent, #059669) 4%, transparent) 0%, transparent 40%);
+  pointer-events: none;
+}
+.wh-kpi-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0,0,0,.08), 0 2px 8px rgba(0,0,0,.04);
+}
+.wh-kpi-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #64748B;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  position: relative;
+  z-index: 1;
+}
+.wh-kpi-value {
+  font-size: 36px;
+  font-weight: 800;
+  color: #0B1120;
+  line-height: 1.15;
+  letter-spacing: -1px;
+  position: relative;
+  z-index: 1;
+}
+.wh-kpi-value.warn {
+  color: #DC2626;
+}
+.wh-kpi-sub {
+  font-size: 13px;
+  color: #94A3B8;
+  font-weight: 500;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── 管理员面板网格（高级现代风格） ── */
+.wh-panel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+}
+.wh-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 16px 12px;
+  background: #ffffff;
+  border: 1px solid #E8ECF0;
+  border-radius: 14px;
+  min-height: 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,.03), 0 2px 6px rgba(0,0,0,.02);
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+  position: relative;
+}
+.wh-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 14px; right: 14px;
+  height: 3px;
+  background: var(--accent, #DC2626);
+  border-radius: 0 0 3px 3px;
+}
+.wh-panel:hover {
+  border-color: #D0D5DB;
+  box-shadow: 0 4px 20px rgba(0,0,0,.06), 0 2px 6px rgba(0,0,0,.03);
+}
+.wh-panel-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0B1120;
+  text-align: center;
+  flex-shrink: 0;
+  letter-spacing: .4px;
+  padding-top: 2px;
+}
+.wh-panel-title b {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--accent, #DC2626);
+}
+.wh-panel-empty {
+  font-size: 14px;
+  color: #94A3B8;
+  padding: 18px 0;
+  text-align: center;
+  font-weight: 500;
+}
+.wh-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.wh-panel-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: #F6F8FA;
+  border-radius: 10px;
+  font-size: 13px;
+  transition: all .15s;
+}
+.wh-panel-item:hover {
+  background: #EEF1F5;
+}
+.wh-panel-item .pi-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #0B1120;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wh-panel-item .pi-info {
+  font-size: 13px;
+  font-weight: 500;
+  color: #5B6B7E;
+  white-space: nowrap;
+}
+.wh-panel-item .pi-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: #DC2626;
+  white-space: nowrap;
+}
 </style>

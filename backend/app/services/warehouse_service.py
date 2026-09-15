@@ -154,14 +154,18 @@ def list_parts(db: Session, page: int = 1, page_size: int = 20,
 
 
 def get_stats(db: Session, part_type: Optional[str] = None) -> Dict[str, Any]:
-    """统计物品状态。支持按类型过滤（治具/耗材），避免总治具/总耗材数字混在一起。"""
+    """统计物品状态 + 看板指标（资产完好率、外借回收率、库存达标率、待办总数）。"""
     q = db.query(WarehousePart)
     if part_type:
         q = q.filter(WarehousePart.part_type == part_type)
     parts = q.all()
+
+    total = len(parts)
     in_stock = 0
     borrowed_out = 0
     low_items: List[dict] = []
+    repair_items: List[dict] = []
+
     for p in parts:
         d = _part_to_dict(p)
         if p.part_type == JIG:
@@ -169,19 +173,70 @@ def get_stats(db: Session, part_type: Optional[str] = None) -> Dict[str, Any]:
                 borrowed_out += 1
             else:
                 in_stock += 1
+            if p.repair_qty and p.repair_qty > 0:
+                repair_items.append(d)
         else:
             if p.total_qty <= 0:
-                borrowed_out += 1      # 耗材缺货 ≈ 已领用完
+                borrowed_out += 1
             else:
                 in_stock += 1
             if p.warn_qty and p.total_qty <= p.warn_qty:
                 low_items.append(d)
+
+    # 丢失/损坏：从BorrowRecord获取（active = 未归还）
+    lost_rows = db.query(BorrowRecord).filter(
+        BorrowRecord.status == "丢失"
+    ).all()
+    damaged_rows = db.query(BorrowRecord).filter(
+        BorrowRecord.status == "损坏"
+    ).all()
+
+    # 组装丢失/损坏的物品信息
+    lost_items = []
+    damaged_items = []
+    part_map = {p.id: _part_to_dict(p) for p in parts}
+    for br in lost_rows:
+        info = part_map.get(br.part_id)
+        if info:
+            lost_items.append({**info, "borrower": br.borrower, "borrow_time": str(br.borrow_time)[:10] if br.borrow_time else ""})
+    for br in damaged_rows:
+        info = part_map.get(br.part_id)
+        if info:
+            damaged_items.append({**info, "borrower": br.borrower, "borrow_time": str(br.borrow_time)[:10] if br.borrow_time else ""})
+
+    # 外借回收率 = 归还transaction数 / 借出transaction数
+    borrow_tx = db.query(PartTransaction).filter(PartTransaction.tx_type == "借出").count()
+    return_tx = db.query(PartTransaction).filter(PartTransaction.tx_type == "归还").count()
+
+    repair_count = len(repair_items)
+    lost_count = len(lost_items)
+    damaged_count = len(damaged_items)
+
+    # 资产完好率 = (total - 丢损物品数) / total
+    lost_part_ids = set(br.part_id for br in lost_rows)
+    damaged_part_ids = set(br.part_id for br in damaged_rows)
+    bad_parts = lost_part_ids | damaged_part_ids
+    good_rate = round((total - len(bad_parts)) / total * 100, 1) if total > 0 else 100.0
+    return_rate = round(return_tx / borrow_tx * 100, 1) if borrow_tx > 0 else 100.0
+    stock_rate = round((total - len(low_items)) / total * 100, 1) if total > 0 else 100.0
+    pending_total = len(low_items) + repair_count + lost_count + damaged_count
+
     return {
-        "total": len(parts),
+        "total": total,
         "in_stock": in_stock,
         "borrowed_out": borrowed_out,
+        "repair_count": repair_count,
+        "lost_count": lost_count,
+        "damaged_count": damaged_count,
         "low_stock": len(low_items),
+        "pending_total": pending_total,
+        "good_rate": good_rate,
+        "return_rate": return_rate,
+        "stock_rate": stock_rate,
         "low_stock_items": low_items,
+        "repair_items": repair_items,
+        "lost_items": lost_items,
+        "damaged_items": damaged_items,
     }
 
 
