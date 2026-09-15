@@ -1,5 +1,3 @@
-import platform
-import subprocess
 from io import BytesIO
 from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
@@ -12,25 +10,7 @@ from app.core.crud import write_operation_log
 from app.core.timeutil import beijing_now
 from app.core.dingtalk import send_dingtalk
 from app.models import Server, AgingRack, WifiAp, NetworkAlert, Setting
-
-
-def _ping_device(ip: str) -> bool:
-    if not ip or not isinstance(ip, str):
-        return False
-    ip = ip.strip()
-    try:
-        import socket
-        socket.inet_aton(ip)
-    except (OSError, ValueError):
-        return False
-    try:
-        if platform.system().lower() == "windows":
-            result = subprocess.run(["ping", "-n", "1", "-w", "2000", ip], capture_output=True, timeout=5, shell=False)
-        else:
-            result = subprocess.run(["ping", "-c", "1", "-W", "2", ip], capture_output=True, timeout=5, shell=False)
-        return result.returncode == 0
-    except Exception:
-        return False
+from app.core.ping_util import ping_device
 
 
 def _server_to_dict(d) -> Dict[str, Any]:
@@ -132,7 +112,7 @@ def _ping_and_update_all(db: Session):
 
     def _probe(target):
         device_type, obj, name, ip, line = target
-        return target, _ping_device(ip)
+        return target, ping_device(ip)
 
     if targets:
         from concurrent.futures import ThreadPoolExecutor
@@ -645,10 +625,10 @@ def monitor_tick(db: Session) -> int:
     """
     for r in db.query(AgingRack).all():
         if r.ip_address and r.status != "维护":
-            r.status = "在线" if _ping_device(r.ip_address) else "离线"
+            r.status = "在线" if ping_device(r.ip_address) else "离线"
     for ap in db.query(WifiAp).all():
         if ap.ip_address and ap.status != "维护":
-            ap.status = "在线" if _ping_device(ap.ip_address) else "离线"
+            ap.status = "在线" if ping_device(ap.ip_address) else "离线"
     tick_row = db.query(Setting).filter(Setting.key == "last_monitor_tick").first()
     if tick_row:
         tick_row.value = beijing_now().strftime("%Y-%m-%d %H:%M:%S")

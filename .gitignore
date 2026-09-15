@@ -30,6 +30,7 @@ node_modules/
 logs/
 backend/logs/
 !backend/logs/.gitkeep
+!backend/logs/ping/.gitkeep
 
 # IDEs / OS
 .vscode/

@@ -19,6 +19,7 @@ EmSmart/
 │   │   ├── auth.py             # JWT 认证 & 权限控制
 │   │   ├── crud.py             # 通用 CRUD 操作
 │   │   ├── dingtalk.py         # 钉钉机器人推送（HMAC-SHA256 加签，标准库实现）
+│   │   ├── ping_util.py        # Ping 探测 + 日志记录
 │   │   └── timeutil.py         # 北京时间工具
 │   ├── models/                 # ORM 模型（按业务域拆分）
 │   │   ├── users.py            # 用户 & 权限
@@ -39,7 +40,8 @@ EmSmart/
 │   │   ├── projects.py         # 项目管理
 │   │   └── responsibilities.py # 岗位职责
 │   ├── schemas/                # Pydantic 请求/响应模型
-│   ├── tasks/                  # 后台任务（asyncio 守护协程：服务器健康检查 + 网络 Ping 巡检）
+│   ├── logs/                   # 日志文件
+│   │   └── ping/               #   └── YYYY-MM-DD.log（Ping 巡检日志，按天切割）
 │   ├── main.py                 # FastAPI 主入口
 │   ├── .env.example            # 环境变量模板
 │   └── requirements.txt        # Python 依赖
