@@ -36,6 +36,8 @@ export const warehouseApi = {
   }),
   // 借出/领用操作流水（全部物品）
   transactions: (params) => api.get('/warehouse/transactions', { params }),
+  // 历史借/领用人列表（el-select allow-create 记忆）
+  operators: () => api.get('/warehouse/operators'),
   // 编辑出入库记录备注
   updateTxRemark: (txId, remark) => api.put(`/warehouse/transactions/${txId}/remark`, { remark }),
 }

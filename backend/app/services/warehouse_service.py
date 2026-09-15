@@ -207,6 +207,15 @@ def get_detail(db: Session, part_id: int) -> Optional[dict]:
     }
 
 
+def get_operators(db: Session, limit: int = 50) -> List[str]:
+    """返回历史借/领用人列表（用于前端 el-select 记忆）。"""
+    rows = db.query(PartTransaction.operator).filter(
+        PartTransaction.operator.isnot(None),
+        PartTransaction.operator != ""
+    ).distinct().order_by(PartTransaction.operator).limit(limit).all()
+    return [r[0] for r in rows]
+
+
 def list_transactions(db: Session, page: int = 1, page_size: int = 50,
                       tx_type: Optional[str] = None,
                       keyword: Optional[str] = None) -> Tuple[List[dict], int]:

@@ -48,7 +48,9 @@
         <template v-if="activeTab === '出入库记录'">
           <div class="wh-table-section">
             <div class="tx-filter-row">
-              <el-input v-model="txFilterTime" placeholder="操作时间" clearable size="small" style="width: 140px;" />
+              <el-date-picker v-model="txFilterTimeRange" type="daterange" range-separator="至"
+                start-placeholder="开始日期" end-placeholder="结束日期" size="small"
+                style="width: 240px;" clearable @change="() => { txPage=1; loadTxData() }" />
               <el-select v-model="txFilterType" placeholder="操作" clearable size="small" style="width: 110px;">
                 <el-option label="借出中" value="借出" />
                 <el-option label="已归还" value="已归还" />
@@ -121,20 +123,20 @@
                   </template>
                 </el-table-column>
 
-                <el-table-column label="物品名称" min-width="180" align="left" show-overflow-tooltip>
+                <el-table-column label="物品名称" min-width="180" align="center" show-overflow-tooltip>
                   <template #default="{ row }">
                     <span class="wh-name">{{ row.name }}</span>
                   </template>
                 </el-table-column>
 
-                <el-table-column label="型号" prop="model" min-width="130" align="left" show-overflow-tooltip
+                <el-table-column label="型号" prop="model" min-width="130" align="center" show-overflow-tooltip
                   v-if="activeTab !== '耗材'">
                   <template #default="{ row }">
                     <span v-if="row.model" class="wh-model">{{ row.model }}</span>
                     <span v-else class="wh-model-empty">-</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="编号" prop="code" min-width="130" align="left" show-overflow-tooltip
+                <el-table-column label="编号" prop="code" min-width="130" align="center" show-overflow-tooltip
                   v-if="activeTab !== '耗材'">
                   <template #default="{ row }">
                     <span v-if="row.code" class="wh-model">{{ row.code }}</span>
@@ -178,7 +180,7 @@
                   </el-table-column>
                 </template>
 
-                <el-table-column label="货位" prop="location" width="100" align="left">
+                <el-table-column label="货位" prop="location" width="100" align="center">
                   <template #default="{ row }">{{ row.location || '-' }}</template>
                 </el-table-column>
 
@@ -309,7 +311,9 @@
 
         <footer class="cd-footer">
           <div class="cd-form-row" v-if="scanMode !== 'return'">
-            <el-input v-model="scanForm.operator" placeholder="借用人/领用人姓名 *" maxlength="50" />
+            <el-select v-model="scanForm.operator" filterable allow-create clearable placeholder="借用人/领用人姓名 *" style="width:150px;">
+              <el-option v-for="o in operatorOptions" :key="o" :label="o" :value="o" />
+            </el-select>
             <el-input v-model="scanForm.department_manager" placeholder="部门负责人" maxlength="50" style="width:130px;" />
             <el-select v-model="scanForm.line" placeholder="线体 *" style="width:110px;">
               <el-option v-for="l in lines" :key="l" :label="l" :value="l" />
@@ -380,7 +384,9 @@
       </div>
       <el-form :model="borrowForm" label-width="92px">
         <el-form-item label="借用人" required>
-          <el-input v-model="borrowForm.operator" placeholder="借用人姓名" maxlength="50" />
+          <el-select v-model="borrowForm.operator" filterable allow-create clearable placeholder="借用人姓名" style="width:100%;">
+            <el-option v-for="o in operatorOptions" :key="o" :label="o" :value="o" />
+          </el-select>
         </el-form-item>
         <el-form-item label="部门负责人">
           <el-input v-model="borrowForm.department_manager" placeholder="部门负责人姓名（选填）" maxlength="50" />
@@ -487,7 +493,9 @@
       </div>
       <el-form :model="consumeForm" label-width="92px">
         <el-form-item label="领用人" required>
-          <el-input v-model="consumeForm.operator" placeholder="领用人姓名" maxlength="50" />
+          <el-select v-model="consumeForm.operator" filterable allow-create clearable placeholder="领用人姓名" style="width:100%;">
+            <el-option v-for="o in operatorOptions" :key="o" :label="o" :value="o" />
+          </el-select>
         </el-form-item>
         <el-form-item label="部门负责人">
           <el-input v-model="consumeForm.department_manager" placeholder="部门负责人姓名（选填）" maxlength="50" />
@@ -687,6 +695,12 @@ const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
 
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线', '9线', '工程', '品质', '维修', '解析']
+const operatorOptions = ref([])          // 历史借/领用人列表
+const loadOperators = async () => {
+  try {
+    operatorOptions.value = (await warehouseApi.operators()).data || []
+  } catch { /* 静默 */ }
+}
 
 // ---------------- 列表 ----------------
 const items = ref([])
@@ -705,7 +719,7 @@ const txPageSize = ref(20)
 const txTotal = ref(0)
 const txLoading = ref(false)
 // 筛选条件（前端本地筛选当前页数据）
-const txFilterTime = ref('')
+const txFilterTimeRange = ref(null)          // [start, end] Date 数组
 const txFilterType = ref('')
 const txFilterPart = ref('')
 const txFilterOperator = ref('')
@@ -713,7 +727,14 @@ const txFilterOperator = ref('')
 // 筛选后的记录（仅保留后端不支持的客户端筛选：操作时间 / 已归还虚拟类型）
 const filteredTxRecords = computed(() => {
   return txRecords.value.filter(r => {
-    if (txFilterTime.value && !(r.created_at || '').includes(txFilterTime.value.trim())) return false
+    // 日期范围筛选
+    if (txFilterTimeRange.value) {
+      const [d0, d1] = txFilterTimeRange.value
+      const t = new Date(r.created_at)
+      if (!d0 || !d1) return true // partial range = no filter
+      d1.setHours(23, 59, 59, 999) // 包含结束日期全天
+      if (t < d0 || t > d1) return false
+    }
     if (txFilterType.value === '已归还') {
       // 已归还 = 借出+有归还时间 或 tx_type=归还
       if (r.tx_type === '借出' && r.return_time) return true
@@ -725,9 +746,8 @@ const filteredTxRecords = computed(() => {
   })
 })
 
-const filterTxRecords = () => { /* 前端筛选，computed 自动更新 */ }
 const resetTxFilter = () => {
-  txFilterTime.value = ''
+  txFilterTimeRange.value = null
   txFilterType.value = ''
   txFilterPart.value = ''
   txFilterOperator.value = ''
@@ -775,7 +795,7 @@ const statusTagType = (row) => {
   }
   return { '正常': 'success', '低于预警': 'warning', '缺货': 'danger' }[row.status] || 'info'
 }
-const txTagType = (t) => ({ '借出': 'warning', '归还': 'success', '领用': 'primary', '补货': 'success', '维修': 'info', '丢失': 'danger', '损坏': 'danger' }[t] || 'info')
+const txTagType = (t) => ({ '借出': 'primary', '归还': 'success', '领用': 'primary', '补货': 'success', '维修': 'info', '丢失': 'danger', '损坏': 'danger' }[t] || 'info')
 
 const loadStats = async () => {
   if (activeTab.value === '出入库记录') return
@@ -999,9 +1019,13 @@ const openReturnFromCart = async (item) => {
 }
 
 const openFinishRepair = (row) => {
-  // row 可能是物品数据或借出记录，不要覆盖 actionRow.value（需要 part_id）
+  // row 可能是物品数据（从列表/更多操作）或借出记录（从归还弹框）
+  // 如果 row 有 repair_qty 则是完整物品，设为 actionRow
+  if (row && typeof row.repair_qty === 'number') {
+    actionRow.value = row
+  }
   resetActionForms()
-  finishRepairForm.qty = row.repair_qty || 1
+  finishRepairForm.qty = actionRow.value?.repair_qty || 1
   finishRepairDialog.value = true
 }
 
@@ -1247,6 +1271,7 @@ onMounted(() => {
   loadData()
   loadStats()
   loadTxData()
+  loadOperators()
 })
 
 // ---------------- 扫码购物车（抽屉模式） ----------------

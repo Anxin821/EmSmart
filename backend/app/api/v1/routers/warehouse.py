@@ -146,6 +146,15 @@ def list_part_transactions(
     return ApiResponse(data=PaginatedData(total=len(part_txs), page=page, page_size=page_size, items=part_txs))
 
 
+@router.get("/operators")
+def list_operators(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """返回历史借/领用人列表（前端 el-select allow-create 使用）。"""
+    return ApiResponse(data=service.get_operators(db))
+
+
 @router.get("/transactions")
 def list_all_transactions(
     page: int = Query(1, ge=1),
