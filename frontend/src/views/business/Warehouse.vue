@@ -60,19 +60,24 @@
                     <span v-else>{{ row.created_at }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="60" align="center">
+                <el-table-column label="操作" width="50" align="center">
                   <template #default="{ row }">
                     <div v-if="row._isFilter" class="jig-fbr-cell">
-                      <el-select v-model="txFilterType" placeholder="操作" clearable size="small"
-                        style="width:100%;" @change="txPage=1;loadTxData()">
-                        <el-option label="借出" value="借出" />
-                        <el-option label="归还" value="归还" />
-                        <el-option label="领用" value="领用" />
-                        <el-option label="补货" value="补货" />
-                        <el-option label="维修" value="维修" />
-                        <el-option label="丢失" value="丢失" />
-                        <el-option label="损坏" value="损坏" />
-                      </el-select>
+                      <el-dropdown trigger="click" @command="v => { txFilterType=v; txPage=1; loadTxData() }">
+                        <span class="tx-filter-trigger">∨</span>
+                        <template #dropdown>
+                          <el-dropdown-menu>
+                            <el-dropdown-item command="">全部</el-dropdown-item>
+                            <el-dropdown-item command="借出">借出</el-dropdown-item>
+                            <el-dropdown-item command="归还">归还</el-dropdown-item>
+                            <el-dropdown-item command="领用">领用</el-dropdown-item>
+                            <el-dropdown-item command="补货">补货</el-dropdown-item>
+                            <el-dropdown-item command="维修">维修</el-dropdown-item>
+                            <el-dropdown-item command="丢失">丢失</el-dropdown-item>
+                            <el-dropdown-item command="损坏">损坏</el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
                     </div>
                     <el-tag v-else-if="row.tx_type === '借出' && row.return_time" type="success" size="small">已归还</el-tag>
                     <el-tag v-else :type="txTagType(row.tx_type)" size="small">{{ row.tx_type }}</el-tag>
@@ -2011,6 +2016,22 @@ const submitBatch = async () => {
   z-index: 3;
   background: var(--el-fill-color-light, #fff);
 }
+/* 操作筛选下拉触发按钮 */
+.tx-filter-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--c-text-mute);
+  user-select: none;
+  transition: background .15s;
+}
+.tx-filter-trigger:hover { background: var(--c-bg-mute); }
 .jig-fbr-cell {
   height: 100%;
   display: flex;
