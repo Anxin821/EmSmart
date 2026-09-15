@@ -35,8 +35,10 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="title" label="标题" min-width="220" align="center" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.title || '-' }}</template>
+        <el-table-column prop="title" label="标题" width="220" align="center" show-overflow-tooltip class-name="title-cell">
+          <template #default="{ row }">
+            <div class="title-text">{{ row.title || '-' }}</div>
+          </template>
         </el-table-column>
 
         <el-table-column prop="severity" label="严重等级" width="80" align="center">
@@ -462,3 +464,13 @@ onUnmounted(() => {
   filters.value = { keyword: '', severity: '', status: '' }
 })
 </script>
+
+<style scoped>
+.title-cell .title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  display: block;
+}
+</style>
