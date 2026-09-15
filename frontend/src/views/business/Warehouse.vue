@@ -60,7 +60,7 @@
                     <span v-else>{{ row.created_at }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="50" align="center">
+                <el-table-column label="操作" width="65" align="center">
                   <template #default="{ row }">
                     <div v-if="row._isFilter" class="jig-fbr-cell">
                       <el-dropdown trigger="click" @command="v => { txFilterType=v; txPage=1; loadTxData() }">
@@ -382,23 +382,31 @@
                 <el-table-column label="状态" min-width="80" align="center">
                   <template #default="{ row }">
                     <div v-if="row._isFilter && activeTab === '治具'" class="jig-fbr-cell">
-                      <el-select v-model="jigFilterStatus" placeholder="状态" clearable size="small"
-                        style="width:100%;" @change="page=1;loadData()">
-                        <el-option label="全部" value="" />
-                        <el-option label="在库" value="在库" />
-                        <el-option label="已借出" value="已借出" />
-                        <el-option label="部分借出" value="部分借出" />
-                        <el-option label="维修中" value="维修中" />
-                      </el-select>
+                      <el-dropdown trigger="click" @command="v => { jigFilterStatus=v; page=1; loadData() }">
+                        <span class="tx-filter-trigger">{{ jigFilterStatus || '全部' }}</span>
+                        <template #dropdown>
+                          <el-dropdown-menu>
+                            <el-dropdown-item command="">全部</el-dropdown-item>
+                            <el-dropdown-item command="在库">在库</el-dropdown-item>
+                            <el-dropdown-item command="已借出">已借出</el-dropdown-item>
+                            <el-dropdown-item command="部分借出">部分借出</el-dropdown-item>
+                            <el-dropdown-item command="维修中">维修中</el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
                     </div>
                     <div v-else-if="row._isFilter && activeTab === '耗材'" class="jig-fbr-cell">
-                      <el-select v-model="consFilterStatus" placeholder="状态" clearable size="small"
-                        style="width:100%;" @change="page=1;loadData()">
-                        <el-option label="全部" value="" />
-                        <el-option label="正常" value="正常" />
-                        <el-option label="低于预警" value="低于预警" />
-                        <el-option label="缺货" value="缺货" />
-                      </el-select>
+                      <el-dropdown trigger="click" @command="v => { consFilterStatus=v; page=1; loadData() }">
+                        <span class="tx-filter-trigger">{{ consFilterStatus || '全部' }}</span>
+                        <template #dropdown>
+                          <el-dropdown-menu>
+                            <el-dropdown-item command="">全部</el-dropdown-item>
+                            <el-dropdown-item command="正常">正常</el-dropdown-item>
+                            <el-dropdown-item command="低于预警">低于预警</el-dropdown-item>
+                            <el-dropdown-item command="缺货">缺货</el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
                     </div>
                     <el-tag v-else :type="statusTagType(row)" size="small">{{ row.status }}</el-tag>
                   </template>
@@ -2028,11 +2036,12 @@ const submitBatch = async () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
+  min-width: 24px;
   height: 24px;
+  padding: 0 6px;
   cursor: pointer;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
   color: var(--c-text-mute);
   user-select: none;
