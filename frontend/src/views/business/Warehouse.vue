@@ -272,10 +272,7 @@
                       <el-input v-model="consFilterName" size="small" placeholder="搜索名称" clearable
                         @change="page=1;loadData()" />
                     </div>
-                    <span v-else class="wh-name-wrap">
-  <span class="wh-name">{{ row.name }}</span>
-  <span v-if="row.part_type === '耗材'" class="wh-name-sub">耗材</span>
-</span>
+                    <span v-else class="wh-name">{{ row.name }}</span>
                   </template>
                 </el-table-column>
 
@@ -1008,10 +1005,12 @@
 import { ref, reactive, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { warehouseApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, RefreshRight, Plus, ArrowDown, Upload, UploadFilled, WarningFilled, InfoFilled,
-         ShoppingCart, Delete, Minus, Close, Check, EditPen } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
 import CommonPagination from '@/components/common/CommonPagination.vue'
+import {
+  Search, Plus, Minus, Close, Check, EditPen, ArrowDown,
+  InfoFilled, ShoppingCart, UploadFilled,
+} from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
@@ -1104,6 +1103,11 @@ const jigSortTotal = ref('')
 const jigSortAvailable = ref('')
 const consSortStock = ref('')
 const consSortWarn = ref('')
+const PART_SORT_REFS = { jigSortTotal, jigSortAvailable, consSortStock, consSortWarn }
+const SORT_FIELDS = {
+  jigSortTotal: 'total_qty', jigSortAvailable: 'available_qty',
+  consSortStock: 'stock_qty', consSortWarn: 'warn_qty',
+}
 
 const filteredTxRecords = computed(() => {
   const filtered = txRecords.value.filter(r => {
@@ -1123,19 +1127,6 @@ const filteredTxRecords = computed(() => {
   })
   return [{ id: -1, _isFilter: true }, ...filtered]
 })
-
-const resetTxFilter = () => {
-  txFilterTimeRange.value = null
-  txFilterType.value = ''
-  txFilterPart.value = ''
-  txFilterOperator.value = ''
-  txFilterRemark.value = ''
-  txFilterDepartmentManager.value = ''
-  txFilterLine.value = ''
-  txFilterBorrowDate.value = null
-  txFilterReturnDate.value = null
-  txSortOrder.value = ''
-}
 
 const loadTxData = async () => {
   txLoading.value = true
@@ -1188,21 +1179,14 @@ const toggleTxSort = (cur) => {
 }
 
 const togglePartSort = (refName) => {
-  const cur = eval(refName).value
-  if (!cur) { eval(refName).value = 'asc' }
-  else if (cur === 'asc') { eval(refName).value = 'desc' }
-  else { eval(refName).value = '' }
+  const r = PART_SORT_REFS[refName]
+  if (!r) return
+  r.value = !r.value ? 'asc' : r.value === 'asc' ? 'desc' : ''
   page.value = 1
   loadData()
 }
 
 watch([txPage, txPageSize], () => loadTxData())
-watch([txFilterType, txFilterPart, txFilterOperator, txFilterRemark,
-       txFilterDepartmentManager, txFilterLine,
-       txFilterBorrowDate, txFilterReturnDate], () => {
-  txPage.value = 1
-  loadTxData()
-})
 
 const statusTagType = (row) => {
   if (row.part_type === '治具') {
@@ -1231,19 +1215,12 @@ const sd = ref({
   good_rate: 0, return_rate: 0, stock_rate: 0,
   low_stock_items: [], repair_items: [], lost_items: [], damaged_items: [],
 })
-const statsUpdateTime = ref('')
-
-const pct = (n, total) => {
-  if (!total || total <= 0) return '0.0'
-  return (n / total * 100).toFixed(1)
-}
 
 const loadStats = async () => {
   if (activeTab.value === '出入库记录') return
   try {
     const res = await warehouseApi.stats({ part_type: activeTab.value === '首页' ? null : activeTab.value })
     sd.value = res.data || sd.value
-    statsUpdateTime.value = new Date().toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   } catch (e) { console.error(e) }
 }
 
@@ -1280,12 +1257,8 @@ const loadData = async () => {
     }
     if (kw) params.keyword = kw
 
-    const sortFieldMap = {
-      jigSortTotal: 'total_qty', jigSortAvailable: 'available_qty',
-      consSortStock: 'stock_qty', consSortWarn: 'warn_qty',
-    }
-    for (const [refName, field] of Object.entries(sortFieldMap)) {
-      const val = eval(refName).value
+    for (const [key, field] of Object.entries(SORT_FIELDS)) {
+      const val = PART_SORT_REFS[key].value
       if (val) { params.sort_by = field; params.sort_order = val; break }
     }
 
@@ -1298,10 +1271,11 @@ const loadData = async () => {
     } else if (activeTab.value === '耗材' && consFilterStatus.value) {
       loaded = loaded.filter(i => i.status === consFilterStatus.value)
     }
-    items.value = loaded
 
     if (activeTab.value === '治具' || activeTab.value === '耗材') {
       items.value = [{ id: -1, _isFilter: true }, ...loaded]
+    } else {
+      items.value = loaded
     }
   } catch (e) {
     console.error(e)
@@ -1315,8 +1289,6 @@ const refreshAll = () => {
   if (activeTab.value === '首页') { loadStats(); loadTxData(); return }
   loadData(); loadStats(); loadTxData()
 }
-
-const onSearch = () => {}
 
 const onTabChange = () => {
   if (activeTab.value === '出入库记录') {
@@ -1798,24 +1770,17 @@ onUnmounted(() => {
 const cartDialog = ref(false)
 const scanMode = ref('borrow')
 const scanKeyword = ref('')
-const scanLoading = ref(false)
 const scanInputRef = ref(null)
 const cartItems = ref([])
 const scanSubmitting = ref(false)
 const scanForm = reactive({ operator: '', department_manager: '', line: '', remark: '' })
 
-const scanModeName = computed(() => {
-  const map = { borrow: '借领', return: '归还' }
-  return map[scanMode.value] || '借领'
-})
+const scanModeName = computed(() => ({ borrow: '借领', return: '归还' }[scanMode.value] || '借领'))
 
-const scanPlaceholder = computed(() => {
-  const map = {
-    borrow: '扫码或输入物品名称/型号，回车添加',
-    return: '扫码或输入治具名称/型号，回车添加到归还列表',
-  }
-  return map[scanMode.value] || '扫码或搜索'
-})
+const scanPlaceholder = computed(() => ({
+  borrow: '扫码或输入物品名称/型号，回车添加',
+  return: '扫码或输入治具名称/型号，回车添加到归还列表',
+}[scanMode.value] || '扫码或搜索'))
 
 const cartTotalQty = computed(() => cartItems.value.reduce((s, i) => s + i.qty, 0))
 
@@ -1837,18 +1802,6 @@ const onBorrowSearch = async () => {
       cartDialog.value = true
     }
     nextTick(focusScanInput)
-  }
-}
-
-/** 归还弹框内：归还单条记录 */
-const cartReturnRecord = async (item, rec) => {
-  try {
-    await warehouseApi.returnBack(item.id, { borrow_record_id: rec.id })
-    toast.success('归还成功')
-    removeFromCart(item.id)
-    refreshAll()
-  } catch (e) {
-    toast.error(e.response?.data?.detail || '操作失败')
   }
 }
 
@@ -1912,7 +1865,6 @@ const openBorrowDialog = () => {
 }
 
 const doScanSearch = async (kw) => {
-  scanLoading.value = true
   try {
     const res = await warehouseApi.list({ keyword: kw, page: 1, page_size: 50 })
     const items = res.data?.items || []
@@ -1971,8 +1923,6 @@ const doScanSearch = async (kw) => {
     console.error(e)
     toast.error('搜索失败')
     return 0
-  } finally {
-    scanLoading.value = false
   }
 }
 
@@ -1984,35 +1934,6 @@ const onScan = async () => {
   if (added > 0) {
     toast.success(`已添加 ${added} 件到出入库抽屉`)
   }
-}
-
-const findBestMatch = async (kw) => {
-  const doSearch = async (params) => {
-    const res = await warehouseApi.list({ ...params, keyword: kw, page: 1, page_size: 10 })
-    return res.data?.items || []
-  }
-
-  let items = await doSearch({})
-  let exact = items.find(i => i.name === kw)
-  if (exact) return exact
-
-  if (items.some(i => i.part_type === '治具')) {
-    const modelMatch = items.find(i => i.model === kw)
-    if (modelMatch) return modelMatch
-  }
-
-  const valid = items.filter(i => {
-    if (scanMode.value === 'return') {
-      return (i.total_qty || 0) - (i.available_qty || 0) > 0
-    }
-    if (i.part_type === '治具') {
-      return (i.available_qty || 0) - (i.repair_qty || 0) > 0
-    }
-    return (i.stock_qty || i.total_qty || 0) > 0
-  })
-  if (valid.length) return valid[0]
-
-  return items.length > 0 ? items[0] : null
 }
 
 const addToCart = (item, forceQty) => {
@@ -2067,12 +1988,9 @@ const loadCartItemsRecords = async () => {
         ? (await warehouseApi.consumeRecords(item.id, true)).data
         : (await warehouseApi.borrowRecords(item.id, true)).data) || []
       const field = isCon ? 'tx_type' : 'status'
-      let active = records.filter(r => ['领用', '借出'].includes(r[field]))
-      active = active.map(r => {
-        if (!isCon && r.borrower !== undefined) {
-          r.operator = r.borrower
-        }
-        return r
+      const active = records.filter(r => ['领用', '借出'].includes(r[field]))
+      active.forEach(r => {
+        if (!isCon && r.borrower !== undefined) r.operator = r.borrower
       })
       item.activeRecords = active
       if (item.activeRecords.length > 0) {
@@ -2546,21 +2464,6 @@ const submitBatch = async () => {
   font-size: 13px;
 }
 .wh-name { font-weight: 600; color: var(--c-text); }
-.wh-name-wrap {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  line-height: 1.2;
-}
-.wh-name-sub {
-  font-size: 11px;
-  color: var(--c-text-mute, #94A3B8);
-  background: #EEF2F6;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-weight: 500;
-}
 .wh-form-hint { margin-left: 10px; font-size: 12px; color: var(--c-text-mute); }
 .wh-form-static { font-size: 14px; font-weight: 600; color: var(--c-text, #0B1120); line-height: 32px; }
 .loc-tags { display: inline-flex; gap: 4px; flex-wrap: wrap; align-items: center; }
