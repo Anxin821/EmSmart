@@ -34,6 +34,8 @@ export const warehouseApi = {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 60000,
   }),
+  // 下载导入模板（.xlsx）
+  downloadTemplate: () => api.get('/warehouse/parts/template', { responseType: 'blob' }),
   // 借出/领用操作流水（全部物品）
   transactions: (params) => api.get('/warehouse/transactions', { params }),
   // 历史借/领用人列表（el-select allow-create 记忆）

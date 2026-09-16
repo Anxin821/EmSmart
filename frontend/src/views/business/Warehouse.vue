@@ -1440,14 +1440,17 @@ const handleImport = async () => {
 }
 
 const downloadTemplate = async () => {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const headers = ['物品名称', '型号', '编号', '类型', '数量', '货位', '单位', '预警值']
-  const example = ['点胶治具', 'PD10/TK1080', 'JIG-001', '治具', 10, 'A01-1-2', '个', 2]
-  const ws = XLSX.utils.aoa_to_sheet([headers, example])
-  ws['!cols'] = headers.map(() => ({ wch: 16 }))
-  XLSX.utils.book_append_sheet(wb, ws, '物品模板')
-  XLSX.writeFile(wb, '物品导入模板.xlsx')
+  try {
+    const blob = await warehouseApi.downloadTemplate()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = '物品导入模板.xlsx'
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    toast.error('下载模板失败')
+  }
 }
 
 // ---------------- 借出 / 归还 / 领用 / 补货 / 维修 ----------------

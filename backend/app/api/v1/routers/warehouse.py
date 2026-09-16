@@ -1,7 +1,9 @@
 """库房管理路由：治具借还 + 耗材领用/补货。"""
 from io import BytesIO
 from typing import Optional
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -39,6 +41,55 @@ def list_parts(
                                       low_stock=low_stock, stock_status=stock_status,
                                       sort_by=sort_by, sort_order=sort_order)
     return ApiResponse(data=PaginatedData(total=total, page=page, page_size=page_size, items=items))
+
+
+@router.get("/parts/template")
+def download_template():
+    """下载导入模板（.xlsx），表头带蓝色背景。"""
+    from openpyxl import Workbook
+    from openpyxl.styles import PatternFill, Font, Alignment, Side, Border
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "物品模板"
+    headers = ["物品名称", "型号", "编号", "类型", "数量", "货位", "单位", "预警值"]
+    # 表头样式：蓝色背景 + 白色粗体 + 居中 + 框线
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True, size=11)
+    header_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
+    for col_idx, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_align
+        cell.border = thin_border
+    # 示例行
+    ws.cell(row=2, column=1, value="点胶治具")
+    ws.cell(row=2, column=2, value="PD10/TK1080")
+    ws.cell(row=2, column=3, value="JIG-001")
+    ws.cell(row=2, column=4, value="治具")
+    ws.cell(row=2, column=5, value=10)
+    ws.cell(row=2, column=6, value="A01-1-2")
+    ws.cell(row=2, column=7, value="个")
+    ws.cell(row=2, column=8, value=2)
+    # 列宽
+    for col_idx in range(1, len(headers) + 1):
+        ws.column_dimensions[chr(64 + col_idx)].width = 20
+    # 表头行高
+    ws.row_dimensions[1].height = 28
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=template.xlsx; filename*=UTF-8''{quote('物品导入模板.xlsx')}"},
+    )
 
 
 @router.post("/parts/import")
