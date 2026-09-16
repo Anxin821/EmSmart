@@ -1296,7 +1296,7 @@ const loadData = async () => {
     }
     items.value = loaded
 
-    if (page.value === 1 && (activeTab.value === '治具' || activeTab.value === '耗材')) {
+    if (activeTab.value === '治具' || activeTab.value === '耗材') {
       items.value = [{ id: -1, _isFilter: true }, ...loaded]
     }
   } catch (e) {
