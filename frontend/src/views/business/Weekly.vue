@@ -3,10 +3,7 @@
     <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">📈</span>生产周报管理</h1>
       <CommonFilterBar v-model="filters" :fields="filterFields" @search="onSearch">
-        <template #actions="{ search, reset }">
-          <el-button type="primary" @click="search">
-            <el-icon><Search /></el-icon>搜索
-          </el-button>
+        <template #actions="{ reset }">
           <el-button @click="reset()">
             <el-icon><RefreshRight /></el-icon>重置
           </el-button>
@@ -18,7 +15,6 @@
     </div>
 
     <div class="page-content">
-    <!-- 改动①：表头加 textAlign: 'center' -->
     <el-table ref="tableRef" :data="tableData" stripe border height="100%" style="width: 100%;" empty-text="暂无数据"
       :header-cell-style="{ fontWeight: 600, textAlign: 'center' }">
 
@@ -34,7 +30,6 @@
 
       <el-table-column prop="qualified_count" label="合格数" min-width="110" align="center" />
 
-      <!-- 改动②：直通率按阈值分级，不再永远绿色 -->
       <el-table-column label="直通率" width="110" align="center">
         <template #default="{ row }">
           <span class="yield-badge" :class="yieldLevel(row.yield_rate)">
@@ -230,7 +225,7 @@ const formatTime = (v) => {
   }).replace(/\//g, '-')
 }
 
-// 改动②：直通率按阈值分级
+// 直通率按阈值分级
 // ≥90 绿（优秀） / 75~90 黄（警告） / <75 红（异常）
 const yieldLevel = (v) => {
   const n = Number(v) || 0
@@ -356,7 +351,7 @@ const showModal = (row = null) => {
   modalVisible.value = true
 }
 const handleSave = async () => {
-  // 改动③：保存前校验合格数 ≤ 总产量
+  // 保存前校验合格数 ≤ 总产量
   const total = Number(form.value.total_output) || 0
   const qualified = Number(form.value.qualified_count) || 0
   if (qualified > total) {
@@ -518,7 +513,7 @@ onBeforeUnmount(() => {
 .page { height: 100%; }
 .page-content { padding-bottom: 20px; }
 
-/* 改动②：直通率三档配色 */
+/* 直通率三档配色 */
 .yield-badge {
   display: inline-block;
   padding: 2px 10px;
