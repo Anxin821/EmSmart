@@ -18,7 +18,9 @@
     </div>
 
     <div class="page-content">
-    <el-table ref="tableRef" :data="tableData" stripe border height="100%" style="width: 100%;" empty-text="暂无数据">
+    <!-- 改动①：表头加 textAlign: 'center' -->
+    <el-table ref="tableRef" :data="tableData" stripe border height="100%" style="width: 100%;" empty-text="暂无数据"
+      :header-cell-style="{ fontWeight: 600, textAlign: 'center' }">
 
       <el-table-column prop="year" label="年" width="80" align="center" />
 
@@ -32,9 +34,10 @@
 
       <el-table-column prop="qualified_count" label="合格数" min-width="110" align="center" />
 
-      <el-table-column label="直通率" width="100" align="center">
+      <!-- 改动②：直通率按阈值分级，不再永远绿色 -->
+      <el-table-column label="直通率" width="110" align="center">
         <template #default="{ row }">
-          <span class="badge" style="background: var(--ok-bg); color: var(--ok); padding: 2px 10px; border-radius: 12px;">
+          <span class="yield-badge" :class="yieldLevel(row.yield_rate)">
             {{ row.yield_rate }}%
           </span>
         </template>
@@ -112,6 +115,7 @@
         </div>
       </template>
     </CommonModal>
+
     <CommonModal
       v-model:visible="modalVisible"
       :title="editingId ? '编辑周报' : '录入周报'"
@@ -136,7 +140,7 @@
         </div>
         <div class="col-4">
           <label class="small form-label">项目</label>
-          <el-select v-model="form.project" placeholder="请选择项目" style="width:100%">
+          <el-select v-model="form.project" placeholder="请选择项目" style="width:100%" filterable>
             <el-option v-for="p in projects" :key="p.project_code" :label="p.project_name" :value="p.project_code" />
           </el-select>
         </div>
@@ -146,7 +150,7 @@
         </div>
         <div class="col-4">
           <label class="small form-label">合格数</label>
-          <el-input-number v-model="form.qualified_count" :min="0" controls-position="right" style="width:100%" />
+          <el-input-number v-model="form.qualified_count" :min="0" :max="form.total_output || 99999999" controls-position="right" style="width:100%" />
         </div>
       </div>
       <template #footer="f">
@@ -195,6 +199,7 @@
     </CommonModal>
   </div>
 </template>
+
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { productionApi, optionsApi, projectsApi } from '@/api'
@@ -205,8 +210,10 @@ import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
+
 const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
+
 // 录入时间：后端返回北京时间 naive 字符串（无 Z/无偏移）。new Date 按本地解析、
 // toLocaleString 按本地显示，两者抵消 → 页面恒回显同一北京墙钟，无需换算
 const formatTime = (v) => {
@@ -222,6 +229,16 @@ const formatTime = (v) => {
     hour12: false
   }).replace(/\//g, '-')
 }
+
+// 改动②：直通率按阈值分级
+// ≥90 绿（优秀） / 75~90 黄（警告） / <75 红（异常）
+const yieldLevel = (v) => {
+  const n = Number(v) || 0
+  if (n >= 90) return 'yield-ok'
+  if (n >= 75) return 'yield-warn'
+  return 'yield-bad'
+}
+
 const tableRef = ref(null)
 const tableData = ref([])
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线']
@@ -252,14 +269,12 @@ const uploadRef = ref(null)
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
-// 年/周改为下拉：值是有限集合，下拉可杜绝非法输入、点选即筛选，与产线风格统一
-// 选项降序排列：「全部」在首位，其后最大（最新）的年/周排在最上面
+
 const currentYear = new Date().getFullYear()
 const yearOptions = [
   { label: '全部', value: '' },
   ...Array.from({ length: 6 }, (_, i) => String(currentYear - i)).map(y => ({ label: y, value: y }))
 ]
-// 周上限跟随“当前数据最大的周”：列表按 year DESC、week_number DESC 排序，取第一条即该范围最大周
 const maxWeek = ref(53)
 const weekOptions = computed(() => [
   { label: '全部', value: '' },
@@ -274,7 +289,7 @@ const filterFields = computed(() => [
     options: [{ label: '全部', value: '' }, ...projectOptions.value] }
 ])
 const projectOptions = computed(() => normalizeProjects(projects.value).map(p => ({ label: p.project_name, value: p.project_code })))
-// 拉取当前范围（按所选年份）的最大周，用于收敛周下拉选项
+
 const loadMaxWeek = async () => {
   try {
     const params = { page: 1, page_size: 1 }
@@ -282,7 +297,6 @@ const loadMaxWeek = async () => {
     const res = await productionApi.weekly(params)
     const first = res.data?.items?.[0]
     maxWeek.value = first?.week_number ? Number(first.week_number) : 53
-    // 若已选周超出新的上限，重置为“全部”避免出现无效筛选
     if (filters.value.week && Number(filters.value.week) > maxWeek.value) filters.value.week = ''
   } catch (e) {
     console.error(e)
@@ -311,7 +325,6 @@ const resetFilters = () => {
   page.value = 1
   loadData()
 }
-// 搜索/筛选：先回到第 1 页再加载，避免停留在旧页码导致“筛选不生效”（筛选后结果变少，旧页码往往为空）
 const onSearch = () => {
   page.value = 1
   loadData()
@@ -322,11 +335,10 @@ const loadData = async () => {
     if (filters.value.year) params.year = filters.value.year
     if (filters.value.week) params.week = filters.value.week
     if (filters.value.line) params.production_line = filters.value.line
-      if (filters.value.project) params.project = filters.value.project
-      const res = await productionApi.weekly(params)
+    if (filters.value.project) params.project = filters.value.project
+    const res = await productionApi.weekly(params)
     tableData.value = res.data?.items || []
     total.value = res.data?.total || 0
-    // 带 height=100% + fixed="right" 的表格不会自动重算，数据变化后需 doLayout 避免固定“操作”列错位/滑动。
     await nextTick()
     tableRef.value?.doLayout()
   } catch (e) {
@@ -344,6 +356,13 @@ const showModal = (row = null) => {
   modalVisible.value = true
 }
 const handleSave = async () => {
+  // 改动③：保存前校验合格数 ≤ 总产量
+  const total = Number(form.value.total_output) || 0
+  const qualified = Number(form.value.qualified_count) || 0
+  if (qualified > total) {
+    toast.error('合格数不能大于总产量')
+    return
+  }
   saving.value = true
   try {
     if (editingId.value) {
@@ -397,7 +416,7 @@ const handleImport = async () => {
     importing.value = false
   }
 }
-// ---------- 项目管理（原月报页迁移） ----------
+// ---------- 项目管理 ----------
 const projectManagerVisible = ref(false)
 const projectManagerLoading = ref(false)
 const projectManagerItems = ref([])
@@ -477,9 +496,7 @@ const deleteProjectRow = async (row) => {
 watch([page, pageSize], () => {
   loadData()
 })
-// 年份变化时重新计算“当前数据最大的周”，收敛周下拉选项上限
 watch(() => filters.value.year, () => { loadMaxWeek() })
-// 窗口尺寸变化时重算表格布局，避免固定列与主体错位
 const handleResize = () => tableRef.value?.doLayout()
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
@@ -500,6 +517,21 @@ onBeforeUnmount(() => {
 /* .page 精确撑满父容器 .content，底部为 position:fixed 分页条预留空间 */
 .page { height: 100%; }
 .page-content { padding-bottom: 20px; }
+
+/* 改动②：直通率三档配色 */
+.yield-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 12.5px;
+  min-width: 60px;
+  text-align: center;
+}
+.yield-ok   { background: var(--ok-bg);  color: var(--ok); }
+.yield-warn { background: #FEF3C7;       color: #92400E; }
+.yield-bad  { background: var(--err-bg); color: var(--err); }
+
 /* 项目管理弹窗：表格填满弹窗、底部按钮条紧贴表格 */
 .project-manager-wrap {
   width: 100%;
