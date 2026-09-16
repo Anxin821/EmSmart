@@ -175,7 +175,7 @@
               <div class="wh-kpi-card" style="--accent: #2563EB">
                 <div class="wh-kpi-label">外借回收率</div>
                 <div class="wh-kpi-value">{{ sd.return_rate }}%</div>
-                <div class="wh-kpi-sub">归还/借出</div>
+                <div class="wh-kpi-sub">已归还/总借出</div>
               </div>
               <div class="wh-kpi-card" style="--accent: #7C3AED">
                 <div class="wh-kpi-label">库存达标率</div>
@@ -376,9 +376,10 @@
                           <el-dropdown-menu>
                             <el-dropdown-item command="">全部</el-dropdown-item>
                             <el-dropdown-item command="在库">在库</el-dropdown-item>
-                            <el-dropdown-item command="已借出">已借出</el-dropdown-item>
-                            <el-dropdown-item command="部分借出">部分借出</el-dropdown-item>
-                            <el-dropdown-item command="维修中">维修中</el-dropdown-item>
+                            <el-dropdown-item command="借出">借出</el-dropdown-item>
+                            <el-dropdown-item command="维修">维修</el-dropdown-item>
+                            <el-dropdown-item command="报损">报损</el-dropdown-item>
+                            <el-dropdown-item command="报失">报失</el-dropdown-item>
                           </el-dropdown-menu>
                         </template>
                       </el-dropdown>
@@ -390,8 +391,11 @@
                           <el-dropdown-menu>
                             <el-dropdown-item command="">全部</el-dropdown-item>
                             <el-dropdown-item command="正常">正常</el-dropdown-item>
-                            <el-dropdown-item command="低于预警">低于预警</el-dropdown-item>
+                            <el-dropdown-item command="预警">预警</el-dropdown-item>
                             <el-dropdown-item command="缺货">缺货</el-dropdown-item>
+                            <el-dropdown-item command="维修">维修</el-dropdown-item>
+                            <el-dropdown-item command="报损">报损</el-dropdown-item>
+                            <el-dropdown-item command="报失">报失</el-dropdown-item>
                           </el-dropdown-menu>
                         </template>
                       </el-dropdown>
@@ -427,10 +431,10 @@
                             <el-dropdown-menu>
                               <el-dropdown-item command="restock">补货</el-dropdown-item>
                               <el-dropdown-item v-if="row.part_type === '治具' && row.repair_qty > 0" command="finish_repair">维修完成</el-dropdown-item>
-                              <el-dropdown-item v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')" command="loss">报失</el-dropdown-item>
-                              <el-dropdown-item v-if="row.part_type === '治具' && (row.status === '已借出' || row.status === '部分借出')" command="damaged">报损</el-dropdown-item>
-                              <el-dropdown-item v-if="row.part_type === '治具' && row.status === '已借出'" command="found_back">已找回</el-dropdown-item>
-                              <el-dropdown-item v-if="row.part_type === '治具' && row.status === '已借出'" command="repair_damaged">已修复</el-dropdown-item>
+                              <el-dropdown-item v-if="row.part_type === '治具' && row.status === '借出'" command="loss">报失</el-dropdown-item>
+                              <el-dropdown-item v-if="row.part_type === '治具' && row.status === '借出'" command="damaged">报损</el-dropdown-item>
+                              <el-dropdown-item v-if="row.part_type === '治具' && row.status === '借出'" command="found_back">已找回</el-dropdown-item>
+                              <el-dropdown-item v-if="row.part_type === '治具' && row.status === '借出'" command="repair_damaged">已修复</el-dropdown-item>
                               <el-dropdown-item command="edit">编辑</el-dropdown-item>
                               <el-dropdown-item v-if="userStore.isAdmin || (userStore.user?.full_name === '秦江蓉' && userStore.isEngineer)" command="delete" divided>删除</el-dropdown-item>
                             </el-dropdown-menu>
@@ -1172,9 +1176,9 @@ watch([txFilterType, txFilterPart, txFilterOperator, txFilterRemark,
 
 const statusTagType = (row) => {
   if (row.part_type === '治具') {
-    return { '在库': 'success', '已借出': 'danger', '部分借出': 'warning', '维修中': 'info' }[row.status] || 'info'
+    return { '在库': 'success', '借出': 'warning', '维修': 'info', '报损': 'danger', '报失': 'danger' }[row.status] || 'info'
   }
-  return { '正常': 'success', '低于预警': 'warning', '缺货': 'danger' }[row.status] || 'info'
+  return { '正常': 'success', '预警': 'warning', '缺货': 'danger', '维修': 'info', '报损': 'danger', '报失': 'danger' }[row.status] || 'info'
 }
 const txTagType = (t) => ({ '借出': 'primary', '归还': 'success', '领用': 'primary', '补货': 'success', '维修': 'info', '丢失': 'danger', '损坏': 'danger' }[t] || 'info')
 

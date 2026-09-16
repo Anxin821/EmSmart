@@ -20,25 +20,57 @@ CONSUMABLE = "耗材"
 
 
 # ---------------- 序列化 ----------------
-def _part_to_dict(p: WarehousePart) -> Dict[str, Any]:
+def _get_troubled_status_map(db: Session, part_ids: List[int]) -> Dict[int, Optional[str]]:
+    """批量查询物品的异常状态（报失 > 报损 > 维修）。"""
+    if not part_ids:
+        return {}
+    result: Dict[int, str] = {}
+    # 治具：BorrowRecord 状态
+    brs = db.query(BorrowRecord).filter(
+        BorrowRecord.part_id.in_(part_ids),
+        BorrowRecord.status.in_(["丢失", "损坏"])
+    ).all()
+    for r in brs:
+        if r.part_id not in result:
+            result[r.part_id] = "报失" if r.status == "丢失" else "报损"
+        elif r.status == "丢失":
+            result[r.part_id] = "报失"
+    # 耗材：PartTransaction 中未归还的异常记录
+    txs = db.query(PartTransaction).filter(
+        PartTransaction.part_id.in_(part_ids),
+        PartTransaction.tx_type.in_(["丢失", "损坏", "维修"]),
+        PartTransaction.return_time.is_(None)
+    ).all()
+    for t in txs:
+        m = {"丢失": "报失", "损坏": "报损", "维修": "维修"}
+        st = m[t.tx_type]
+        if t.part_id not in result:
+            result[t.part_id] = st
+        elif st == "报失" or (st == "报损" and result[t.part_id] != "报失"):
+            result[t.part_id] = st
+    return result
+
+
+def _part_to_dict(p: WarehousePart, troubled_status: Optional[str] = None) -> Dict[str, Any]:
     if p.part_type == JIG:
-        if p.repair_qty and p.repair_qty > 0:
-            status = "维修中"
-        elif p.available_qty >= p.total_qty:
-            status = "在库"
-        elif p.available_qty <= 0:
-            status = "已借出"
+        if troubled_status:
+            status = troubled_status
+        elif p.repair_qty and p.repair_qty > 0:
+            status = "维修"
+        elif p.available_qty < p.total_qty:
+            status = "借出"
         else:
-            # 部分借出：仍有可用余量，应允许继续借出
-            status = "部分借出"
+            status = "在库"
         qty_text = f"{p.available_qty}/{p.total_qty}"
         stock_qty = p.total_qty
     else:
         stock_qty = p.total_qty
-        if stock_qty <= 0:
+        if troubled_status:
+            status = troubled_status
+        elif stock_qty <= 0:
             status = "缺货"
         elif p.warn_qty and stock_qty <= p.warn_qty:
-            status = "低于预警"
+            status = "预警"
         else:
             status = "正常"
         qty_text = f"{stock_qty} {p.unit or ''}".strip()
@@ -165,7 +197,9 @@ def list_parts(db: Session, page: int = 1, page_size: int = 20,
     else:
         items = (q.order_by(WarehousePart.part_type.asc(), WarehousePart.id.desc())
                   .offset((page - 1) * page_size).limit(page_size).all())
-    return [_part_to_dict(p) for p in items], total
+    # 批量预加载异常状态（报失/报损/维修）
+    troubled_map = _get_troubled_status_map(db, [p.id for p in items]) if items else {}
+    return [_part_to_dict(p, troubled_map.get(p.id)) for p in items], total
 
 
 def get_stats(db: Session, part_type: Optional[str] = None) -> Dict[str, Any]:
@@ -181,24 +215,28 @@ def get_stats(db: Session, part_type: Optional[str] = None) -> Dict[str, Any]:
     low_items: List[dict] = []
     repair_items: List[dict] = []
 
+    # 批量预加载异常状态
+    troubled_map = _get_troubled_status_map(db, [p.id for p in parts]) if parts else {}
+
     for p in parts:
-        d = _part_to_dict(p)
+        d = _part_to_dict(p, troubled_map.get(p.id))
+        status = d["status"]
         if p.part_type == JIG:
-            if (p.repair_qty and p.repair_qty > 0) or d["status"] in ("已借出", "部分借出"):
+            if status in ("借出", "维修", "报损", "报失"):
                 borrowed_out += 1
             else:
                 in_stock += 1
             if p.repair_qty and p.repair_qty > 0:
                 repair_items.append(d)
         else:
-            if p.total_qty <= 0:
+            if status in ("缺货", "报损", "报失", "维修"):
                 borrowed_out += 1
             else:
                 in_stock += 1
             if p.warn_qty and p.total_qty <= p.warn_qty:
                 low_items.append(d)
 
-    # 丢失/损坏：从BorrowRecord获取（active = 未归还）
+    # 丢失/损坏：从BorrowRecord获取
     lost_rows = db.query(BorrowRecord).filter(
         BorrowRecord.status == "丢失"
     ).all()
@@ -206,10 +244,10 @@ def get_stats(db: Session, part_type: Optional[str] = None) -> Dict[str, Any]:
         BorrowRecord.status == "损坏"
     ).all()
 
-    # 组装丢失/损坏的物品信息
+    # 组装丢失/损坏的物品信息（使用带异常状态的 dict）
     lost_items = []
     damaged_items = []
-    part_map = {p.id: _part_to_dict(p) for p in parts}
+    part_map = {p.id: _part_to_dict(p, troubled_map.get(p.id)) for p in parts}
     for br in lost_rows:
         info = part_map.get(br.part_id)
         if info:
@@ -227,9 +265,17 @@ def get_stats(db: Session, part_type: Optional[str] = None) -> Dict[str, Any]:
                 "borrow_record_id": br.id,
             })
 
-    # 外借回收率 = 归还transaction数 / 借出transaction数
-    borrow_tx = db.query(PartTransaction).filter(PartTransaction.tx_type == "借出").count()
-    return_tx = db.query(PartTransaction).filter(PartTransaction.tx_type == "归还").count()
+    # 外借回收率 = 已归还记录数 / 总借出记录数（仅统计治具）
+    jig_ids = [p.id for p in parts if p.part_type == JIG]
+    if jig_ids:
+        total_borrowed = db.query(BorrowRecord).filter(BorrowRecord.part_id.in_(jig_ids)).count()
+        total_returned = db.query(BorrowRecord).filter(
+            BorrowRecord.part_id.in_(jig_ids),
+            BorrowRecord.status == "已归还"
+        ).count()
+        return_rate = round(total_returned / total_borrowed * 100, 1) if total_borrowed > 0 else 100.0
+    else:
+        return_rate = 100.0
 
     repair_count = len(repair_items)
     lost_count = len(lost_items)
@@ -240,7 +286,6 @@ def get_stats(db: Session, part_type: Optional[str] = None) -> Dict[str, Any]:
     damaged_part_ids = set(br.part_id for br in damaged_rows)
     bad_parts = lost_part_ids | damaged_part_ids
     good_rate = round((total - len(bad_parts)) / total * 100, 1) if total > 0 else 100.0
-    return_rate = round(return_tx / borrow_tx * 100, 1) if borrow_tx > 0 else 100.0
     stock_rate = round((total - len(low_items)) / total * 100, 1) if total > 0 else 100.0
     pending_total = len(low_items) + repair_count + lost_count + damaged_count
 
@@ -271,6 +316,7 @@ def get_detail(db: Session, part_id: int) -> Optional[dict]:
              .filter(PartTransaction.part_id == part_id)
              .order_by(PartTransaction.id.desc()).limit(5).all())
     # 治具：附带当前未归还的借出记录
+    troubled_map = _get_troubled_status_map(db, [p.id])
     borrows = []
     if p.part_type == JIG:
         active = (db.query(BorrowRecord)
@@ -279,7 +325,7 @@ def get_detail(db: Session, part_id: int) -> Optional[dict]:
                     .order_by(BorrowRecord.id.desc()).all())
         borrows = [_borrow_to_dict(r) for r in active]
     return {
-        "part": _part_to_dict(p),
+        "part": _part_to_dict(p, troubled_map.get(p.id)),
         "transactions": [_tx_to_dict(t) for t in txs],
         "borrow_records": borrows,
     }
