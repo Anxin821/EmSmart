@@ -461,11 +461,27 @@
   modal-class="cart-modal">
       <div class="cd-wrap">
         <div class="cd-mode-bar">
-          <el-radio-group v-model="scanMode">
-            <el-radio-button label="borrow">借领</el-radio-button>
-            <el-radio-button label="return">归还</el-radio-button>
-          </el-radio-group>
-        </div>
+  <div class="cd-mode-switch">
+    <button
+      type="button"
+      class="cd-mode-btn cd-mode-borrow"
+      :class="{ active: scanMode === 'borrow' }"
+      @click="scanMode = 'borrow'"
+    >
+      <span class="bi bi-box-arrow-up-right"></span>
+      <span class="cd-mode-label">借领</span>
+    </button>
+    <button
+      type="button"
+      class="cd-mode-btn cd-mode-return"
+      :class="{ active: scanMode === 'return' }"
+      @click="scanMode = 'return'"
+    >
+      <span class="bi bi-box-arrow-in-down"></span>
+      <span class="cd-mode-label">归还</span>
+    </button>
+  </div>
+</div>
 
         <div class="cd-scan-bar">
           <el-input
@@ -523,47 +539,50 @@
         </div>
 
         <footer class="cd-footer">
-          <div class="cd-form-row" v-if="scanMode !== 'return'">
-            <el-select v-model="scanForm.operator" filterable allow-create clearable
-              placeholder="借领人姓名" style="width:160px;">
-              <el-option v-for="o in operatorOptions" :key="o" :label="o" :value="o">
-                <div class="mem-option">
-                  <span>{{ o }}</span>
-                  <el-button text size="small" class="mem-del-btn" @click.stop="deleteOperator(o)">
-                    <el-icon><Close /></el-icon>
-                  </el-button>
-                </div>
-              </el-option>
-            </el-select>
-            <el-select v-model="scanForm.department_manager" filterable allow-create clearable
-              placeholder="部门负责人" style="width:160px;">
-              <el-option v-for="d in departmentManagerOptions" :key="d" :label="d" :value="d">
-                <div class="mem-option">
-                  <span>{{ d }}</span>
-                  <el-button text size="small" class="mem-del-btn" @click.stop="deleteDepartmentManager(d)">
-                    <el-icon><Close /></el-icon>
-                  </el-button>
-                </div>
-              </el-option>
-            </el-select>
-            <el-select v-model="scanForm.line" clearable placeholder="线体" style="width:110px;">
-              <el-option v-for="l in lines" :key="l" :label="l" :value="l" />
-            </el-select>
-          </div>
-          <div v-else class="cd-return-hint">
-            <el-icon><InfoFilled /></el-icon>
-            <span>请在上方物品行中点击选中要归还的记录</span>
-          </div>
-          <el-input v-model="scanForm.remark" placeholder="备注" maxlength="255" />
-          <div class="cd-submit-row">
-            <el-button text type="danger" :disabled="!cartItems.length" @click="clearCart">清空</el-button>
-            <el-button type="primary" size="large" :loading="scanSubmitting"
-              :disabled="!cartItems.length" @click="submitBatch">
-              <el-icon><Check /></el-icon>
-              提交（{{ cartTotalQty }} 件）
-            </el-button>
-          </div>
-        </footer>
+  <!-- 第一行：借领人 / 部门负责人 / 线体（等宽平分） -->
+  <div class="cd-form-row" v-if="scanMode !== 'return'">
+    <el-select v-model="scanForm.operator" filterable allow-create clearable
+      placeholder="借领人姓名" class="cd-field">
+      <el-option v-for="o in operatorOptions" :key="o" :label="o" :value="o">
+        <div class="mem-option">
+          <span>{{ o }}</span>
+          <el-button text size="small" class="mem-del-btn" @click.stop="deleteOperator(o)">
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </div>
+      </el-option>
+    </el-select>
+    <el-select v-model="scanForm.department_manager" filterable allow-create clearable
+      placeholder="部门负责人" class="cd-field">
+      <el-option v-for="d in departmentManagerOptions" :key="d" :label="d" :value="d">
+        <div class="mem-option">
+          <span>{{ d }}</span>
+          <el-button text size="small" class="mem-del-btn" @click.stop="deleteDepartmentManager(d)">
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </div>
+      </el-option>
+    </el-select>
+    <el-select v-model="scanForm.line" clearable placeholder="线体" class="cd-field">
+      <el-option v-for="l in lines" :key="l" :label="l" :value="l" />
+    </el-select>
+  </div>
+  <div v-else class="cd-return-hint">
+    <el-icon><InfoFilled /></el-icon>
+    <span>请在上方物品行中点击选中要归还的记录</span>
+  </div>
+
+  <!-- 第二行：备注 + 清空 + 提交 -->
+  <div class="cd-submit-row">
+    <el-input v-model="scanForm.remark" placeholder="备注（选填）" maxlength="255" class="cd-remark-input" />
+    <el-button text type="danger" :disabled="!cartItems.length" @click="clearCart">清空</el-button>
+    <el-button type="primary" size="large" :loading="scanSubmitting"
+      :disabled="!cartItems.length" @click="submitBatch">
+      <el-icon><Check /></el-icon>
+      提交（{{ cartTotalQty }} 件）
+    </el-button>
+  </div>
+</footer>
       </div>
     </el-dialog>
 
@@ -964,8 +983,8 @@ const userStore = useUserStore()
 const { toast, confirmDelete } = useNotify()
 
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线', '9线', '工程', '品质', '维修', '解析']
-const operatorOptions = ref([])          // 历史借/领用人列表
-const departmentManagerOptions = ref([]) // 历史部门负责人列表
+const operatorOptions = ref([])
+const departmentManagerOptions = ref([])
 const HIDDEN_OP_KEY = 'wh_hidden_operators'
 const HIDDEN_DM_KEY = 'wh_hidden_department_managers'
 const loadOperators = async () => {
@@ -1001,9 +1020,8 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
-const borrowKeyword = ref('')   // 顶部搜索，仅用于借领/归还
+const borrowKeyword = ref('')
 const activeTab = ref('首页')
-
 
 // 治具 Tab 筛选
 const jigFilterName = ref('')
@@ -1030,51 +1048,45 @@ const resetConsFilters = () => {
   page.value = 1; loadData()
 }
 
-// 出入库记录（右侧常驻表格）
+// 出入库记录
 const txRecords = ref([])
 const txPage = ref(1)
 const txPageSize = ref(20)
 const txTotal = ref(0)
 const txLoading = ref(false)
-// 筛选条件（前端本地筛选当前页数据）
-const txFilterTimeRange = ref(null)          // [start, end] Date 数组
+const txFilterTimeRange = ref(null)
 const txFilterType = ref('')
 const txFilterPart = ref('')
 const txFilterOperator = ref('')
 const txFilterRemark = ref('')
 const txFilterDepartmentManager = ref('')
 const txFilterLine = ref('')
-const txFilterBorrowDate = ref(null)         // Date 对象
-const txFilterReturnDate = ref(null)         // Date 对象
-const txSortOrder = ref('')                  // '' / 'asc' / 'desc'
+const txFilterBorrowDate = ref(null)
+const txFilterReturnDate = ref(null)
+const txSortOrder = ref('')
 
 // 治具/耗材排序状态
-const jigSortTotal = ref('')       // '' / 'asc' / 'desc'
+const jigSortTotal = ref('')
 const jigSortAvailable = ref('')
 const consSortStock = ref('')
 const consSortWarn = ref('')
 
-// 筛选后的记录（仅保留后端不支持的客户端筛选：操作时间 / 归还虚拟类型）
 const filteredTxRecords = computed(() => {
   const filtered = txRecords.value.filter(r => {
-    // 日期范围筛选
     if (txFilterTimeRange.value) {
       const [d0, d1] = txFilterTimeRange.value
       const t = new Date(r.created_at)
-      if (!d0 || !d1) return true // partial range = no filter
-      d1.setHours(23, 59, 59, 999) // 包含结束日期全天
+      if (!d0 || !d1) return true
+      d1.setHours(23, 59, 59, 999)
       if (t < d0 || t > d1) return false
     }
     if (txFilterType.value === '归还') {
-      // 归还 = 匹配 tx_type='归还' 或 借出/领用且有归还时间
       if (r.tx_type === '归还') return true
       if ((r.tx_type === '借出' || r.tx_type === '领用') && r.return_time) return true
       return false
     }
-    // txFilterType / txFilterPart / txFilterOperator 已由后端处理，前端不再重复过滤
     return true
   })
-  // 在表头与数据之间插入筛选行
   return [{ id: -1, _isFilter: true }, ...filtered]
 })
 
@@ -1095,16 +1107,13 @@ const loadTxData = async () => {
   txLoading.value = true
   try {
     const params = { page: txPage.value, page_size: txPageSize.value }
-    // 将前端筛选条件发给后端，保证分页 total 与筛选结果一致
     if (txFilterType.value) {
       if (txFilterType.value === '归还') {
-        // "归还"是前端组合类型（含 归还 及 归还的借出/领用），后端只传"归还"
         params.tx_type = '归还'
       } else {
         params.tx_type = txFilterType.value
       }
     }
-    // 构造 keyword 支持物品名+借/领人+备注+部门负责人+线体同时搜索
     const kwParts = []
     if (txFilterPart.value?.trim()) kwParts.push(txFilterPart.value.trim())
     if (txFilterOperator.value?.trim()) kwParts.push(txFilterOperator.value.trim())
@@ -1112,7 +1121,6 @@ const loadTxData = async () => {
     if (txFilterDepartmentManager.value?.trim()) kwParts.push(txFilterDepartmentManager.value.trim())
     if (txFilterLine.value?.trim()) kwParts.push(txFilterLine.value.trim())
     if (kwParts.length) params.keyword = kwParts.join(' ')
-    // 日期筛选作为单独参数传给后端
     if (txFilterBorrowDate.value) {
       const d = txFilterBorrowDate.value
       params.borrow_date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
@@ -1121,7 +1129,6 @@ const loadTxData = async () => {
       const d = txFilterReturnDate.value
       params.return_date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
     }
-    // 数量排序
     if (txSortOrder.value) {
       params.sort_by = 'qty'
       params.sort_order = txSortOrder.value
@@ -1139,7 +1146,6 @@ const loadTxData = async () => {
 }
 
 const toggleTxSort = (cur) => {
-  // 单箭头循环：'' → 'asc' → 'desc' → ''
   if (!cur) { txSortOrder.value = 'asc' }
   else if (cur === 'asc') { txSortOrder.value = 'desc' }
   else { txSortOrder.value = '' }
@@ -1147,7 +1153,6 @@ const toggleTxSort = (cur) => {
   loadTxData()
 }
 
-// 治具/耗材通用排序切换（单箭头循环）
 const togglePartSort = (refName) => {
   const cur = eval(refName).value
   if (!cur) { eval(refName).value = 'asc' }
@@ -1173,7 +1178,7 @@ const statusTagType = (row) => {
 }
 const txTagType = (t) => ({ '借出': 'primary', '归还': 'success', '领用': 'primary', '补货': 'success', '维修': 'info', '丢失': 'danger', '损坏': 'danger' }[t] || 'info')
 
-// ---------------- 看板统计（首页Tab） ----------------
+// ---------------- 看板统计 ----------------
 const sd = ref({
   total: 0, in_stock: 0, borrowed_out: 0,
   repair_count: 0, lost_count: 0, damaged_count: 0,
@@ -1197,7 +1202,6 @@ const loadStats = async () => {
   } catch (e) { console.error(e) }
 }
 
-// ── 看板定时轮询（每15秒自动刷新） ──
 const STATS_POLL_INTERVAL = 15000
 const statsTimer = ref(null)
 const startStatsPolling = () => {
@@ -1214,14 +1218,12 @@ const stopStatsPolling = () => {
 }
 
 const loadData = async () => {
-  // 出入库记录 tab 不加载物品列表
   if (activeTab.value === '出入库记录') { items.value = []; total.value = 0; return }
   loading.value = true
   try {
     const params = { page: page.value, page_size: pageSize.value }
     if (activeTab.value !== '首页') params.part_type = activeTab.value
 
-    // 组合 tab 筛选条件为 keyword（后端搜索 name/model/location 等）
     let kw = ''
     if (activeTab.value === '治具') {
       const parts = [jigFilterName.value, jigFilterModel.value, jigFilterCode.value, jigFilterLocation.value]
@@ -1233,7 +1235,6 @@ const loadData = async () => {
     }
     if (kw) params.keyword = kw
 
-    // 治具/耗材排序
     const sortFieldMap = {
       jigSortTotal: 'total_qty', jigSortAvailable: 'available_qty',
       consSortStock: 'stock_qty', consSortWarn: 'warn_qty',
@@ -1247,7 +1248,6 @@ const loadData = async () => {
     let loaded = res.data?.items || []
     total.value = res.data?.total || 0
 
-    // 客户端状态筛选（状态由后端计算，不在 keyword 搜索范围）
     if (activeTab.value === '治具' && jigFilterStatus.value) {
       loaded = loaded.filter(i => i.status === jigFilterStatus.value)
     } else if (activeTab.value === '耗材' && consFilterStatus.value) {
@@ -1255,7 +1255,6 @@ const loadData = async () => {
     }
     items.value = loaded
 
-    // 治具/耗材 Tab：在表头与数据之间插入筛选行（仅 page 1）
     if (page.value === 1 && (activeTab.value === '治具' || activeTab.value === '耗材')) {
       items.value = [{ id: -1, _isFilter: true }, ...loaded]
     }
@@ -1272,7 +1271,6 @@ const refreshAll = () => {
   loadData(); loadStats(); loadTxData()
 }
 
-// 此 search 按钮已移除（顶部搜索改为 borrowKeyword），保留空函数避免引用报错
 const onSearch = () => {}
 
 const onTabChange = () => {
@@ -1359,7 +1357,6 @@ const handleDelete = async (row) => {
   }
 }
 
-/** 格式化时间用于展示，只显示月-日 时:分 */
 const formatTime = (t) => {
   if (!t) return ''
   const d = new Date(t)
@@ -1432,7 +1429,6 @@ const consumeForm = reactive({ operator: '', department_manager: '', line: '', q
 const restockForm = reactive({ qty: 1, remark: '' })
 const finishRepairForm = reactive({ qty: 1, remark: '' })
 
-// 借出记录列表（归还弹框用）
 const borrowRecords = ref([])
 const borrowRecordsLoading = ref(false)
 
@@ -1468,8 +1464,6 @@ const openDamaged = (row) => {
 }
 
 const openFinishRepair = (row) => {
-  // row 可能是物品数据（从列表/更多操作）或借出记录（从归还弹框）
-  // 如果 row 有 repair_qty 则是完整物品，设为 actionRow
   if (row && typeof row.repair_qty === 'number') {
     actionRow.value = row
   }
@@ -1519,10 +1513,8 @@ const submitReturn = async (record) => {
     await warehouseApi.returnBack(actionRow.value.id, payload)
     toast.success('归还成功')
     removeFromCart(actionRow.value.id)
-    // 刷新借出记录列表和物品状态
     await loadBorrowRecords()
     refreshAll()
-    // 如果没有更多借出记录，关闭弹框
     if (!borrowRecords.value.length) {
       returnDialog.value = false
     }
@@ -1598,9 +1590,7 @@ const submitFoundBack = async (record) => {
       confirmButtonText: '确认', cancelButtonText: '取消', type: 'success',
     })
     actionLoading.value = true
-    // 看板首页调用：record.borrow_record_id 存在；借出记录弹框调用：record.id = borrow_record_id
     const borrowRecordId = record.borrow_record_id || record.id
-    // 看板首页调用：record.id = part_id；借出记录弹框调用：actionRow.value.id = part_id
     const partId = record.borrow_record_id ? record.id : actionRow.value?.id
     if (!partId) { toast.error('无法获取物品信息'); return }
     await warehouseApi.foundBack(partId, { borrow_record_id: borrowRecordId })
@@ -1625,9 +1615,7 @@ const submitRepairDamaged = async (record) => {
       confirmButtonText: '确认', cancelButtonText: '取消', type: 'success',
     })
     actionLoading.value = true
-    // 看板首页调用：record.borrow_record_id 存在；借出记录弹框调用：record.id = borrow_record_id
     const borrowRecordId = record.borrow_record_id || record.id
-    // 看板首页调用：record.id = part_id；借出记录弹框调用：actionRow.value.id = part_id
     const partId = record.borrow_record_id ? record.id : actionRow.value?.id
     if (!partId) { toast.error('无法获取物品信息'); return }
     await warehouseApi.repairDamaged(partId, { borrow_record_id: borrowRecordId })
@@ -1703,7 +1691,6 @@ const submitRemark = async () => {
     await warehouseApi.updateTxRemark(remarkRow.value.id, remarkEditing.value)
     toast.success('备注已更新')
     remarkRow.value.remark = remarkEditing.value
-    // 更新列表中的记录
     const idx = txRecords.value.findIndex(t => t.id === remarkRow.value.id)
     if (idx >= 0) txRecords.value[idx].remark = remarkEditing.value
     remarkDialog.value = false
@@ -1719,7 +1706,6 @@ const detailDialog = ref(false)
 const detail = ref(null)
 
 const openDetail = async (row) => {
-  // 选中文本时（复制操作）不弹详情
   const sel = window.getSelection()
   if (sel && sel.toString().trim()) return
   try {
@@ -1732,13 +1718,11 @@ const openDetail = async (row) => {
   }
 }
 
-// 筛选行：在 el-table 内作为第一行数据（位于表头与实际数据之间）
 const onTableRowClick = (row) => {
   if (row._isFilter) return
   showDetail(row)
 }
 
-// 筛选行固定跟随表头
 const tableRowClassName = ({ row }) => {
   return row._isFilter ? 'filter-row' : ''
 }
@@ -1762,11 +1746,11 @@ onUnmounted(() => {
 
 // ---------------- 扫码出入库弹框 ----------------
 const cartDialog = ref(false)
-const scanMode = ref('borrow')             // 'borrow' | 'return' | 'consume'
+const scanMode = ref('borrow')
 const scanKeyword = ref('')
 const scanLoading = ref(false)
 const scanInputRef = ref(null)
-const cartItems = ref([])                  // [{ id, name, model, part_type, qty, maxQty }]
+const cartItems = ref([])
 const scanSubmitting = ref(false)
 const scanForm = reactive({ operator: '', department_manager: '', line: '', remark: '' })
 
@@ -1792,12 +1776,10 @@ watch(activeTab, () => {
   cartItems.value = []
 })
 
-/** 顶部搜索：先搜索物品加入购物车，再打开弹框（避免弹框动画导致延迟） */
 const onBorrowSearch = async () => {
   const kw = borrowKeyword.value.trim()
   if (!kw) return
   borrowKeyword.value = ''
-  // 先搜索，直接加购物车，再开弹框
   const added = await doScanSearch(kw)
   if (added > 0) {
     if (!cartDialog.value) {
@@ -1812,7 +1794,6 @@ const openBorrowDialog = () => {
   nextTick(focusScanInput)
 }
 
-/** 执行搜索并添加物品到购物车，返回实际添加数量（归还模式下自动过滤无记录物品） */
 const doScanSearch = async (kw) => {
   scanLoading.value = true
   try {
@@ -1823,9 +1804,7 @@ const doScanSearch = async (kw) => {
       return 0
     }
 
-    // 筛选最终要添加的物品列表
     let targetItems = items
-    // 治具：输入型号时，只添加同型号的
     if (items.some(i => i.part_type === '治具')) {
       const model = items.find(i => i.model === kw)?.model
       if (model) {
@@ -1833,17 +1812,15 @@ const doScanSearch = async (kw) => {
       }
     }
 
-    // 加入购物车，每个默认 1 件
     let added = 0
     for (const item of targetItems) {
       addToCart(item, 1)
       added++
     }
     if (added > 0 && scanMode.value === 'return') {
-      // 归还模式：加载记录并自动过滤无借出物品
       await loadCartItemsRecords()
     }
-    return cartItems.value.length  // 返回实际留在购物车中的数量
+    return cartItems.value.length
   } catch (e) {
     console.error(e)
     toast.error('搜索失败')
@@ -1863,30 +1840,21 @@ const onScan = async () => {
   }
 }
 
-/**
- * 智能搜索最佳匹配物品：
- * - 耗材：按名称精确匹配，找不到则模糊搜索取第一条
- * - 治具：先按型号精确匹配，找不到再按名称精确/模糊匹配
- * - 始终只返回 1 条最佳结果
- */
 const findBestMatch = async (kw) => {
   const doSearch = async (params) => {
     const res = await warehouseApi.list({ ...params, keyword: kw, page: 1, page_size: 10 })
     return res.data?.items || []
   }
 
-  // 1. 精确名称匹配
   let items = await doSearch({})
   let exact = items.find(i => i.name === kw)
   if (exact) return exact
 
-  // 2. 对治具：尝试型号精确匹配
   if (items.some(i => i.part_type === '治具')) {
     const modelMatch = items.find(i => i.model === kw)
     if (modelMatch) return modelMatch
   }
 
-  // 3. 返回第一条有效结果
   const valid = items.filter(i => {
     if (scanMode.value === 'return') {
       return (i.total_qty || 0) - (i.available_qty || 0) > 0
@@ -1898,7 +1866,6 @@ const findBestMatch = async (kw) => {
   })
   if (valid.length) return valid[0]
 
-  // 4. 无有效结果，返回第一条（让 addToCart 提示库存不足）
   return items.length > 0 ? items[0] : null
 }
 
@@ -1907,18 +1874,16 @@ const addToCart = (item, forceQty) => {
   if (scanMode.value === 'return') {
     maxQty = (item.total_qty || 0) - (item.available_qty || 0)
   } else {
-    // 借领模式：治具=可借量，耗材=库存量
     if (item.part_type === '治具') {
       maxQty = (item.available_qty || 0) - (item.repair_qty || 0)
     } else {
       maxQty = item.stock_qty || item.total_qty || 0
     }
   }
-  // 批量添加模式（从 onScan 自动加入）：已存在则跳过，不重复
   if (forceQty !== undefined) {
     const existing = cartItems.value.find(c => c.id === item.id)
     if (existing) return
-    if (maxQty <= 0) return  // 无库存跳过
+    if (maxQty <= 0) return
     cartItems.value.push({ id: item.id, name: item.name, model: item.model, part_type: item.part_type, qty: forceQty, maxQty })
     return
   }
@@ -1946,8 +1911,6 @@ const changeQty = (item, delta) => {
 const removeFromCart = (id) => { cartItems.value = cartItems.value.filter(c => c.id !== id) }
 const clearCart = () => { cartItems.value = [] }
 
-/** 加载购物车中每件物品的活跃记录（归还模式用）
- *  自动移除没有借出记录的物品 */
 const loadCartItemsRecords = async () => {
   for (const item of cartItems.value) {
     if (item.activeRecords) continue
@@ -1959,7 +1922,6 @@ const loadCartItemsRecords = async () => {
         : (await warehouseApi.borrowRecords(item.id, true)).data) || []
       const field = isCon ? 'tx_type' : 'status'
       let active = records.filter(r => ['领用', '借出'].includes(r[field]))
-      // 统一字段名：治具借出记录用 borrower，耗食用 operator，统一成 operator 方便模板使用
       active = active.map(r => {
         if (!isCon && r.borrower !== undefined) {
           r.operator = r.borrower
@@ -1974,7 +1936,6 @@ const loadCartItemsRecords = async () => {
       item.loadingRecords = false
     }
   }
-  // 移除没有借出记录的物品（无借出记录不应出现在归还列表）
   cartItems.value = cartItems.value.filter(item => {
     const hasRecords = item.activeRecords && item.activeRecords.length > 0
     if (!hasRecords && scanMode.value === 'return') {
@@ -1984,7 +1945,6 @@ const loadCartItemsRecords = async () => {
   })
 }
 
-// 切换借领/归还模式时，自动加载或清除购物车物品的活跃记录
 watch(scanMode, (mode) => {
   if (mode === 'return' && cartItems.value.length > 0) {
     loadCartItemsRecords()
@@ -2010,7 +1970,6 @@ const submitBatch = async () => {
       try {
         const payload = { qty: item.qty, remark: scanForm.remark }
         if (scanMode.value === 'return') {
-          // 归还模式：使用用户点击选中的记录
           if (!item.selectedRecordId) {
             results.errors.push(`${item.name}: 请点击左侧记录选中要归还的项`)
             results.fail++
@@ -2069,13 +2028,210 @@ const submitBatch = async () => {
   flex-direction: column;
   box-sizing: border-box;
 }
-/* 双层锁定：overlay + overlay-dialog 都不能滚 */
-:global(.cart-modal) {
-  overflow: hidden !important;
-}
+
+/* ================================================================
+   出入库弹框：固定高度 + 顶部/底部固定 + 仅列表滚动
+   关键：从 .cart-modal 出发选，scoped 才能命中
+   ================================================================ */
+
+/* ① overlay 双层锁死：禁止整页滚动 */
+:global(.cart-modal),
 :global(.cart-modal .el-overlay-dialog) {
   overflow: hidden !important;
 }
+
+/* ② dialog 本体：从 overlay 出发的后代选择器，一定命中 */
+:global(.cart-modal .el-dialog) {
+  height: 92vh !important;
+  max-height: 92vh !important;
+  margin: 4vh auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+:global(.cart-modal .el-dialog__header) {
+  flex-shrink: 0 !important;
+}
+:global(.cart-modal .el-dialog__body) {
+  flex: 1 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ③ cd-wrap 撑满 body —— 组件内元素，scoped 直接命中 */
+.cd-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ④ 上中下三段固定不压缩 */
+.cd-mode-bar,
+.cd-scan-bar,
+.cd-footer {
+  flex-shrink: 0;
+}
+
+/* ⑤ cd-body 吃满剩余 */
+.cd-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ⑥ cd-list 唯一滚动区 */
+.cd-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---------- 出入库弹框内部元素 ---------- */
+.cd-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 60px 0;
+  color: var(--c-text-mute);
+}
+.cd-empty p { margin: 0; font-size: 14px; }
+.cd-empty-sub { font-size: 12px; }
+
+.cd-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-divider);
+  border-radius: 8px;
+  background: var(--c-bg);
+  flex-shrink: 0;
+}
+.cd-row-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cd-row-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-row-model { font-size: 12px; color: var(--c-text-mute); font-family: Consolas, monospace; }
+.cd-row-qty { display: flex; align-items: center; gap: 8px; }
+.cd-row-qty .el-button { --el-button-size: 32px; font-size: 16px; }
+.cd-row .el-button--warning { height: 32px; font-size: 14px; padding: 0 16px; }
+.cd-row .el-button--danger.is-text { --el-button-size: 32px; font-size: 16px; }
+.cd-qty-num { font-weight: 700; font-size: 16px; min-width: 32px; text-align: center; }
+.cd-qty-limit { font-size: 12px; color: var(--c-text-mute); }
+
+.cd-mode-bar {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--c-divider);
+}
+
+/* 借领/归还：两个大 Segment 按钮，各占一半宽 */
+.cd-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cd-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 54px;
+  border: 1.5px solid #E2E8F0;
+  background: #FAFBFC;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+  outline: none;
+  letter-spacing: 0.4px;
+}
+
+.cd-mode-btn .bi {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.cd-mode-btn:hover:not(.active) {
+  border-color: #93C5FD;
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+/* 借领：选中时橙色（往外借 / 警示感） */
+.cd-mode-btn.cd-mode-borrow.active {
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  border-color: #D97706;
+  color: #FFFFFF;
+  box-shadow: 0 8px 20px -8px rgba(217, 119, 6, 0.55);
+}
+
+/* 归还：选中时绿色（往回收 / 完成感） */
+.cd-mode-btn.cd-mode-return.active {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  border-color: #059669;
+  color: #FFFFFF;
+  box-shadow: 0 8px 20px -8px rgba(5, 150, 105, 0.55);
+}
+
+/* 选中态图标微动效 */
+.cd-mode-btn.active .bi {
+  animation: cd-mode-pop 0.28s ease-out;
+}
+@keyframes cd-mode-pop {
+  0%   { transform: scale(0.85); }
+  60%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+.cd-scan-bar {
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--c-divider);
+}
+.cd-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--c-divider);
+  background: var(--c-bg-soft, #f5f7fa);
+}
+
+/* 第一行：三个字段等宽平分整行 */
+.cd-form-row {
+  display: flex;
+  gap: 10px;
+}
+.cd-form-row .cd-field {
+  flex: 1;
+  min-width: 0;   /* 关键：允许收缩，长内容省略号 */
+}
+
+/* 第二行：备注 + 按钮同行 */
+.cd-submit-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cd-submit-row .cd-remark-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- 页面其他样式 ---------- */
 .page-header {
   display: flex;
   align-items: center;
@@ -2108,7 +2264,6 @@ const submitBatch = async () => {
   gap: 10px;
   flex-wrap: wrap;
 }
-/* 型号列 */
 .wh-model {
   display: block;
   font-family: Consolas, monospace;
@@ -2120,7 +2275,6 @@ const submitBatch = async () => {
   display: block;
   color: var(--c-text-mute);
 }
-/* 内容区 */
 .wh-content {
   display: flex;
   flex-direction: column;
@@ -2136,9 +2290,6 @@ const submitBatch = async () => {
   justify-content: space-between;
   flex-shrink: 0;
 }
-
-
-/* 主区域：看板 / 列表 / 出入库记录 */
 .wh-main {
   display: flex;
   flex: 1;
@@ -2158,15 +2309,12 @@ const submitBatch = async () => {
   min-height: 0;
 }
 .wh-table-wrap :deep(.el-table) { height: 100%; }
-/* 治具 / 耗材 / 出入库 Tab 筛选行：防止输入框撑大单元格 */
-/* 筛选行固定跟随表头 */
 .wh-table-wrap :deep(.filter-row) {
   position: sticky;
   top: 0;
   z-index: 3;
   background: var(--el-bg-color, #fff);
 }
-/* 操作筛选下拉触发按钮 */
 .tx-filter-trigger {
   display: inline-flex;
   align-items: center;
@@ -2183,17 +2331,9 @@ const submitBatch = async () => {
   transition: background .15s;
 }
 .tx-filter-trigger:hover { background: var(--c-bg-mute); }
-/* 线体筛选下拉菜单：滚动显示，防止截断，提升层级避免和 sticky 行冲突 */
-.tx-line-popper {
-  z-index: 9999 !important;
-}
-.tx-line-menu {
-  max-height: 280px;
-  overflow-y: auto;
-}
-.tx-line-menu .el-dropdown-menu__item {
-  justify-content: center;
-}
+.tx-line-popper { z-index: 9999 !important; }
+.tx-line-menu { max-height: 280px; overflow-y: auto; }
+.tx-line-menu .el-dropdown-menu__item { justify-content: center; }
 .jig-fbr-cell {
   height: 100%;
   display: flex;
@@ -2210,13 +2350,9 @@ const submitBatch = async () => {
 .jig-fbr-cell :deep(.el-date-editor .el-input__wrapper) { height: 28px; justify-content: center; }
 .jig-fbr-cell :deep(.el-date-editor .el-input__inner) { text-align: center; }
 .jig-fbr-cell :deep(.el-date-editor .el-range-input) { font-size: 12px; text-align: center; }
-/* 防止 daterange 内部的 separator / 图标撑大容器 */
 .jig-fbr-cell :deep(.el-date-editor .el-range-separator) { font-size: 11px; padding: 0 2px; }
 .jig-fbr-cell :deep(.el-date-editor .el-range__icon) { display: none; }
-/* 下拉筛选菜单选项居中 */
 .jig-fbr-cell :deep(.el-dropdown-menu__item) { justify-content: center; }
-
-/* 治具/耗材/出入库记录数量排序按钮（单箭头循环 ⇅ → ↑ → ↓） */
 .part-sort-btn {
   display: inline-flex;
   align-items: center;
@@ -2233,7 +2369,6 @@ const submitBatch = async () => {
 }
 .part-sort-btn:hover { background: var(--c-bg-mute); }
 .part-sort-btn.active { background: var(--el-color-primary); color: #fff; }
-
 .tx-remark-cell {
   display: flex;
   align-items: center;
@@ -2253,19 +2388,12 @@ const submitBatch = async () => {
   padding: 30px 0;
   font-size: 13px;
 }
-
-
-
-/* 表格 */
 .wh-name { font-weight: 600; color: var(--c-text); }
-
 .wh-form-hint { margin-left: 10px; font-size: 12px; color: var(--c-text-mute); }
 .wh-form-static { font-size: 14px; font-weight: 600; color: var(--c-text, #0B1120); line-height: 32px; }
 .ok-text { color: #059669; }
 .warn-text { color: #D97706; }
 .danger-text { color: #DC2626; }
-
-/* 操作弹窗信息块 */
 .wh-action-info {
   background: #F8FAFC;
   border: 1px solid var(--c-divider);
@@ -2276,8 +2404,6 @@ const submitBatch = async () => {
   color: var(--c-text-2);
 }
 .wh-action-info p { margin: 2px 0; }
-
-/* 详情弹窗 */
 .wh-detail-head {
   display: flex;
   align-items: center;
@@ -2303,8 +2429,6 @@ const submitBatch = async () => {
   font-weight: 600;
 }
 .wh-desc { margin-bottom: 4px; }
-
-/* 批量导入结果 */
 .wh-import-result {
   margin-top: 14px;
   border: 1px solid var(--c-divider);
@@ -2330,8 +2454,6 @@ const submitBatch = async () => {
   color: #DC2626;
   line-height: 1.9;
 }
-
-/* 模式切换 */
 .wh-mode-switch { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .cart-badge {
   display: inline-flex; align-items: center; justify-content: center;
@@ -2340,147 +2462,6 @@ const submitBatch = async () => {
   background: #DC2626; color: #fff;
   border-radius: 9px; padding: 0 5px;
 }
-
-/* 出入库弹框 */
-/* ① el-dialog 整体：限制最大高度 + flex 布局 */
-.cart-dialog :deep(.el-dialog) {
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  margin-top: 10vh !important;
-}
-.cart-dialog :deep(.el-dialog__header) { flex-shrink: 0; }
-.cart-dialog :deep(.el-dialog__footer) { flex-shrink: 0; }
-
-/* ④ 上部三个区固定，不参与压缩 */
-.cart-dialog .cd-mode-bar,
-.cart-dialog .cd-scan-bar,
-.cart-dialog .cd-footer {
-  flex-shrink: 0;
-}
-/* dialog 固定高度 + flex column */
-.cart-dialog :deep(.el-dialog) {
-  height: 80vh !important;
-  max-height: 80vh !important;
-  display: flex !important;
-  flex-direction: column !important;
-  margin: 10vh auto !important;
-}
-.cart-dialog :deep(.el-dialog__header) { flex-shrink: 0; }
-.cart-dialog :deep(.el-dialog__footer) { flex-shrink: 0; }
-
-/* body 吃满剩余高度，向下传 */
-.cart-dialog :deep(.el-dialog__body) {
-  flex: 1 !important;
-  min-height: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-/* cd-wrap 撑满 body */
-.cart-dialog .cd-wrap {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* 上中下三段：上段固定，body 可滚 */
-.cart-dialog .cd-mode-bar,
-.cart-dialog .cd-scan-bar,
-.cart-dialog .cd-footer {
-  flex-shrink: 0;
-}
-
-/* cd-body 吃满剩余，唯一滚动区 */
-.cart-dialog .cd-body {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  padding: 10px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* cd-list 内部滚 */
-.cart-dialog .cd-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-/* ⑥ cd-list：唯一滚动区 */
-.cart-dialog .cd-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  /* 删掉 max-height: 100%（不再需要，反而会干扰） */
-}
-.cd-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.cd-header {
-  flex-shrink: 0;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 15px 20px;
-  background: linear-gradient(135deg, #F7FAFF 0%, #EEF4FF 100%);
-  border-bottom: 1px solid var(--c-divider);
-}
-.cd-title { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; }
-.cd-count { font-size: 13px; font-weight: 600; color: var(--primary, #2563EB); }
-
-.cd-mode-bar { flex-shrink: 0; padding: 10px 20px; border-bottom: 1px solid var(--c-divider); }
-.cd-scan-bar { flex-shrink: 0; padding: 10px 20px; border-bottom: 1px solid var(--c-divider); }
-
-.cd-body {
-  flex: 1; min-height: 0; overflow: hidden; padding: 12px 16px;
-  display: flex; flex-direction: column; gap: 8px;
-}
-.cd-empty {
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 60px 0; color: var(--c-text-mute);
-}
-.cd-empty p { margin: 0; font-size: 14px; }
-.cd-empty-sub { font-size: 12px; }
-
-.cd-list {
-  display: flex; flex-direction: column; gap: 8px;
-  overflow-y: auto;
-  flex: 1; min-height: 0;
-  /* 强制约束：不超出父容器高度 */
-  max-height: 100%;
-}
-.cd-row {
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: 10px 12px; border: 1px solid var(--c-divider); border-radius: 8px;
-  background: var(--c-bg); flex-shrink: 0;
-}
-.cd-row-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.cd-row-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cd-row-model { font-size: 12px; color: var(--c-text-mute); font-family: Consolas, monospace; }
-.cd-row-qty { display: flex; align-items: center; gap: 8px; }
-.cd-row-qty .el-button { --el-button-size: 32px; font-size: 16px; }
-.cd-row .el-button--warning { height: 32px; font-size: 14px; padding: 0 16px; }
-.cd-row .el-button--danger.is-text { --el-button-size: 32px; font-size: 16px; }
-.cd-qty-num { font-weight: 700; font-size: 16px; min-width: 32px; text-align: center; }
-.cd-qty-limit { font-size: 12px; color: var(--c-text-mute); }
-
-.cd-footer {
-  flex-shrink: 0;
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 16px 20px;
-  border-top: 1px solid var(--c-divider);
-  background: var(--c-bg-soft, #f5f7fa);
-}
-.cd-form-row { display: flex; gap: 8px; }
-.cd-submit-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
 /* ============ 首页Tab：看板仪表盘 ============ */
 .wh-dashboard {
@@ -2491,8 +2472,6 @@ const submitBatch = async () => {
   gap: 10px;
   min-height: 0;
 }
-
-/* ── 4 大 KPI 卡片（高级现代风格） ── */
 .wh-kpi-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -2552,9 +2531,7 @@ const submitBatch = async () => {
   position: relative;
   z-index: 1;
 }
-.wh-kpi-value.warn {
-  color: #DC2626;
-}
+.wh-kpi-value.warn { color: #DC2626; }
 .wh-kpi-sub {
   font-size: 13px;
   color: #94A3B8;
@@ -2562,8 +2539,6 @@ const submitBatch = async () => {
   position: relative;
   z-index: 1;
 }
-
-/* ── 管理员面板网格（高级现代风格） ── */
 .wh-panel-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2635,9 +2610,7 @@ const submitBatch = async () => {
   font-size: 13px;
   transition: all .15s;
 }
-.wh-panel-item:hover {
-  background: #EEF1F5;
-}
+.wh-panel-item:hover { background: #EEF1F5; }
 .wh-panel-item .pi-name {
   font-weight: 600;
   font-size: 14px;
@@ -2661,7 +2634,7 @@ const submitBatch = async () => {
   white-space: nowrap;
 }
 
-/* 记忆下拉：选项内嵌删除按钮 */
+/* 记忆下拉 */
 .mem-option {
   display: flex;
   align-items: center;
@@ -2676,7 +2649,7 @@ const submitBatch = async () => {
 }
 .mem-del-btn:hover { color: #DC2626; }
 
-/* 归还模式：购物车物品的借款人列表 */
+/* 归还模式：借款人列表 */
 .cd-return-records {
   display: flex;
   flex-direction: column;
