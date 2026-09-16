@@ -131,6 +131,22 @@ const router = createRouter({
   scrollBehavior: () => ({ left: 0, top: 0 })
 })
 
+// 路由 → 权限模块映射（不含看板：看板默认全用户可见）
+const ROUTE_MODULE_MAP = {
+  Devices: 'devices',
+  Weekly: 'weekly',
+  Servers: 'servers',
+  AgingRacks: 'agingracks',
+  Wifi: 'wifi',
+  Bugs: 'bugs',
+  DevReqs: 'devreqs',
+  Exception: 'exception',
+  EsopParts: 'esopparts',
+  Antivirus: 'antivirus',
+  Warehouse: 'warehouse',
+  Users: 'users'
+}
+
 // 路由守卫
 router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
@@ -151,6 +167,13 @@ router.beforeEach(async (to, from, next) => {
       userStore.logout()
       ElMessage.warning('登录已过期，请重新登录')
       next('/login')
+      return
+    }
+    // 检查模块权限
+    const moduleKey = ROUTE_MODULE_MAP[to.name]
+    if (moduleKey && !userStore.canRead(moduleKey)) {
+      ElMessage.warning('您没有该模块的访问权限')
+      next('/dashboard/aoi')
       return
     }
     next()

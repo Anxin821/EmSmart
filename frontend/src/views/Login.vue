@@ -91,9 +91,11 @@ const handleLogin = async () => {
     if (res.code === 200 && res.data.access_token) {
       userStore.setToken(res.data.access_token)
       userStore.setUser({
+        id: res.data.id,
         username: res.data.username,
         role: res.data.role,
-        full_name: res.data.full_name
+        full_name: res.data.full_name,
+        permissions: res.data.permissions || []
       })
       ElMessage.success(`登录成功，欢迎回来${res.data.full_name ? '，' + res.data.full_name : ''}`)
       router.push('/dashboard/aoi')

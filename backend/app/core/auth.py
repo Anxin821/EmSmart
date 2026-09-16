@@ -184,6 +184,7 @@ PERMISSION_MODULES = [
     {"key": "antivirus", "label": "设备杀毒记录"},
     {"key": "esopparts", "label": "ESOP料号管理"},
     {"key": "exception", "label": "异常履历管理"},
+    {"key": "warehouse", "label": "库房管理"},
     {"key": "users", "label": "用户管理"},
 ]
 
@@ -223,4 +224,3 @@ def build_permissions(db: Session, user) -> list[dict]:
         else:
             result.append({"module_key": key, "can_read": default_read, "can_write": False})
     return result
-

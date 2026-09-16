@@ -10,7 +10,7 @@
           <el-button @click="reset">
             <el-icon><RefreshRight /></el-icon>重置
           </el-button>
-          <template v-if="userStore.isAdmin">
+          <template v-if="userStore.canWrite('users')">
             <el-button type="success" @click="showModal()">
               <el-icon><Plus /></el-icon>新增用户
             </el-button>
@@ -86,40 +86,40 @@
       :ok-loading="saving"
       @ok="handleSave"
     >
-      <div class="row g-3">
-        <div class="col-6">
-          <label class="small form-label">用户名 <span style="color: var(--err);">*</span></label>
-          <el-input v-model="form.username" clearable placeholder="登录账号" />
-        </div>
-        <div class="col-6">
-          <label class="small form-label">姓名</label>
-          <el-input v-model="form.full_name" clearable placeholder="真实姓名" />
-        </div>
-        <div class="col-6">
-          <label class="small form-label">密码 <span style="color: var(--err);" v-if="!editingId">*</span></label>
-          <el-input v-model="form.password" type="password" show-password clearable
-                    :placeholder="editingId ? '留空则不修改' : '请输入密码'" />
-        </div>
-        <div class="col-6">
-          <label class="small form-label">角色</label>
-          <el-select v-model="form.role" placeholder="请选择角色" style="width: 100%;">
-            <el-option label="admin" value="admin" />
-            <el-option label="engineer" value="engineer" />
-            <el-option label="viewer" value="viewer" />
-          </el-select>
-        </div>
-        <div class="col-6">
-          <label class="small form-label">邮箱</label>
-          <el-input v-model="form.email" clearable placeholder="email@example.com" />
-        </div>
-        <div class="col-6">
-          <label class="small form-label">状态</label>
-          <el-select v-model="form.is_active" placeholder="请选择状态" style="width: 100%;">
-            <el-option label="正常" :value="true" />
-            <el-option label="禁用" :value="false" />
-          </el-select>
-        </div>
-      </div>
+      <div class="form-grid">
+  <div class="form-item">
+    <label class="form-label">用户名 <span class="required">*</span></label>
+    <el-input v-model="form.username" clearable placeholder="登录账号" />
+  </div>
+  <div class="form-item">
+    <label class="form-label">姓名</label>
+    <el-input v-model="form.full_name" clearable placeholder="真实姓名" />
+  </div>
+  <div class="form-item">
+    <label class="form-label">密码 <span class="required" v-if="!editingId">*</span></label>
+    <el-input v-model="form.password" type="password" show-password clearable
+              :placeholder="editingId ? '留空则不修改' : '请输入密码'" />
+  </div>
+  <div class="form-item">
+    <label class="form-label">角色</label>
+    <el-select v-model="form.role" placeholder="请选择角色" style="width: 100%;">
+      <el-option label="admin" value="admin" />
+      <el-option label="engineer" value="engineer" />
+      <el-option label="viewer" value="viewer" />
+    </el-select>
+  </div>
+  <div class="form-item">
+    <label class="form-label">邮箱</label>
+    <el-input v-model="form.email" clearable placeholder="email@example.com" />
+  </div>
+  <div class="form-item">
+    <label class="form-label">状态</label>
+    <el-select v-model="form.is_active" placeholder="请选择状态" style="width: 100%;">
+      <el-option label="正常" :value="true" />
+      <el-option label="禁用" :value="false" />
+    </el-select>
+  </div>
+</div>
       <template #footer="f">
         <div class="cm-footer">
           <el-button @click="f.cancel">取消</el-button>
@@ -127,56 +127,87 @@
         </div>
       </template>
     </CommonModal>
-    <!-- 权限设置弹框 -->
+        <!-- 权限设置弹框 -->
     <CommonModal
       v-model:visible="permModalVisible"
       :title="'权限设置 - ' + (currentUser?.username || '')"
-      width="820px"
+      width="680px"
       :ok-loading="permSaving"
       @ok="handlePermSave"
     >
-      <!-- admin 提示：admin 角色默认拥有全部权限，细项授权不生效 -->
+      <!-- admin 提示 -->
       <el-alert
         v-if="currentUser?.role === 'admin'"
         type="info" :closable="false" show-icon
-        title="该用户为 admin 角色，默认拥有全部模块的读写权限，此处授权仅对 engineer / viewer 角色生效。"
-        style="margin-bottom: 12px;"
+        title="该用户为 admin 角色，默认拥有全部模块读写权限，此处授权仅对 engineer / viewer 角色生效。"
+        style="margin-bottom: 10px;"
       />
-      <!-- 快捷操作 + 授权统计 -->
-      <div class="perm-toolbar">
+
+      <!-- 工具栏：搜索 + 快捷操作 -->
+      <div class="perm-bar">
+        <el-input
+          v-model="permSearch"
+          placeholder="搜索模块..."
+          clearable
+          size="default"
+          class="perm-search"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
         <div class="perm-quick">
           <el-button size="small" type="primary" plain @click="setAllPerms('write')">全部读写</el-button>
           <el-button size="small" plain @click="setAllPerms('read')">全部只读</el-button>
           <el-button size="small" plain @click="setAllPerms('none')">全部清空</el-button>
         </div>
-        <div class="perm-summary">
-          可访问 <b>{{ permStats.readable }}</b> / {{ permModules.length }} 个模块，
-          可写入 <b>{{ permStats.writable }}</b> 个
+      </div>
+
+      <!-- 统计 -->
+      <div class="perm-summary">
+        <span>已授权 <b class="stat-read">{{ permStats.readable }}</b> / {{ permModules.length }} 个模块可读</span>
+        <span class="perm-summary-dot">·</span>
+        <span><b class="stat-write">{{ permStats.writable }}</b> 个可写</span>
+      </div>
+
+      <!-- 模块列表 -->
+      <div class="perm-list">
+        <div
+          v-for="m in filteredPermModules"
+          :key="m.key"
+          class="perm-row"
+          :class="{ 'is-on': perms[m.key]?.can_read }"
+        >
+          <span :class="['bi', m.icon]" class="perm-row-icon"></span>
+          <span class="perm-row-label">{{ m.label }}</span>
+          <div class="perm-row-actions">
+            <button
+              type="button"
+              class="perm-btn perm-btn--read"
+              :class="{ active: perms[m.key]?.can_read }"
+              @click="toggleRead(m.key)"
+            >
+              <span class="dot"></span>{{ perms[m.key]?.can_read ? '可读' : '不可读' }}
+            </button>
+            <button
+              type="button"
+              class="perm-btn perm-btn--write"
+              :class="{ active: perms[m.key]?.can_write }"
+              :disabled="!perms[m.key]?.can_read"
+              @click="toggleWrite(m.key)"
+            >
+              <span class="dot"></span>{{ perms[m.key]?.can_write ? '可写' : '不可写' }}
+            </button>
+          </div>
+        </div>
+        <div v-if="!filteredPermModules.length" class="perm-empty">
+          没有匹配「{{ permSearch }}」的模块
         </div>
       </div>
 
-      <el-row :gutter="12">
-        <el-col v-for="m in permModules" :key="m.key" :span="8" style="margin-bottom: 12px;">
-          <div class="mod-perm-card" :class="{ 'perm-on': perms[m.key]?.can_read }">
-            <div class="mod-title">
-              <span :class="['bi', m.icon]" style="color: var(--primary); margin-right: 6px;"></span>
-              {{ m.label }}
-            </div>
-            <div class="perm-checks">
-              <el-checkbox v-model="perms[m.key].can_read" @change="onReadChange(m.key)">
-                <span style="font-size: 13px;">可读取</span>
-              </el-checkbox>
-              <el-checkbox v-model="perms[m.key].can_write" @change="onWriteChange(m.key)">
-                <span style="font-size: 13px;">可写入</span>
-              </el-checkbox>
-            </div>
-          </div>
-        </el-col>
-      </el-row>
       <div class="perm-tip">
         <span class="bi bi-info-circle"></span>
-        联动规则：勾选「可写入」自动授予「可读取」；取消「可读取」自动收回「可写入」。
+        联动规则：勾选「可写」自动授予「可读」；取消「可读」自动收回「可写」。
       </div>
+
       <template #footer="f">
         <div class="cm-footer">
           <el-button @click="f.cancel">取消</el-button>
@@ -192,7 +223,6 @@ import { usersApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, Key, RefreshRight, Plus, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
@@ -204,7 +234,7 @@ const pageSize = ref(20)
 const filters = ref({ keyword: '', role: '' })
 
 // 用于取消请求的 AbortController
-let abortController = null
+let _reqSeq = 0
 
 const filterFields = [
   { type: 'input', key: 'keyword', label: '', placeholder: '用户名 / 姓名 / 邮箱', autoSearch: false, clearable: true, minWidth: 175 },
@@ -230,9 +260,17 @@ const permModules = [
   { key: 'antivirus',  label: '设备杀毒记录', icon: 'bi-shield-check' },
   { key: 'esopparts',  label: 'ESOP料号管理', icon: 'bi-file-earmark-text' },
   { key: 'exception',  label: '异常履历管理', icon: 'bi-exclamation-triangle' },
+  { key: 'warehouse',  label: '库房管理',     icon: 'bi-box-seam' },
   { key: 'users',      label: '用户管理',     icon: 'bi-people' },
 ]
 const modules = permModules.map(m => m.key)
+const filteredPermModules = computed(() => {
+  const kw = (permSearch.value || '').trim().toLowerCase()
+  if (!kw) return permModules
+  return permModules.filter(m =>
+    m.label.toLowerCase().includes(kw) || m.key.toLowerCase().includes(kw)
+  )
+})
 
 // 客户端筛选 + 分页：filteredData 全量过滤结果，listFiltered 当前页切片
 const filteredData = computed(() => {
@@ -263,6 +301,7 @@ const currentUser = ref(null)
 const saving = ref(false)
 const permSaving = ref(false)
 const perms = ref({})
+const permSearch = ref('')
 const form = ref({})
 
 const defaultForm = () => ({ username: '', full_name: '', password: '', role: 'viewer', email: '', is_active: true })
@@ -271,45 +310,47 @@ const getRoleClass = (role) => ({ admin: 'severe', engineer: 'info', viewer: 'mu
 
 const onSearch = () => { page.value = 1 }
 
-const loadData = async () => {
-  // 取消之前的请求（如果有）
-  if (abortController) {
-    abortController.abort()
-  }
-  
-  abortController = new AbortController()
-  
-  try {
-    const res = await usersApi.list()
-    data.value = res.data || []
-  } catch(e) {
-    // 忽略AbortError
-    if (e.name !== 'AbortError') {
-      console.error(e)
-    }
-  } finally {
-    abortController = null
-  }
-}
+
 
 const showModal = (u = null) => {
   editingId.value = u?.id
-  form.value = u ? { ...u, password: '' } : defaultForm()
+  form.value = u ? {
+    username:  u.username  || '',
+    full_name: u.full_name || '',
+    email:     u.email     || '',
+    role:      u.role      || 'viewer',
+    is_active: u.is_active ?? true,
+    password:  '',       // 编辑时留空 = 不改密码
+  } : defaultForm()
   modalVisible.value = true
 }
 
 const handleSave = async () => {
+  if (saving.value) return   // ← 加这行，防双击
   saving.value = true
   try {
     if (editingId.value) {
       await usersApi.update(editingId.value, form.value)
       ElMessage.success('用户修改成功')
     } else {
-      if (!form.value.username || !form.value.password) {
-        ElMessage.warning('请填写用户名与密码')
-        saving.value = false
-        return
-      }
+      // 替换为
+const username = (form.value.username || '').trim()
+if (!username) {
+  ElMessage.warning('请填写用户名')
+  saving.value = false
+  return
+}
+if (!/^[a-zA-Z0-9_-]{3,20}$/.test(username)) {
+  ElMessage.warning('用户名需为 3-20 位字母 / 数字 / 下划线 / 中划线')
+  saving.value = false
+  return
+}
+if (!form.value.password || form.value.password.length < 6) {
+  ElMessage.warning('密码长度不能少于 6 位')
+  saving.value = false
+  return
+}
+form.value.username = username   // 顺带 trim
       await usersApi.create(form.value)
       ElMessage.success('用户新增成功')
     }
@@ -339,6 +380,7 @@ const handleDelete = async (id) => {
 
 const showPermModal = (u) => {
   currentUser.value = u
+  permSearch.value = ''          // ← 加这行，每次打开清空搜索
   modules.forEach(m => { perms.value[m] = { can_read: true, can_write: false } })
   ;(u.permissions || []).forEach(p => {
     if (perms.value[p.module_key]) {
@@ -348,12 +390,14 @@ const showPermModal = (u) => {
   permModalVisible.value = true
 }
 
-// 权限联动：勾选「可写入」自动授予「可读取」；取消「可读取」自动收回「可写入」
-const onWriteChange = (key) => {
-  if (perms.value[key]?.can_write) perms.value[key].can_read = true
+const toggleRead = (key) => {
+  if (!perms.value[key]) return
+  perms.value[key].can_read = !perms.value[key].can_read
+  if (!perms.value[key].can_read) perms.value[key].can_write = false
 }
-const onReadChange = (key) => {
-  if (!perms.value[key]?.can_read) perms.value[key].can_write = false
+const toggleWrite = (key) => {
+  if (!perms.value[key]?.can_read) return
+  perms.value[key].can_write = !perms.value[key].can_write
 }
 
 // 快捷授权
@@ -397,37 +441,44 @@ const handlePermSave = async () => {
 }
 
 onMounted(() => {
-  console.log('Users组件挂载')
   loadData()
 })
 
-onUnmounted(() => {
-  console.log('Users组件卸载，清理资源')
-  // 取消正在进行的请求
-  if (abortController) {
-    abortController.abort()
+const loadData = async () => {
+  const seq = ++_reqSeq
+  try {
+    const res = await usersApi.list()
+    if (seq !== _reqSeq) return   // 被更新的请求超越，忽略本次结果
+    data.value = res.data || []
+  } catch (e) {
+    console.error(e)
   }
-  
-  // 清理引用
+}
+
+// onUnmounted 里删掉 abortController 相关行
+onUnmounted(() => {
   data.value = []
   form.value = {}
   filters.value = { keyword: '', role: '' }
 })
 </script>
 <style scoped>
-.mod-perm-card {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 14px;
-  background: var(--card-bg);
-  transition: border-color .15s, box-shadow .15s, background .15s;
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
 }
-/* 已授权读取的模块卡片高亮，未授权置灰 */
-.mod-perm-card.perm-on {
-  border-color: var(--primary, #2c5ce8);
-  background: rgba(44, 92, 232, .05);
-  box-shadow: 0 2px 8px rgba(44, 92, 232, .08);
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
+.form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+.required { color: var(--err, #DC2626); }
 .mod-title {
   font-size: 13.5px;
   font-weight: 600;
@@ -438,24 +489,183 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.perm-checks {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 10px;
-  padding-left: 4px;
-}
-.perm-toolbar {
+/* 工具栏：搜索 + 快捷操作 */
+.perm-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
+}
+.perm-search { flex: 1; min-width: 180px; }
+.perm-quick { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* 统计行 */
+.perm-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 12px;
+  margin-bottom: 10px;
   background: var(--c-fill, #f8fafc);
   border-radius: 8px;
+  font-size: 13px;
+  color: var(--c-text-mute, #64748b);
 }
+.perm-summary b { font-size: 15px; margin: 0 2px; }
+.perm-summary .stat-read  { color: var(--primary, #2c5ce8); }
+.perm-summary .stat-write { color: #16a34a; }
+.perm-summary-dot { color: var(--c-text-mute, #cbd5e1); }
+
+/* 模块列表 */
+.perm-list {
+  max-height: 460px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  background: var(--card-bg);
+}
+.perm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: background .12s;
+}
+.perm-row + .perm-row { margin-top: 2px; }
+.perm-row:hover { background: var(--c-fill, #f8fafc); }
+
+
+.perm-row-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+  color: var(--c-text-mute, #94a3b8);
+  flex-shrink: 0;
+  transition: color .12s;
+}
+
+.perm-row-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color .12s;
+}
+.perm-row.is-on {
+  background: #eff5ff;              /* 淡蓝底，浅色主题安全 */
+}
+.perm-row.is-on .perm-row-icon {
+  color: #2c5ce8;
+}
+.perm-row.is-on .perm-row-label {
+  color: #1a3fb8;                  /* 比主色略深，保证白底对比 */
+  font-weight: 600;
+}
+
+/* 暗色主题兜底（如果你的项目有 .dark 或 body.dark 类） */
+:global(.dark) .perm-row.is-on {
+  background: rgba(44, 92, 232, .15);
+}
+.perm-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* 双按钮：可读 / 可写 */
+.perm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 12px;
+  min-width: 76px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--c-text-mute, #64748b);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  user-select: none;
+}
+.perm-btn .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .4;
+  transition: opacity .15s;
+}
+/* 未激活状态：悬停显示蓝描边 */
+.perm-btn:hover:not(:disabled):not(.active) {
+  border-color: var(--primary, #2c5ce8);
+  color: var(--primary, #2c5ce8);
+}
+
+/* 激活状态：悬停加深背景，保持白字 */
+.perm-btn--read.active:hover:not(:disabled) {
+  background: #1e4bd0;
+  border-color: #1e4bd0;
+  color: #fff;
+}
+.perm-btn--write.active:hover:not(:disabled) {
+  background: #15803d;
+  border-color: #15803d;
+  color: #fff;
+}
+/* active 状态 hover 保持白字 + 稍加深背景 */
+.perm-btn--read.active:hover:not(:disabled) {
+  background: #1e4bd0;
+  border-color: #1e4bd0;
+  color: #fff;
+}
+.perm-btn--write.active:hover:not(:disabled) {
+  background: #15803d;
+  border-color: #15803d;
+  color: #fff;
+}
+.perm-btn.active .dot { opacity: 1; }
+.perm-btn--read.active {
+  border-color: var(--primary, #2c5ce8);
+  background: var(--primary, #2c5ce8);
+  color: #fff;
+}
+.perm-btn--write.active {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: #fff;
+}
+.perm-btn:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+/* 空状态 */
+.perm-empty {
+  padding: 36px 0;
+  text-align: center;
+  color: var(--c-text-mute, #94a3b8);
+  font-size: 13px;
+}
+
+/* 提示（保留原样式即可，无需改） */
+.perm-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--c-text-mute, #94a3b8);
+}
+.perm-tip .bi { margin-right: 4px; }
 .perm-summary { font-size: 12.5px; color: var(--c-text-mute, #64748b); }
 .perm-summary b { color: var(--primary, #2c5ce8); font-size: 14px; margin: 0 2px; }
 .perm-tip {

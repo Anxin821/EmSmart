@@ -8,11 +8,11 @@
           style="width: 320px;" @keyup.enter="onBorrowSearch">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
-        <el-button v-if="userStore.canEdit" type="warning" @click="openBorrowDialog">
+        <el-button v-if="userStore.canWrite('warehouse')" type="warning" @click="openBorrowDialog">
           <el-icon><ShoppingCart /></el-icon>
           借领/归还<span v-if="cartItems.length" class="cart-badge">{{ cartTotalQty }}</span>
         </el-button>
-        <template v-if="userStore.canEdit">
+        <template v-if="userStore.canWrite('warehouse')">
           <el-button @click="openImport">批量导入</el-button>
           <el-button type="primary" @click="openEdit(null)">新增物品</el-button>
         </template>
@@ -151,9 +151,9 @@
                       <el-input v-model="txFilterRemark" size="small" placeholder="搜索" clearable
                         @change="txPage=1;loadTxData()" />
                     </div>
-                    <div v-else class="tx-remark-cell" @click.stop="userStore.canEdit && openEditRemark(row)">
+                    <div v-else class="tx-remark-cell" @click.stop="userStore.canWrite('warehouse') && openEditRemark(row)">
                       <span>{{ row.remark || '-' }}</span>
-                      <el-icon v-if="userStore.canEdit" class="tx-remark-edit"><EditPen /></el-icon>
+                      <el-icon v-if="userStore.canWrite('warehouse')" class="tx-remark-edit"><EditPen /></el-icon>
                     </div>
                   </template>
                 </el-table-column>
@@ -200,7 +200,7 @@
                   <div v-for="it in sd.low_stock_items" :key="it.id" class="wh-panel-item">
                     <span class="pi-name">{{ it.name }}</span>
                     <span class="pi-num">{{ it.stock_qty }}/{{ it.warn_qty }}{{ it.unit }}</span>
-                    <el-button v-if="userStore.canEdit" type="danger" size="small" plain @click.stop="openRestock(it)">补货</el-button>
+                    <el-button v-if="userStore.canWrite('warehouse')" type="danger" size="small" plain @click.stop="openRestock(it)">补货</el-button>
                   </div>
                 </div>
               </div>
@@ -212,7 +212,7 @@
                 <div v-else class="wh-panel-list">
                   <div v-for="it in sd.repair_items" :key="it.id" class="wh-panel-item">
                     <span class="pi-name">{{ it.name }}</span>
-                    <el-button v-if="userStore.canEdit" type="warning" size="small" plain @click.stop="openFinishRepair(it)">维修完成</el-button>
+                    <el-button v-if="userStore.canWrite('warehouse')" type="warning" size="small" plain @click.stop="openFinishRepair(it)">维修完成</el-button>
                   </div>
                 </div>
               </div>
@@ -225,7 +225,7 @@
                   <div v-for="it in sd.lost_items" :key="it.id" class="wh-panel-item">
                     <span class="pi-name">{{ it.name }}</span>
                     <span class="pi-info">{{ it.borrower || '-' }}</span>
-                    <el-button v-if="userStore.canEdit" type="success" size="small" plain @click.stop="submitFoundBack(it)">已找回</el-button>
+                    <el-button v-if="userStore.canWrite('warehouse')" type="success" size="small" plain @click.stop="submitFoundBack(it)">已找回</el-button>
                   </div>
                 </div>
               </div>
@@ -238,7 +238,7 @@
                   <div v-for="it in sd.damaged_items" :key="it.id" class="wh-panel-item">
                     <span class="pi-name">{{ it.name }}</span>
                     <span class="pi-info">{{ it.borrower || '-' }}</span>
-                    <el-button v-if="userStore.canEdit" type="success" size="small" plain @click.stop="submitRepairDamaged(it)">已修复</el-button>
+                    <el-button v-if="userStore.canWrite('warehouse')" type="success" size="small" plain @click.stop="submitRepairDamaged(it)">已修复</el-button>
                   </div>
                 </div>
               </div>
@@ -424,7 +424,7 @@
                         @click.stop="activeTab === '治具' ? resetJigFilters() : resetConsFilters()">重置</el-button>
                     </div>
                     <template v-else>
-                      <template v-if="userStore.canEdit">
+                      <template v-if="userStore.canWrite('warehouse')">
                         <template v-if="row.part_type === '治具'">
                           <el-button v-if="row.available_qty - (row.repair_qty || 0) > 0"
                             type="primary" link size="small" @click.stop="openBorrow(row)">借领</el-button>
@@ -1441,14 +1441,21 @@ const handleImport = async () => {
 
 const downloadTemplate = async () => {
   try {
-    const blob = await warehouseApi.downloadTemplate()
-    const url = window.URL.createObjectURL(blob)
+    const res = await warehouseApi.downloadTemplate()
+    // 兼容三种返回：Blob / AxiosResponse(.data 是 Blob) / 包装对象(.data.data 是 Blob)
+    const blob = res instanceof Blob
+      ? res
+      : (res?.data instanceof Blob ? res.data : new Blob([res?.data ?? res]))
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = '物品导入模板.xlsx'
+    document.body.appendChild(a)   // ← Firefox 必须 append 才能 click
     a.click()
-    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   } catch (e) {
+    console.error(e)
     toast.error('下载模板失败')
   }
 }
@@ -2016,10 +2023,12 @@ const loadCartItemsRecords = async () => {
         ? (await warehouseApi.consumeRecords(item.id, true)).data
         : (await warehouseApi.borrowRecords(item.id, true)).data) || []
       const field = isCon ? 'tx_type' : 'status'
-      const active = records.filter(r => ['领用', '借出'].includes(r[field]))
-      active.forEach(r => {
-        if (!isCon && r.borrower !== undefined) r.operator = r.borrower
-      })
+      const active = records
+  .filter(r => ['领用', '借出'].includes(r[field]))
+  .map(r => ({ ...r }))   // ← 浅拷贝，避免污染后端返回的对象
+active.forEach(r => {
+  if (!isCon && r.borrower !== undefined) r.operator = r.borrower
+})
       item.activeRecords = active
       if (item.activeRecords.length > 0) {
         item.selectedRecordId = item.activeRecords[0].id

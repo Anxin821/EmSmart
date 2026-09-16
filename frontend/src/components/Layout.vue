@@ -25,40 +25,40 @@
       </button>
 
       <div class="nav-title">业务管理</div>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Devices' }" @click="go('/devices')">
+      <button v-if="userStore.canRead('devices')" type="button" class="nav-link" :class="{ active: $route.name === 'Devices' }" @click="go('/devices')">
         <span class="bi bi-cpu-fill" aria-hidden="true"></span>AOI&AI设备管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Weekly' }" @click="go('/weekly')">
+      <button v-if="userStore.canRead('weekly')" type="button" class="nav-link" :class="{ active: $route.name === 'Weekly' }" @click="go('/weekly')">
         <span class="bi bi-graph-up-arrow" aria-hidden="true"></span>生产周报管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Servers' }" @click="go('/servers')">
+      <button v-if="userStore.canRead('servers')" type="button" class="nav-link" :class="{ active: $route.name === 'Servers' }" @click="go('/servers')">
         <span class="bi bi-server" aria-hidden="true"></span>服务器管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'AgingRacks' }" @click="go('/agingracks')">
+      <button v-if="userStore.canRead('agingracks')" type="button" class="nav-link" :class="{ active: $route.name === 'AgingRacks' }" @click="go('/agingracks')">
         <span class="bi bi-box-seam-fill" aria-hidden="true"></span>老化架管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Wifi' }" @click="go('/wifi')">
+      <button v-if="userStore.canRead('wifi')" type="button" class="nav-link" :class="{ active: $route.name === 'Wifi' }" @click="go('/wifi')">
         <span class="bi bi-wifi" aria-hidden="true"></span>WiFi AP管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Bugs' }" @click="go('/bugs')">
+      <button v-if="userStore.canRead('bugs')" type="button" class="nav-link" :class="{ active: $route.name === 'Bugs' }" @click="go('/bugs')">
         <span class="bi bi-bug-fill" aria-hidden="true"></span>MES BUG管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'DevReqs' }" @click="go('/devreqs')">
+      <button v-if="userStore.canRead('devreqs')" type="button" class="nav-link" :class="{ active: $route.name === 'DevReqs' }" @click="go('/devreqs')">
         <span class="bi bi-lightbulb-fill" aria-hidden="true"></span>MES 需求管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Exception' }" @click="go('/exception')">
+      <button v-if="userStore.canRead('exception')" type="button" class="nav-link" :class="{ active: $route.name === 'Exception' }" @click="go('/exception')">
         <span class="bi bi-exclamation-triangle-fill" aria-hidden="true"></span>异常履历管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'EsopParts' }" @click="go('/esop-parts')">
+      <button v-if="userStore.canRead('esopparts')" type="button" class="nav-link" :class="{ active: $route.name === 'EsopParts' }" @click="go('/esop-parts')">
         <span class="bi bi-file-earmark-text-fill" aria-hidden="true"></span>ESOP料号管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Antivirus' }" @click="go('/antivirus')">
+      <button v-if="userStore.canRead('antivirus')" type="button" class="nav-link" :class="{ active: $route.name === 'Antivirus' }" @click="go('/antivirus')">
         <span class="bi bi-shield-shaded" aria-hidden="true"></span>设备杀毒记录
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Warehouse' }" @click="go('/warehouse')">
+      <button v-if="userStore.canRead('warehouse')" type="button" class="nav-link" :class="{ active: $route.name === 'Warehouse' }" @click="go('/warehouse')">
         <span class="bi bi-box-seam-fill" aria-hidden="true"></span>库房管理
       </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'Users' }" @click="go('/users')">
+      <button v-if="userStore.canRead('users')" type="button" class="nav-link" :class="{ active: $route.name === 'Users' }" @click="go('/users')">
         <span class="bi bi-people-fill" aria-hidden="true"></span>用户管理
       </button>
     </aside>
