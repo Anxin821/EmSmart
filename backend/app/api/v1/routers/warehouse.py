@@ -158,6 +158,15 @@ def list_operators(
     return ApiResponse(data=service.get_operators(db))
 
 
+@router.get("/department-managers")
+def list_department_managers(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """返回历史部门负责人列表（前端 el-select allow-create 使用）。"""
+    return ApiResponse(data=service.get_department_managers(db))
+
+
 @router.get("/transactions")
 def list_all_transactions(
     page: int = Query(1, ge=1),

@@ -29,19 +29,7 @@
         </el-tabs>
       </div>
 
-      <!-- 低库存预警条（治具/耗材Tab时显示，首页Tab看板内已包含） -->
-      <div v-if="lowItems.length && (activeTab === '治具' || activeTab === '耗材')" class="wh-warn-bar">
-        <span class="wh-warn-title"><el-icon><WarningFilled /></el-icon> 低库存预警：</span>
-        <div class="wh-warn-items">
-          <span v-for="it in lowItems" :key="it.id" class="wh-warn-chip">
-            {{ it.name }}
-            <b>{{ it.stock_qty }}</b>/{{ it.warn_qty }}{{ it.unit }}
-            <el-button v-if="userStore.canEdit" type="danger" size="small" plain @click.stop="openRestock(it)">补货</el-button>
-          </span>
-        </div>
-      </div>
-
-            <!-- 主区域：Tab 切换 -->
+      <!-- 主区域：Tab 切换 -->
       <div class="wh-main">
         <!-- ── 出入库记录 Tab ── -->
         <template v-if="activeTab === '出入库记录'">
@@ -468,11 +456,12 @@
     </div>
 
     <!-- 借领 / 归还 弹框 -->
-    <el-dialog v-model="cartDialog" :title="scanModeName" width="520px" destroy-on-close
-      :close-on-click-modal="false" @opened="focusScanInput" class="cart-dialog">
+    <el-dialog v-model="cartDialog" :title="scanModeName" width="1000px" destroy-on-close
+  :close-on-click-modal="false" @opened="focusScanInput" class="cart-dialog"
+  modal-class="cart-modal">
       <div class="cd-wrap">
         <div class="cd-mode-bar">
-          <el-radio-group v-model="scanMode" size="small">
+          <el-radio-group v-model="scanMode">
             <el-radio-button label="borrow">借领</el-radio-button>
             <el-radio-button label="return">归还</el-radio-button>
           </el-radio-group>
@@ -504,18 +493,29 @@
                 <span class="cd-row-model">{{ item.model || '-' }}</span>
               </div>
               <template v-if="scanMode === 'return'">
-                <el-button type="warning" size="small" @click="openReturnFromCart(item)">处理</el-button>
+                <div class="cd-return-records" v-if="item.activeRecords?.length">
+                  <div v-for="rec in item.activeRecords" :key="rec.id"
+                    class="cd-return-rec"
+                    :class="{ active: item.selectedRecordId === rec.id }"
+                    @click="item.selectedRecordId = rec.id">
+                    <span class="cd-rec-operator">{{ rec.operator || '未知' }}</span>
+                    <span class="cd-rec-line" v-if="rec.line">【{{ rec.line }}】</span>
+                    <span class="cd-rec-time">{{ formatTime(rec.borrow_time) }}</span>
+                  </div>
+                </div>
+                <div v-else-if="item.loadingRecords" class="cd-rec-loading">加载中…</div>
+                <div v-else class="cd-rec-empty">无活跃记录</div>
               </template>
               <template v-else>
                 <div class="cd-row-qty">
-                  <el-button size="small" circle @click="changeQty(item, -1)"><el-icon><Minus /></el-icon></el-button>
+                  <el-button circle @click="changeQty(item, -1)"><el-icon><Minus /></el-icon></el-button>
                   <span class="cd-qty-num">{{ item.qty }}</span>
-                  <el-button size="small" circle @click="changeQty(item, 1)" :disabled="item.qty >= item.maxQty">
+                  <el-button circle @click="changeQty(item, 1)" :disabled="item.qty >= item.maxQty">
                     <el-icon><Plus /></el-icon></el-button>
                   <span class="cd-qty-limit">/{{ item.maxQty }}</span>
                 </div>
               </template>
-              <el-button text type="danger" size="small" @click="removeFromCart(item.id)">
+              <el-button text type="danger" @click="removeFromCart(item.id)">
                 <el-icon><Close /></el-icon>
               </el-button>
             </div>
@@ -524,13 +524,35 @@
 
         <footer class="cd-footer">
           <div class="cd-form-row" v-if="scanMode !== 'return'">
-            <el-select v-model="scanForm.operator" filterable allow-create clearable placeholder="借领人姓名" style="width:150px;">
-              <el-option v-for="o in operatorOptions" :key="o" :label="o" :value="o" />
+            <el-select v-model="scanForm.operator" filterable allow-create clearable
+              placeholder="借领人姓名" style="width:160px;">
+              <el-option v-for="o in operatorOptions" :key="o" :label="o" :value="o">
+                <div class="mem-option">
+                  <span>{{ o }}</span>
+                  <el-button text size="small" class="mem-del-btn" @click.stop="deleteOperator(o)">
+                    <el-icon><Close /></el-icon>
+                  </el-button>
+                </div>
+              </el-option>
             </el-select>
-            <el-input v-model="scanForm.department_manager" placeholder="部门负责人" maxlength="50" style="width:130px;" />
-            <el-select v-model="scanForm.line" placeholder="线体" style="width:110px;">
+            <el-select v-model="scanForm.department_manager" filterable allow-create clearable
+              placeholder="部门负责人" style="width:160px;">
+              <el-option v-for="d in departmentManagerOptions" :key="d" :label="d" :value="d">
+                <div class="mem-option">
+                  <span>{{ d }}</span>
+                  <el-button text size="small" class="mem-del-btn" @click.stop="deleteDepartmentManager(d)">
+                    <el-icon><Close /></el-icon>
+                  </el-button>
+                </div>
+              </el-option>
+            </el-select>
+            <el-select v-model="scanForm.line" clearable placeholder="线体" style="width:110px;">
               <el-option v-for="l in lines" :key="l" :label="l" :value="l" />
             </el-select>
+          </div>
+          <div v-else class="cd-return-hint">
+            <el-icon><InfoFilled /></el-icon>
+            <span>请在上方物品行中点击选中要归还的记录</span>
           </div>
           <el-input v-model="scanForm.remark" placeholder="备注" maxlength="255" />
           <div class="cd-submit-row">
@@ -598,13 +620,29 @@
         <p>可用数量：<b class="ok-text">{{ actionRow.available_qty - (actionRow.repair_qty || 0) }}</b> / {{ actionRow.total_qty }}</p>
       </div>
       <el-form :model="borrowForm" label-width="92px">
-        <el-form-item label="借用人" required>
+        <el-form-item label="领用人" required>
           <el-select v-model="borrowForm.operator" filterable allow-create clearable placeholder="借用人姓名" style="width:100%;">
-            <el-option v-for="o in operatorOptions" :key="o" :label="o" :value="o" />
+            <el-option v-for="o in operatorOptions" :key="o" :label="o" :value="o">
+              <div class="mem-option">
+                <span>{{ o }}</span>
+                <el-button text size="small" class="mem-del-btn" @click.stop="deleteOperator(o)">
+                  <el-icon><Close /></el-icon>
+                </el-button>
+              </div>
+            </el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="部门负责人">
-          <el-input v-model="borrowForm.department_manager" placeholder="部门负责人姓名（选填）" maxlength="50" />
+          <el-select v-model="borrowForm.department_manager" filterable allow-create clearable placeholder="部门负责人姓名（选填）" style="width:100%;">
+            <el-option v-for="d in departmentManagerOptions" :key="d" :label="d" :value="d">
+              <div class="mem-option">
+                <span>{{ d }}</span>
+                <el-button text size="small" class="mem-del-btn" @click.stop="deleteDepartmentManager(d)">
+                  <el-icon><Close /></el-icon>
+                </el-button>
+              </div>
+            </el-option>
+          </el-select>
         </el-form-item>
         <el-form-item label="线体" required>
           <el-select v-model="borrowForm.line" placeholder="选择线体" style="width: 100%;">
@@ -709,11 +747,27 @@
       <el-form :model="consumeForm" label-width="92px">
         <el-form-item label="领用人" required>
           <el-select v-model="consumeForm.operator" filterable allow-create clearable placeholder="领用人姓名" style="width:100%;">
-            <el-option v-for="o in operatorOptions" :key="o" :label="o" :value="o" />
+            <el-option v-for="o in operatorOptions" :key="o" :label="o" :value="o">
+              <div class="mem-option">
+                <span>{{ o }}</span>
+                <el-button text size="small" class="mem-del-btn" @click.stop="deleteOperator(o)">
+                  <el-icon><Close /></el-icon>
+                </el-button>
+              </div>
+            </el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="部门负责人">
-          <el-input v-model="consumeForm.department_manager" placeholder="部门负责人姓名（选填）" maxlength="50" />
+          <el-select v-model="consumeForm.department_manager" filterable allow-create clearable placeholder="部门负责人姓名（选填）" style="width:100%;">
+            <el-option v-for="d in departmentManagerOptions" :key="d" :label="d" :value="d">
+              <div class="mem-option">
+                <span>{{ d }}</span>
+                <el-button text size="small" class="mem-del-btn" @click.stop="deleteDepartmentManager(d)">
+                  <el-icon><Close /></el-icon>
+                </el-button>
+              </div>
+            </el-option>
+          </el-select>
         </el-form-item>
         <el-form-item label="线体" required>
           <el-select v-model="consumeForm.line" placeholder="选择线体" style="width: 100%;">
@@ -901,7 +955,7 @@
 import { ref, reactive, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { warehouseApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { Search, RefreshRight, Plus, ArrowDown, Upload, UploadFilled, WarningFilled,
+import { Search, RefreshRight, Plus, ArrowDown, Upload, UploadFilled, WarningFilled, InfoFilled,
          ShoppingCart, Delete, Minus, Close, Check, EditPen } from '@element-plus/icons-vue'
 import { useNotify } from '@/composables/useNotify'
 import CommonPagination from '@/components/common/CommonPagination.vue'
@@ -911,10 +965,34 @@ const { toast, confirmDelete } = useNotify()
 
 const lines = ['1线', '2线', '3线', '4线', '5线', '6线', '7线', '8线', '9线', '工程', '品质', '维修', '解析']
 const operatorOptions = ref([])          // 历史借/领用人列表
+const departmentManagerOptions = ref([]) // 历史部门负责人列表
+const HIDDEN_OP_KEY = 'wh_hidden_operators'
+const HIDDEN_DM_KEY = 'wh_hidden_department_managers'
 const loadOperators = async () => {
   try {
-    operatorOptions.value = (await warehouseApi.operators()).data || []
+    const raw = (await warehouseApi.operators()).data || []
+    const hidden = new Set(JSON.parse(localStorage.getItem(HIDDEN_OP_KEY) || '[]'))
+    operatorOptions.value = raw.filter(o => !hidden.has(o))
   } catch { /* 静默 */ }
+}
+const loadDepartmentManagers = async () => {
+  try {
+    const raw = (await warehouseApi.departmentManagers()).data || []
+    const hidden = new Set(JSON.parse(localStorage.getItem(HIDDEN_DM_KEY) || '[]'))
+    departmentManagerOptions.value = raw.filter(d => !hidden.has(d))
+  } catch { /* 静默 */ }
+}
+const deleteOperator = (name) => {
+  const s = new Set(JSON.parse(localStorage.getItem(HIDDEN_OP_KEY) || '[]'))
+  s.add(name)
+  localStorage.setItem(HIDDEN_OP_KEY, JSON.stringify([...s]))
+  operatorOptions.value = operatorOptions.value.filter(o => o !== name)
+}
+const deleteDepartmentManager = (name) => {
+  const s = new Set(JSON.parse(localStorage.getItem(HIDDEN_DM_KEY) || '[]'))
+  s.add(name)
+  localStorage.setItem(HIDDEN_DM_KEY, JSON.stringify([...s]))
+  departmentManagerOptions.value = departmentManagerOptions.value.filter(d => d !== name)
 }
 
 // ---------------- 列表 ----------------
@@ -925,7 +1003,7 @@ const pageSize = ref(20)
 const loading = ref(false)
 const borrowKeyword = ref('')   // 顶部搜索，仅用于借领/归还
 const activeTab = ref('首页')
-const lowItems = ref([])
+
 
 // 治具 Tab 筛选
 const jigFilterName = ref('')
@@ -1115,7 +1193,6 @@ const loadStats = async () => {
   try {
     const res = await warehouseApi.stats({ part_type: activeTab.value === '首页' ? null : activeTab.value })
     sd.value = res.data || sd.value
-    lowItems.value = res.data?.low_stock_items || []
     statsUpdateTime.value = new Date().toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   } catch (e) { console.error(e) }
 }
@@ -1282,6 +1359,18 @@ const handleDelete = async (row) => {
   }
 }
 
+/** 格式化时间用于展示，只显示月-日 时:分 */
+const formatTime = (t) => {
+  if (!t) return ''
+  const d = new Date(t)
+  if (isNaN(d.getTime())) return t
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  return `${mm}-${dd} ${hh}:${mi}`
+}
+
 // ---------------- 批量导入 ----------------
 const uploadRef = ref(null)
 const importDialog = ref(false)
@@ -1376,18 +1465,6 @@ const openLoss = (row) => {
 const openDamaged = (row) => {
   actionRow.value = row
   returnDialog.value = true
-}
-
-const openReturnFromCart = async (item) => {
-  scanKeyword.value = ''
-  returnDialog.value = true
-  // 从 API 获取完整物品信息（cart item 缺少 stock_qty/total_qty 等字段）
-  try {
-    const res = await warehouseApi.detail(item.id)
-    actionRow.value = res.data.part || item
-  } catch {
-    actionRow.value = item
-  }
 }
 
 const openFinishRepair = (row) => {
@@ -1676,6 +1753,7 @@ onMounted(() => {
   }
   loadTxData()
   loadOperators()
+  loadDepartmentManagers()
 })
 
 onUnmounted(() => {
@@ -1714,20 +1792,19 @@ watch(activeTab, () => {
   cartItems.value = []
 })
 
-/** 顶部搜索：搜索物品并直接加入购物车，同时打开弹框 */
+/** 顶部搜索：先搜索物品加入购物车，再打开弹框（避免弹框动画导致延迟） */
 const onBorrowSearch = async () => {
   const kw = borrowKeyword.value.trim()
   if (!kw) return
-  // 自动打开弹框
-  if (!cartDialog.value) {
-    cartDialog.value = true
-    await nextTick()
-  }
-  // 把关键词填入弹框搜索框并执行搜索
-  scanKeyword.value = kw
-  await onScan()
-  scanKeyword.value = ''
   borrowKeyword.value = ''
+  // 先搜索，直接加购物车，再开弹框
+  const added = await doScanSearch(kw)
+  if (added > 0) {
+    if (!cartDialog.value) {
+      cartDialog.value = true
+    }
+    nextTick(focusScanInput)
+  }
 }
 
 const openBorrowDialog = () => {
@@ -1735,17 +1812,15 @@ const openBorrowDialog = () => {
   nextTick(focusScanInput)
 }
 
-const onScan = async () => {
-  const kw = scanKeyword.value.trim()
-  if (!kw) return
+/** 执行搜索并添加物品到购物车，返回实际添加数量（归还模式下自动过滤无记录物品） */
+const doScanSearch = async (kw) => {
   scanLoading.value = true
   try {
-    // 搜索所有匹配的物品
     const res = await warehouseApi.list({ keyword: kw, page: 1, page_size: 50 })
     const items = res.data?.items || []
     if (!items.length) {
       toast.error('未找到匹配物品')
-      return
+      return 0
     }
 
     // 筛选最终要添加的物品列表
@@ -1758,19 +1833,33 @@ const onScan = async () => {
       }
     }
 
-    // 首页加入出入库抽屉，每个默认 1 件
+    // 加入购物车，每个默认 1 件
     let added = 0
     for (const item of targetItems) {
-      addToCart(item, 1)   // 强制 qty=1，不触发库存不足提示
+      addToCart(item, 1)
       added++
     }
-    scanKeyword.value = ''
-    if (added > 0) toast.success(`已添加 ${added} 件到出入库抽屉`)
+    if (added > 0 && scanMode.value === 'return') {
+      // 归还模式：加载记录并自动过滤无借出物品
+      await loadCartItemsRecords()
+    }
+    return cartItems.value.length  // 返回实际留在购物车中的数量
   } catch (e) {
     console.error(e)
     toast.error('搜索失败')
+    return 0
   } finally {
     scanLoading.value = false
+  }
+}
+
+const onScan = async () => {
+  const kw = scanKeyword.value.trim()
+  if (!kw) return
+  scanKeyword.value = ''
+  const added = await doScanSearch(kw)
+  if (added > 0) {
+    toast.success(`已添加 ${added} 件到出入库抽屉`)
   }
 }
 
@@ -1857,6 +1946,57 @@ const changeQty = (item, delta) => {
 const removeFromCart = (id) => { cartItems.value = cartItems.value.filter(c => c.id !== id) }
 const clearCart = () => { cartItems.value = [] }
 
+/** 加载购物车中每件物品的活跃记录（归还模式用）
+ *  自动移除没有借出记录的物品 */
+const loadCartItemsRecords = async () => {
+  for (const item of cartItems.value) {
+    if (item.activeRecords) continue
+    item.loadingRecords = true
+    try {
+      const isCon = item.part_type === '耗材'
+      const records = (isCon
+        ? (await warehouseApi.consumeRecords(item.id, true)).data
+        : (await warehouseApi.borrowRecords(item.id, true)).data) || []
+      const field = isCon ? 'tx_type' : 'status'
+      let active = records.filter(r => ['领用', '借出'].includes(r[field]))
+      // 统一字段名：治具借出记录用 borrower，耗食用 operator，统一成 operator 方便模板使用
+      active = active.map(r => {
+        if (!isCon && r.borrower !== undefined) {
+          r.operator = r.borrower
+        }
+        return r
+      })
+      item.activeRecords = active
+      if (item.activeRecords.length > 0) {
+        item.selectedRecordId = item.activeRecords[0].id
+      }
+    } catch {} finally {
+      item.loadingRecords = false
+    }
+  }
+  // 移除没有借出记录的物品（无借出记录不应出现在归还列表）
+  cartItems.value = cartItems.value.filter(item => {
+    const hasRecords = item.activeRecords && item.activeRecords.length > 0
+    if (!hasRecords && scanMode.value === 'return') {
+      return false
+    }
+    return true
+  })
+}
+
+// 切换借领/归还模式时，自动加载或清除购物车物品的活跃记录
+watch(scanMode, (mode) => {
+  if (mode === 'return' && cartItems.value.length > 0) {
+    loadCartItemsRecords()
+  } else if (mode === 'borrow') {
+    cartItems.value.forEach(item => {
+      delete item.activeRecords
+      delete item.selectedRecordId
+      delete item.loadingRecords
+    })
+  }
+})
+
 const submitBatch = async () => {
   if (!cartItems.value.length) return
   if (scanMode.value !== 'return') {
@@ -1870,35 +2010,23 @@ const submitBatch = async () => {
       try {
         const payload = { qty: item.qty, remark: scanForm.remark }
         if (scanMode.value === 'return') {
-          // 归还模式：根据物品类型获取活跃记录，自动处理
-          const isConsumable = item.part_type === '耗材'
-          const records = isConsumable
-            ? (await warehouseApi.consumeRecords(item.id, true)).data || []
-            : (await warehouseApi.borrowRecords(item.id, true)).data || []
-          // 耗材用 tx_type，治具用 status
-          const statusField = isConsumable ? 'tx_type' : 'status'
-          // 按优先级查找可处理的记录
-          const priority = isConsumable
-            ? ['领用', '损坏', '维修', '丢失']
-            : ['借出', '损坏', '维修', '丢失']
-          const activeRecord = records.find(r => priority.includes(r[statusField]))
-          if (!activeRecord) {
-            results.errors.push(`${item.name}: 没有可处理的记录`)
+          // 归还模式：使用用户点击选中的记录
+          if (!item.selectedRecordId) {
+            results.errors.push(`${item.name}: 请点击左侧记录选中要归还的项`)
             results.fail++
             continue
           }
-          const curStatus = activeRecord[statusField]
-          if (curStatus === '领用' || curStatus === '借出') {
-            const retPayload = isConsumable
-              ? { consume_tx_id: activeRecord.id }
-              : { borrow_record_id: activeRecord.id }
-            await warehouseApi.returnBack(item.id, retPayload)
-          } else {
-            // 损坏 / 维修 / 丢失 → 需要用户在弹框中手动处理
-            results.errors.push(`${item.name}: 当前状态为"${curStatus}"，请点击右侧"处理"按钮手动操作`)
+          const isCon = item.part_type === '耗材'
+          const record = item.activeRecords?.find(r => r.id === item.selectedRecordId)
+          if (!record) {
+            results.errors.push(`${item.name}: 选中的记录不存在`)
             results.fail++
             continue
           }
+          const retPayload = isCon
+            ? { consume_tx_id: record.id }
+            : { borrow_record_id: record.id }
+          await warehouseApi.returnBack(item.id, retPayload)
         } else {
           payload.operator = scanForm.operator
           payload.department_manager = scanForm.department_manager
@@ -1940,6 +2068,13 @@ const submitBatch = async () => {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+}
+/* 双层锁定：overlay + overlay-dialog 都不能滚 */
+:global(.cart-modal) {
+  overflow: hidden !important;
+}
+:global(.cart-modal .el-overlay-dialog) {
+  overflow: hidden !important;
 }
 .page-header {
   display: flex;
@@ -2001,7 +2136,7 @@ const submitBatch = async () => {
   justify-content: space-between;
   flex-shrink: 0;
 }
-.wh-warn-bar { flex-shrink: 0; }
+
 
 /* 主区域：看板 / 列表 / 出入库记录 */
 .wh-main {
@@ -2119,31 +2254,7 @@ const submitBatch = async () => {
   font-size: 13px;
 }
 
-/* 低库存预警条 */
-.wh-warn-bar {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 14px;
-  margin-bottom: 10px;
-  background: #FEF2F2;
-  border: 1px solid #FECACA;
-  border-radius: 6px;
-  font-size: 13px;
-}
-.wh-warn-title { color: #DC2626; font-weight: 700; white-space: nowrap; padding-top: 3px; display: flex; align-items: center; gap: 4px; }
-.wh-warn-items { display: flex; flex-wrap: wrap; gap: 8px; }
-.wh-warn-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: #fff;
-  border: 1px solid #FECACA;
-  border-radius: 999px;
-  padding: 2px 6px 2px 12px;
-  color: var(--c-text-2);
-}
-.wh-warn-chip b { color: #DC2626; }
+
 
 /* 表格 */
 .wh-name { font-weight: 600; color: var(--c-text); }
@@ -2231,14 +2342,88 @@ const submitBatch = async () => {
 }
 
 /* 出入库弹框 */
+/* ① el-dialog 整体：限制最大高度 + flex 布局 */
+.cart-dialog :deep(.el-dialog) {
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  margin-top: 10vh !important;
+}
+.cart-dialog :deep(.el-dialog__header) { flex-shrink: 0; }
+.cart-dialog :deep(.el-dialog__footer) { flex-shrink: 0; }
+
+/* ④ 上部三个区固定，不参与压缩 */
+.cart-dialog .cd-mode-bar,
+.cart-dialog .cd-scan-bar,
+.cart-dialog .cd-footer {
+  flex-shrink: 0;
+}
+/* dialog 固定高度 + flex column */
+.cart-dialog :deep(.el-dialog) {
+  height: 80vh !important;
+  max-height: 80vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: 10vh auto !important;
+}
+.cart-dialog :deep(.el-dialog__header) { flex-shrink: 0; }
+.cart-dialog :deep(.el-dialog__footer) { flex-shrink: 0; }
+
+/* body 吃满剩余高度，向下传 */
 .cart-dialog :deep(.el-dialog__body) {
-  padding: 0; overflow: hidden;
+  flex: 1 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
+
+/* cd-wrap 撑满 body */
 .cart-dialog .cd-wrap {
-  max-height: 520px; display: flex; flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+
+/* 上中下三段：上段固定，body 可滚 */
+.cart-dialog .cd-mode-bar,
+.cart-dialog .cd-scan-bar,
+.cart-dialog .cd-footer {
+  flex-shrink: 0;
+}
+
+/* cd-body 吃满剩余，唯一滚动区 */
 .cart-dialog .cd-body {
-  flex: 1; min-height: 0; overflow-y: auto; padding: 10px 20px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* cd-list 内部滚 */
+.cart-dialog .cd-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* ⑥ cd-list：唯一滚动区 */
+.cart-dialog .cd-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* 删掉 max-height: 100%（不再需要，反而会干扰） */
 }
 .cd-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .cd-header {
@@ -2267,19 +2452,23 @@ const submitBatch = async () => {
 
 .cd-list {
   display: flex; flex-direction: column; gap: 8px;
-  overflow-y: auto; min-height: 0;
-  /* 利用 flex: 1 撑满 .cd-body 剩余空间，超出时内部滚动，不影响底部按钮 */
-  flex: 1;
+  overflow-y: auto;
+  flex: 1; min-height: 0;
+  /* 强制约束：不超出父容器高度 */
+  max-height: 100%;
 }
 .cd-row {
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: flex-start; gap: 12px;
   padding: 10px 12px; border: 1px solid var(--c-divider); border-radius: 8px;
-  background: var(--c-bg);
+  background: var(--c-bg); flex-shrink: 0;
 }
 .cd-row-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .cd-row-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cd-row-model { font-size: 12px; color: var(--c-text-mute); font-family: Consolas, monospace; }
-.cd-row-qty { display: flex; align-items: center; gap: 6px; }
+.cd-row-qty { display: flex; align-items: center; gap: 8px; }
+.cd-row-qty .el-button { --el-button-size: 32px; font-size: 16px; }
+.cd-row .el-button--warning { height: 32px; font-size: 14px; padding: 0 16px; }
+.cd-row .el-button--danger.is-text { --el-button-size: 32px; font-size: 16px; }
 .cd-qty-num { font-weight: 700; font-size: 16px; min-width: 32px; text-align: center; }
 .cd-qty-limit { font-size: 12px; color: var(--c-text-mute); }
 
@@ -2470,5 +2659,61 @@ const submitBatch = async () => {
   font-weight: 700;
   color: #DC2626;
   white-space: nowrap;
+}
+
+/* 记忆下拉：选项内嵌删除按钮 */
+.mem-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+.mem-del-btn {
+  flex-shrink: 0;
+  margin-left: 12px;
+  color: #999;
+  font-size: 12px;
+}
+.mem-del-btn:hover { color: #DC2626; }
+
+/* 归还模式：购物车物品的借款人列表 */
+.cd-return-records {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cd-return-rec {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid var(--c-divider, #e5e7eb);
+  border-radius: 16px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  user-select: none;
+}
+.cd-return-rec:hover { border-color: var(--el-color-primary); color: var(--el-color-primary); }
+.cd-return-rec.active {
+  background: var(--el-color-primary);
+  color: #fff;
+  border-color: var(--el-color-primary);
+}
+.cd-rec-operator { font-weight: 700; font-size: 13px; }
+.cd-rec-line { opacity: .85; font-size: 11px; }
+.cd-rec-time { opacity: .7; font-size: 11px; }
+.cd-rec-loading { font-size: 12px; color: #999; padding: 4px 0; }
+.cd-rec-empty { font-size: 12px; color: #ccc; padding: 4px 0; }
+.cd-return-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #fefce8;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #92400e;
 }
 </style>

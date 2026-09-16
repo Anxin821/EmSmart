@@ -38,6 +38,8 @@ export const warehouseApi = {
   transactions: (params) => api.get('/warehouse/transactions', { params }),
   // 历史借/领用人列表（el-select allow-create 记忆）
   operators: () => api.get('/warehouse/operators'),
+  // 历史部门负责人列表（el-select allow-create 记忆）
+  departmentManagers: () => api.get('/warehouse/department-managers'),
   // 编辑出入库记录备注
   updateTxRemark: (txId, remark) => api.put(`/warehouse/transactions/${txId}/remark`, { remark }),
 }

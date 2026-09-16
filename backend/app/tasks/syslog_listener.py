@@ -164,6 +164,12 @@ def _do_ping_monitor_tick(db) -> None:
 
     from app.core.timeutil import beijing_now
     now = time.time()
+
+    # ── 读取排除列表（不需要 Ping 的 IP，逗号分隔） ──
+    from app.services.network_service import get_settings
+    _cfg = get_settings(db)
+    _excluded = {ip.strip() for ip in (_cfg.get("syslog_exclude_ips") or "").split(",") if ip.strip()}
+
     # 清理超过 10 分钟未活动的 IP
     stale = [ip for ip, last_seen in _PING_SRC_IPS.items() if now - last_seen > 600]
     for ip in stale:
@@ -173,7 +179,8 @@ def _do_ping_monitor_tick(db) -> None:
         _PING_ALERTED.pop(ip, None)
         _PING_ALERT_TIME.pop(ip, None)
 
-    ips = list(_PING_SRC_IPS.keys())
+    # 排除不需要 Ping 的 IP
+    ips = [ip for ip in _PING_SRC_IPS if ip not in _excluded]
     if not ips:
         _PING_LAST_TICK = now
         return
@@ -275,15 +282,6 @@ def syslog_listener_loop(get_session) -> None:
                         pass
             db.close()
             db = None
-            # Ping 连通监控：无论是否绑定 socket，每轮都执行
-            ping_db = get_session()
-            try:
-                _do_ping_monitor_tick(ping_db)
-            except Exception as e:
-                print(f"[PingMonitor] tick 异常：{e}")
-            finally:
-                ping_db.close()
-                ping_db = None
 
             if sock is None:
                 time.sleep(2)
@@ -294,13 +292,6 @@ def syslog_listener_loop(get_session) -> None:
                 print(f"[Syslog-DBG] 收到数据包，来源IP:{addr[0]}，原始字节: {data}")
                 # ==============================
                 src_ip = addr[0]
-                # 记录源 IP 供 Ping 连通监控使用
-                _PING_SRC_IPS[src_ip] = time.time()
-                # ★ 收到 syslog 报文 = 设备在线，重置 ping 监控计数（很多设备禁 Ping）
-                _PING_FAIL_COUNT.pop(src_ip, None)
-                _PING_ALERTED.pop(src_ip, None)
-                _PING_OK_COUNT.pop(src_ip, None)
-                _PING_ALERT_TIME.pop(src_ip, None)
                 parsed = parse_syslog(data)
                 if not parsed:
                     print(f"[Syslog-DBG] 报文解析失败，丢弃")

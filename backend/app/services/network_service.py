@@ -308,6 +308,8 @@ DEFAULT_SETTINGS = {
     # 关键词覆盖登录/退出（用户要求监控）+ H3C 交换机端口/环路/硬件事件实时捕获。
     # 防轰炸靠 _SYSLOG_DEDUP（同 IP + 同消息 60 秒内只发一次）+ 移除 notice 级别告警。
     "syslog_keywords": "登录,退出,失败,攻击,非法,error,warning,critical,异常,故障,断开,down,状态变为DOWN,link down,Line protocol,环路,温度过高,风扇,端口防雷",
+    # 不需要 Ping 监控的 Syslog 源 IP（逗号分隔），如已下架/停用的设备
+    "syslog_exclude_ips": "",
 }
 
 # Syslog 严重等级（不依赖关键词，命中即告警）
@@ -359,12 +361,13 @@ def get_settings(db: Session) -> Dict[str, Any]:
         "syslog_enabled": (m.get("syslog_enabled") or "0") in ("1", "true", "True", "on"),
         "syslog_port": syslog_port,
         "syslog_keywords": m.get("syslog_keywords") or "",
+        "syslog_exclude_ips": m.get("syslog_exclude_ips") or "",
     }
 
 
 def update_settings(db: Session, data: dict, request, username: str) -> Dict[str, Any]:
     for k in ("dingtalk_webhook", "dingtalk_secret", "ping_interval",
-              "syslog_port", "syslog_keywords"):
+              "syslog_port", "syslog_keywords", "syslog_exclude_ips"):
         if k not in data or data[k] is None:
             continue
         val = str(data[k]).strip()

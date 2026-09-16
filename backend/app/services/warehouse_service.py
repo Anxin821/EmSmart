@@ -294,6 +294,15 @@ def get_operators(db: Session, limit: int = 50) -> List[str]:
     return [r[0] for r in rows]
 
 
+def get_department_managers(db: Session, limit: int = 50) -> List[str]:
+    """返回历史部门负责人列表（用于前端 el-select 记忆）。"""
+    rows = db.query(PartTransaction.department_manager).filter(
+        PartTransaction.department_manager.isnot(None),
+        PartTransaction.department_manager != ""
+    ).distinct().order_by(PartTransaction.department_manager).limit(limit).all()
+    return [r[0] for r in rows]
+
+
 def list_transactions(db: Session, page: int = 1, page_size: int = 50,
                       tx_type: Optional[str] = None,
                       keyword: Optional[str] = None,

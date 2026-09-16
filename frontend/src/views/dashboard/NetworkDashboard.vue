@@ -329,6 +329,14 @@
               :disabled="!settingsForm.syslog_enabled"
             />
           </el-form-item>
+          <el-form-item label="排除 Ping 的 IP">
+            <el-input
+              v-model="settingsForm.syslog_exclude_ips"
+              placeholder="逗号分隔，如：172.16.195.5,172.16.195.159"
+              :disabled="!settingsForm.syslog_enabled"
+            />
+            <div style="font-size:12px;color:#999;margin-top:4px;">这些 IP 停止 Ping 监控，不再产生离线告警</div>
+          </el-form-item>
         </el-form>
       </div>
       <template #footer>
@@ -590,7 +598,8 @@ const settingsForm = ref({
   ping_interval: 60,
   syslog_enabled: false,
   syslog_port: 514,
-  syslog_keywords: ''
+  syslog_keywords: '',
+  syslog_exclude_ips: ''
 })
 
 const openSettings = async () => {
@@ -604,7 +613,8 @@ const openSettings = async () => {
       ping_interval: res.data?.ping_interval || 60,
       syslog_enabled: !!res.data?.syslog_enabled,
       syslog_port: res.data?.syslog_port || 514,
-      syslog_keywords: res.data?.syslog_keywords || ''
+      syslog_keywords: res.data?.syslog_keywords || '',
+      syslog_exclude_ips: res.data?.syslog_exclude_ips || ''
     }
   } catch (e) {
     console.error(e)
@@ -620,7 +630,8 @@ const buildSettingsPayload = () => ({
   ping_interval: settingsForm.value.ping_interval || 60,
   syslog_enabled: !!settingsForm.value.syslog_enabled,
   syslog_port: settingsForm.value.syslog_port || 514,
-  syslog_keywords: (settingsForm.value.syslog_keywords || '').trim()
+  syslog_keywords: (settingsForm.value.syslog_keywords || '').trim(),
+  syslog_exclude_ips: (settingsForm.value.syslog_exclude_ips || '').trim()
 })
 
 const handleSaveSettings = async () => {
