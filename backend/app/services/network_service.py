@@ -17,6 +17,12 @@ import time
 ALERT_COOLDOWN = 1800          # 同一设备两次离线告警的最小间隔（秒）= 30 分钟
 _LAST_ALERT_TIME: Dict[str, float] = {}   # device_key → 上次推离线告警的时间戳
 
+# ── 老化架 / AP Ping 防抖 ─────────────────────────────────────
+# 连续 N 次不通才判离线，防止单次丢包误报
+_PING_FAIL_LIMIT = 2
+_AGING_FAIL_COUNT: Dict[int, int] = {}  # AgingRack.id → 连续失败次数
+_AP_FAIL_COUNT: Dict[int, int] = {}     # WifiAp.id → 连续失败次数
+
 
 def _server_to_dict(d) -> Dict[str, Any]:
     return {
@@ -302,6 +308,9 @@ DEFAULT_SETTINGS = {
     "dingtalk_webhook": "",
     "dingtalk_secret": "",
     "ping_interval": "60",
+    "ping_enabled": "1",                  # Ping 监控总开关
+    "ping_fail_limit": "2",              # Ping 连续失败几次才告警
+    "dingtalk_cooldown": "1800",          # 同设备两次钉钉通知的最小间隔（秒）
     # Syslog UDP 日志监听（迁移自 wifi-monitor/syslog_listener.py）
     "syslog_enabled": "0",            # 默认关闭：Windows 绑定 514 需管理员权限
     "syslog_port": "514",
@@ -346,20 +355,18 @@ def ensure_default_settings(db: Session) -> None:
 def get_settings(db: Session) -> Dict[str, Any]:
     ensure_default_settings(db)
     m = {s.key: s.value for s in db.query(Setting).all()}
-    try:
-        interval = int(m.get("ping_interval") or 60)
-    except (TypeError, ValueError):
-        interval = 60
-    try:
-        syslog_port = int(m.get("syslog_port") or 514)
-    except (TypeError, ValueError):
-        syslog_port = 514
+    def _int(key: str, default: int) -> int:
+        try: return int(m.get(key) or default)
+        except (TypeError, ValueError): return default
     return {
         "dingtalk_webhook": m.get("dingtalk_webhook") or "",
         "dingtalk_secret": m.get("dingtalk_secret") or "",
-        "ping_interval": interval,
+        "ping_interval": _int("ping_interval", 60),
+        "ping_enabled": (m.get("ping_enabled") or "1") in ("1", "true", "True", "on"),
+        "ping_fail_limit": _int("ping_fail_limit", 2),
+        "dingtalk_cooldown": _int("dingtalk_cooldown", 1800),
         "syslog_enabled": (m.get("syslog_enabled") or "0") in ("1", "true", "True", "on"),
-        "syslog_port": syslog_port,
+        "syslog_port": _int("syslog_port", 514),
         "syslog_keywords": m.get("syslog_keywords") or "",
         "syslog_exclude_ips": m.get("syslog_exclude_ips") or "",
     }
@@ -367,6 +374,7 @@ def get_settings(db: Session) -> Dict[str, Any]:
 
 def update_settings(db: Session, data: dict, request, username: str) -> Dict[str, Any]:
     for k in ("dingtalk_webhook", "dingtalk_secret", "ping_interval",
+              "ping_enabled", "ping_fail_limit", "dingtalk_cooldown",
               "syslog_port", "syslog_keywords", "syslog_exclude_ips"):
         if k not in data or data[k] is None:
             continue
@@ -629,9 +637,9 @@ def sync_alerts(db: Session, notify: bool = True) -> Dict[str, int]:
             continue
         if offline:
             if key not in open_map:
-                # 告警冷却：同一设备 30 分钟内不重复推钉钉（但告警记录仍落库）
+                # 告警冷却：同设备不重复推钉钉（间隔由设置 dingtalk_cooldown 控制）
                 now_ts = time.time()
-                in_cooldown = (now_ts - _LAST_ALERT_TIME.get(key, 0)) < ALERT_COOLDOWN
+                in_cooldown = (now_ts - _LAST_ALERT_TIME.get(key, 0)) < cfg.get("dingtalk_cooldown", 1800)
                 if in_cooldown:
                     continue  # 静默跳过，不下发钉钉、不建新告警
                 db.add(NetworkAlert(
@@ -683,12 +691,33 @@ def monitor_tick(db: Session) -> int:
     对账告警并推送钉钉，返回设置中的下一轮检测间隔（秒）。
     每轮无论设备状态是否变化都写入 last_monitor_tick 时间戳，供看板确认巡检在跑。
     """
-    for r in db.query(AgingRack).all():
-        if r.ip_address and r.status != "维护":
-            r.status = "在线" if ping_device(r.ip_address) is not None else "离线"
-    for ap in db.query(WifiAp).all():
-        if ap.ip_address and ap.status != "维护":
-            ap.status = "在线" if ping_device(ap.ip_address) is not None else "离线"
+    cfg = get_settings(db)
+    ping_enabled = cfg["ping_enabled"]
+    fail_limit = cfg["ping_fail_limit"]
+
+    if ping_enabled:
+        for r in db.query(AgingRack).all():
+            if r.ip_address and r.status != "维护":
+                ok = ping_device(r.ip_address) is not None
+                if ok:
+                    _AGING_FAIL_COUNT.pop(r.id, None)
+                    r.status = "在线"
+                else:
+                    cnt = _AGING_FAIL_COUNT.get(r.id, 0) + 1
+                    _AGING_FAIL_COUNT[r.id] = cnt
+                    if cnt >= fail_limit:
+                        r.status = "离线"
+        for ap in db.query(WifiAp).all():
+            if ap.ip_address and ap.status != "维护":
+                ok = ping_device(ap.ip_address) is not None
+                if ok:
+                    _AP_FAIL_COUNT.pop(ap.id, None)
+                    ap.status = "在线"
+                else:
+                    cnt = _AP_FAIL_COUNT.get(ap.id, 0) + 1
+                    _AP_FAIL_COUNT[ap.id] = cnt
+                    if cnt >= fail_limit:
+                        ap.status = "离线"
     tick_row = db.query(Setting).filter(Setting.key == "last_monitor_tick").first()
     if tick_row:
         tick_row.value = beijing_now().strftime("%Y-%m-%d %H:%M:%S")

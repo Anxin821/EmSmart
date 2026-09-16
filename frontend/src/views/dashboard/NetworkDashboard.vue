@@ -278,72 +278,111 @@
       </div>
     </el-drawer>
 
-    <!-- 告警通知设置弹窗（顶栏「告警设置」按钮打开） -->
+    <!-- 告警通知设置弹窗（压缩版：卡片 + 并排 + 开关上标题） -->
     <el-dialog
       v-model="settingsDialog"
       title="告警通知设置"
-      width="560px"
+      width="640px"
       destroy-on-close
       class="net-settings-dialog"
+      modal-class="net-modal"
     >
       <div v-loading="settingsLoading" class="ns-body">
-        <el-form :model="settingsForm" label-width="110px" label-position="right">
-          <el-form-item label="钉钉 Webhook">
-            <el-input
-              v-model="settingsForm.dingtalk_webhook"
-              clearable
-              placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxxx"
-            />
-          </el-form-item>
-          <el-form-item label="加签 Secret">
-            <el-input
-              v-model="settingsForm.dingtalk_secret"
-              type="password"
-              show-password
-              clearable
-              placeholder="机器人安全设置选择「加签」后生成的 SEC"
-            />
-          </el-form-item>
-          <el-form-item label=" ">
-            <el-button :loading="settingsTesting" @click="handleTestSettings">
-              <span class="bi bi-send" style="margin-right:4px;"></span>发送测试消息
-            </el-button>
-            <span class="ns-test-hint">将先保存当前配置，再向钉钉群发送一条测试消息</span>
-          </el-form-item>
-          <el-form-item label="Ping 间隔">
-            <el-input-number v-model="settingsForm.ping_interval" :min="1" :max="3600" :step="10" controls-position="right" />
-            <span class="ns-hint">秒（后台自动巡检间隔）</span>
-          </el-form-item>
 
-          <el-divider content-position="left">Syslog 日志监听（UDP）</el-divider>
-          <el-form-item label="启用监听">
-            <el-switch v-model="settingsForm.syslog_enabled" active-text="接收设备 Syslog 并自动告警" />
-          </el-form-item>
-          <!-- 监听端口默认 514，不在前端显示 -->
-          <el-form-item label="告警关键词">
-            <el-input
-              v-model="settingsForm.syslog_keywords"
-              type="textarea"
-              :rows="2"
+        <!-- ① 钉钉机器人 -->
+        <section class="ns-card">
+          <header class="ns-card-head">
+            <span class="ns-card-icon" style="background:#EFF6FF;color:#2563EB;">
+              <span class="bi bi-chat-dots-fill"></span>
+            </span>
+            <span class="ns-card-title">钉钉机器人</span>
+            <span class="ns-card-desc">所有告警通过此渠道推送</span>
+          </header>
+
+          <div class="ns-row">
+            <label class="ns-label">Webhook</label>
+            <el-input v-model="settingsForm.dingtalk_webhook" clearable size="small"
+              placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxxx" />
+          </div>
+          <div class="ns-row">
+            <label class="ns-label">加签 Secret</label>
+            <el-input v-model="settingsForm.dingtalk_secret" type="password" show-password clearable size="small"
+              placeholder="机器人安全设置选择「加签」后生成的 SEC" />
+            <el-button :loading="settingsTesting" size="small" @click="handleTestSettings">
+              <span class="bi bi-send"></span>测试
+            </el-button>
+          </div>
+        </section>
+
+        <!-- ② Ping 连通检测 -->
+        <section class="ns-card">
+          <header class="ns-card-head">
+            <span class="ns-card-icon" style="background:#F0FDF4;color:#059669;">
+              <span class="bi bi-broadcast-pin"></span>
+            </span>
+            <span class="ns-card-title">Ping 连通检测</span>
+            <span class="ns-card-desc">设备掉线自动告警</span>
+            <el-switch v-model="settingsForm.ping_enabled" size="small" />
+          </header>
+
+          <div class="ns-row ns-row-nums" :class="{ disabled: !settingsForm.ping_enabled }">
+            <div class="ns-num-group">
+              <label>检测间隔</label>
+              <el-input-number v-model="settingsForm.ping_interval" :min="1" :max="3600" :step="10"
+                controls-position="right" size="small" :disabled="!settingsForm.ping_enabled" />
+              <span class="unit">秒</span>
+            </div>
+            <div class="ns-num-group">
+              <label>失败次数</label>
+              <el-input-number v-model="settingsForm.ping_fail_limit" :min="1" :max="20" :step="1"
+                controls-position="right" size="small" :disabled="!settingsForm.ping_enabled" />
+              <span class="unit">次</span>
+            </div>
+            <div class="ns-num-group">
+              <label>通知冷却</label>
+              <el-input-number v-model="settingsForm.dingtalk_cooldown" :min="1" :max="1440" :step="1"
+                controls-position="right" size="small" :disabled="!settingsForm.ping_enabled" />
+              <span class="unit">分钟</span>
+            </div>
+          </div>
+
+          <div v-if="settingsForm.ping_enabled" class="ns-tip">
+            <span class="bi bi-info-circle"></span>
+            每 <b>{{ settingsForm.ping_interval }}</b> 秒检测一次，连续
+            <b>{{ settingsForm.ping_fail_limit }}</b> 次失败告警，同设备
+            <b>{{ settingsForm.dingtalk_cooldown }}</b> 分钟内只推一次
+          </div>
+        </section>
+
+        <!-- ③ Syslog 日志监听 -->
+        <section class="ns-card">
+          <header class="ns-card-head">
+            <span class="ns-card-icon" style="background:#FEF3C7;color:#B45309;">
+              <span class="bi bi-file-earmark-text-fill"></span>
+            </span>
+            <span class="ns-card-title">Syslog 监听</span>
+            <span class="ns-card-desc">UDP 接收设备日志</span>
+            <el-switch v-model="settingsForm.syslog_enabled" size="small" />
+          </header>
+
+          <div class="ns-row">
+            <label class="ns-label">告警关键词</label>
+            <el-input v-model="settingsForm.syslog_keywords" type="textarea" :rows="2"
               placeholder="逗号分隔，如：失败,攻击,非法,error,warning,critical"
-              :disabled="!settingsForm.syslog_enabled"
-            />
-          </el-form-item>
-          <el-form-item label="排除 Ping 的 IP">
-            <el-input
-              v-model="settingsForm.syslog_exclude_ips"
-              placeholder="逗号分隔，如：172.16.195.5,172.16.195.159"
-              :disabled="!settingsForm.syslog_enabled"
-            />
-            <div style="font-size:12px;color:#999;margin-top:4px;">这些 IP 停止 Ping 监控，不再产生离线告警</div>
-          </el-form-item>
-        </el-form>
+              :disabled="!settingsForm.syslog_enabled" />
+          </div>
+          <div class="ns-row">
+            <label class="ns-label">排除 IP</label>
+            <el-input v-model="settingsForm.syslog_exclude_ips" size="small"
+              placeholder="逗号分隔，这些 IP 不参与 Syslog 告警"
+              :disabled="!settingsForm.syslog_enabled" />
+          </div>
+        </section>
+
       </div>
       <template #footer>
-        <div class="ns-footer">
-          <el-button @click="settingsDialog = false">取消</el-button>
-          <el-button type="primary" :loading="settingsSaving" @click="handleSaveSettings">保存设置</el-button>
-        </div>
+        <el-button size="small" @click="settingsDialog = false">取消</el-button>
+        <el-button size="small" type="primary" :loading="settingsSaving" @click="handleSaveSettings">保存设置</el-button>
       </template>
     </el-dialog>
   </div>
@@ -596,6 +635,9 @@ const settingsForm = ref({
   dingtalk_webhook: '',
   dingtalk_secret: '',
   ping_interval: 60,
+  ping_enabled: true,
+  ping_fail_limit: 2,
+  dingtalk_cooldown: 30,
   syslog_enabled: false,
   syslog_port: 514,
   syslog_keywords: '',
@@ -610,7 +652,10 @@ const openSettings = async () => {
     settingsForm.value = {
       dingtalk_webhook: res.data?.dingtalk_webhook || '',
       dingtalk_secret: res.data?.dingtalk_secret || '',
-      ping_interval: res.data?.ping_interval || 60,
+      ping_interval: res.data?.ping_interval ?? 60,
+      ping_enabled: res.data?.ping_enabled !== false,
+      ping_fail_limit: res.data?.ping_fail_limit ?? 2,
+      dingtalk_cooldown: Math.round((res.data?.dingtalk_cooldown ?? 1800) / 60),
       syslog_enabled: !!res.data?.syslog_enabled,
       syslog_port: res.data?.syslog_port || 514,
       syslog_keywords: res.data?.syslog_keywords || '',
@@ -628,6 +673,9 @@ const buildSettingsPayload = () => ({
   dingtalk_webhook: (settingsForm.value.dingtalk_webhook || '').trim(),
   dingtalk_secret: (settingsForm.value.dingtalk_secret || '').trim(),
   ping_interval: settingsForm.value.ping_interval || 60,
+  ping_enabled: !!settingsForm.value.ping_enabled,
+  ping_fail_limit: settingsForm.value.ping_fail_limit || 2,
+  dingtalk_cooldown: (settingsForm.value.dingtalk_cooldown || 30) * 60,
   syslog_enabled: !!settingsForm.value.syslog_enabled,
   syslog_port: settingsForm.value.syslog_port || 514,
   syslog_keywords: (settingsForm.value.syslog_keywords || '').trim(),
@@ -707,10 +755,10 @@ onBeforeUnmount(() => {
 .top-section {
   display: flex;
   gap: 16px;
-  margin-bottom: 5px;  /* 👈 减小底部外边距：从16px→12px */
-  margin-top: 1px;     /* 👈 添加顶部外边距：增加12px */
-  margin-left: -8px;    /* 👈 减小左侧外边距：从0→-8px */
-  margin-right: -8px;   /* 👈 减小右侧外边距：从0→-8px */
+  margin-bottom: 5px;
+  margin-top: 1px;
+  margin-left: -8px;
+  margin-right: -8px;
   align-items: stretch;
   height: 180px;
   flex-shrink: 0;
@@ -721,7 +769,6 @@ onBeforeUnmount(() => {
   gap: 14px;
   flex: 1;
 }
-/* KPI 卡统一走 StatCard 组件；以下为汇报场景对这两张 hero 卡的视觉强化 */
 .stat-pair .stat-card {
   flex: 1;
   min-width: 0;
@@ -729,9 +776,7 @@ onBeforeUnmount(() => {
   padding: 16px 20px;
   border-radius: 16px;
   overflow: hidden;
-  /* 居中堆叠布局已由 StatCard 的 centered prop 提供，这里只保留 hero 卡专属尺寸/圆角 */
 }
-/* 左侧主题色竖条：一眼区分在线/离线 */
 .stat-pair .net-stat::before {
   content: "";
   position: absolute;
@@ -739,22 +784,19 @@ onBeforeUnmount(() => {
   width: 5px;
   z-index: 2;
 }
-.net-online::before  { background: transparent; }   /* 去掉绿边：在线卡不再显示左侧绿条 */
-.net-offline::before { background: transparent; }   /* 去掉红边：离线卡不再显示左侧红条 */
-/* 卡片底色：主题色淡渐变 → 白，比纯白更有层次 */
+.net-online::before  { background: transparent; }
+.net-offline::before { background: transparent; }
 .stat-pair .net-online {
   background: linear-gradient(135deg, #ECFDF5 0%, #FFFFFF 62%) !important;
-  border-color: var(--c-divider) !important;   /* 去掉绿边：改中性描边 */
-  box-shadow: 0 2px 6px rgba(15, 23, 42, .03) !important;   /* 去掉绿色光晕 */
+  border-color: var(--c-divider) !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, .03) !important;
 }
 .stat-pair .net-offline {
   background: linear-gradient(135deg, #FEF2F2 0%, #FFFFFF 62%) !important;
-  border-color: var(--c-divider) !important;   /* 去掉红边：改中性描边 */
-  box-shadow: 0 2px 6px rgba(15, 23, 42, .03) !important;   /* 去掉红色光晕 */
+  border-color: var(--c-divider) !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, .03) !important;
 }
-/* 图标徽章：圆角实底 + 白色图标 + 主题色投影 */
 .stat-pair .net-stat :deep(.icon-box) {
-  /* grid 定位由 centered prop 处理，这里只做 hero 卡图标徽章的尺寸/圆角 */
   width: 52px; height: 52px;
   border-radius: 15px;
   display: flex; align-items: center; justify-content: center;
@@ -762,11 +804,9 @@ onBeforeUnmount(() => {
 .net-online  :deep(.icon-box) { background: linear-gradient(135deg, #10B981, #059669); box-shadow: 0 8px 18px -6px rgba(16, 185, 129, .6); }
 .net-offline :deep(.icon-box) { background: linear-gradient(135deg, #EF4444, #DC2626); box-shadow: 0 8px 18px -6px rgba(239, 68, 68, .6); }
 .stat-pair .net-stat :deep(.icon-box span) { color: #fff !important; font-size: 28px; }
-/* 超大主题色数字：居中/去 padding 由 centered prop 处理，这里只保留 hero 卡的字号与主题色 */
 .net-online  :deep(.num) { color: #059669; font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
 .net-offline :deep(.num) { color: #DC2626; font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
 .stat-pair .net-stat :deep(.label) { font-size: 15px; font-weight: 600; color: var(--c-text-2); letter-spacing: .3px; }
-/* 未处理告警卡：黄色主题，数值为 0 时弱化，有告警时醒目 */
 .stat-pair .net-alert {
   background: linear-gradient(135deg, #FFFBEB 0%, #FFFFFF 62%) !important;
   border-color: var(--c-divider) !important;
@@ -779,7 +819,7 @@ onBeforeUnmount(() => {
 .spin { display: inline-block; animation: net-spin 1s linear infinite; }
 @keyframes net-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-/* 顶栏「告警设置」按钮（Teleport 内容仍带 scoped 属性，样式生效） */
+/* 顶栏「告警设置」按钮 */
 .btn-outline-gear {
   color: #64748B;
   background: #fff;
@@ -791,8 +831,7 @@ onBeforeUnmount(() => {
   background: var(--primary-50, #EEF4FF);
 }
 
-/* ---- 告警抽屉（美化版） ---- */
-/* 固定头 + 滚动体：body 裁掉自身滚动，ad-wrap 占满，ad-body 用 min-height:0 获得内部滚动 */
+/* ---- 告警抽屉 ---- */
 .alerts-drawer :deep(.el-drawer__body) {
   padding: 0;
   display: flex;
@@ -850,7 +889,6 @@ onBeforeUnmount(() => {
 .ad-stat-num.zero { color: #059669; }
 .ad-stat-label { font-size: 13px; color: var(--c-text-3); }
 
-/* 「全部标记已处理」：自定义按钮，明确蓝底白字 hover，避免 plain 按钮文字色被全局样式覆盖 */
 .ad-resolve-all {
   display: inline-flex;
   align-items: center;
@@ -1084,54 +1122,153 @@ onBeforeUnmount(() => {
 }
 .cr-ok-line { margin-left: auto; font-size: 12px; color: var(--c-text-mute); white-space: nowrap; }
 
-/* ---- 告警通知设置弹窗（限高：内容超出时仅表单区滚动，头尾固定） ---- */
-.net-settings-dialog { margin-top: 5vh !important; margin-bottom: 5vh; }
-.net-settings-dialog :deep(.el-dialog) {
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  margin: 0 auto;
+/* ============ 告警通知设置弹窗（压缩版） ============ */
+
+/* overlay 双层锁死：整页不滚 */
+:global(.net-modal),
+:global(.net-modal .el-overlay-dialog) {
+  overflow: hidden !important;
 }
-.net-settings-dialog :deep(.el-dialog__header) { flex-shrink: 0; }
+/* overlay-dialog 作为 flex 容器，让 dialog 在其中垂直+水平居中 */
+:global(.net-modal .el-overlay-dialog) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* dialog 弹性高度 + flex column */
+.net-settings-dialog :deep(.el-dialog) {
+  max-height: 85vh !important;
+  margin: 0 !important;           /* ← 去掉 margin，交给 flex 居中 */
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+.net-settings-dialog :deep(.el-dialog__header) {
+  flex-shrink: 0 !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid #EDF0F3 !important;
+}
+.net-settings-dialog :deep(.el-dialog__footer) {
+  flex-shrink: 0 !important;
+  padding-top: 10px !important;
+  border-top: 1px solid #EDF0F3 !important;
+}
 .net-settings-dialog :deep(.el-dialog__body) {
+  flex: 1 !important;
+  min-height: 0 !important;
+  padding: 12px 18px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ns-body：唯一滚动区 */
+.ns-body {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
-  padding-top: 8px;
-  padding-bottom: 8px;
-}
-.net-settings-dialog :deep(.el-dialog__footer) { flex-shrink: 0; }
-.ns-body {
-  max-height: calc(90vh - 150px);
   overflow-y: auto;
-  padding-right: 8px;
+  padding-right: 6px;
 }
-.ns-hint { margin-left: 12px; font-size: 12px; color: var(--c-text-3); }
+
+/* ===== 卡片 ===== */
+.ns-card {
+  background: #FAFBFC;
+  border: 1px solid #E8ECF0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.ns-card:last-of-type { margin-bottom: 4px; }
+
+/* 卡片头部：图标 + 标题 + 描述 + 开关（一行） */
+.ns-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #EDF0F3;
+}
+.ns-card-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.ns-card-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0B1120;
+}
+.ns-card-desc {
+  font-size: 12px;
+  color: #94A3B8;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ===== 通用行（label + 控件） ===== */
+.ns-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ns-row:last-child { margin-bottom: 0; }
+
+.ns-label {
+  width: 88px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: #475569;
+  text-align: right;
+}
+
+/* ===== Ping 三数字并排 ===== */
+.ns-row-nums {
+  gap: 16px;
+}
+.ns-num-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.ns-num-group label {
+  font-size: 12.5px;
+  color: #64748B;
+  white-space: nowrap;
+}
+.ns-num-group .unit {
+  font-size: 12px;
+  color: #94A3B8;
+}
+.ns-row-nums.disabled {
+  opacity: .5;
+}
+
+/* ===== 人话总结 ===== */
 .ns-tip {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
-  margin-top: 6px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 7px 10px;
+  margin-top: 10px;
   background: #F0F7FF;
-  border: 1px solid #DBEAFE;
-  border-radius: 8px;
+  border-left: 3px solid #2563EB;
+  border-radius: 4px;
   font-size: 12.5px;
   line-height: 1.6;
   color: #1E40AF;
 }
-.ns-tip .bi { margin-top: 3px; }
-.ns-test-hint {
-  margin-left: 12px;
-  font-size: 12px;
-  color: var(--c-text-mute);
-}
-.ns-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
+.ns-tip .bi { margin-top: 2px; flex-shrink: 0; }
+.ns-tip b { color: #1E3A8A; font-weight: 700; padding: 0 2px; }
 
 .gauge-wrapper {
   width: 320px;
@@ -1185,7 +1322,7 @@ onBeforeUnmount(() => {
   padding: 12px 16px;
   border-bottom: 1px solid var(--c-divider);
   display: flex;
-  justify-content: center;   /* 标题居中 */
+  justify-content: center;
   align-items: center;
 }
 
@@ -1199,7 +1336,7 @@ onBeforeUnmount(() => {
 }
 
 .card-subtitle {
-  position: absolute;   /* 靠右，不占中间标题的居中位 */
+  position: absolute;
   right: 16px;
   top: 50%;
   transform: translateY(-50%);
@@ -1240,7 +1377,6 @@ onBeforeUnmount(() => {
   transform: translateY(-2px);
   box-shadow: 0 10px 24px -12px rgba(15, 23, 42, .28);
 }
-/* 三档状态配色：整卡环绕描边（绿=全部正常 / 黄=轻度异常 / 红=严重异常），不再只在左侧着色 */
 .lv-ok     { background: linear-gradient(135deg, #F0FDF4 0%, #fff 55%); border: 1.5px solid rgba(16, 185, 129, .45); }
 .lv-warn   { background: linear-gradient(135deg, #FFFBEB 0%, #fff 55%); border: 1.5px solid rgba(245, 158, 11, .55); }
 .lv-danger { background: linear-gradient(135deg, #FEF2F2 0%, #fff 55%); border: 1.5px solid rgba(239, 68, 68, .6); }
@@ -1277,7 +1413,7 @@ onBeforeUnmount(() => {
 .lh-frac b { color: var(--c-text); font-size: 14px; }
 
 .lh-bar {
-  align-self: stretch;   /* 居中堆叠下仍保持进度条满宽，不塔缩 */
+  align-self: stretch;
   height: 7px;
   border-radius: 999px;
   background: #EEF2F7;
@@ -1288,8 +1424,6 @@ onBeforeUnmount(() => {
 .lv-warn .lh-bar i   { background: linear-gradient(90deg, #FBBF24, #F59E0B); }
 .lv-danger .lh-bar i { background: linear-gradient(90deg, #F87171, #EF4444); }
 
-/* 设备芯片：整块流动 + 文字不折行。能并排就并排，放不下时整块换到下一行，
-   绝不把“服务器 3”拆成两行（之前用刚性 2 列网格，窄卡下 auto 列被压缩导致芯片内文字折行） */
 .lh-types {
   display: flex;
   flex-wrap: wrap;
@@ -1306,7 +1440,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--c-divider);
   border-radius: 7px;
   padding: 2px 7px;
-  white-space: nowrap;   /* 芯片文字（如“服务器 3”）不折行 */
+  white-space: nowrap;
 }
 .lh-chip .bi { font-size: 12px; color: var(--c-text-3); }
 .lh-chip em { font-style: normal; font-weight: 700; color: #DC2626; }
@@ -1338,11 +1472,11 @@ onBeforeUnmount(() => {
 }
 
 .all-ok {
-  height: 100%;              /* 撑满 offline-body 内容区 */
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;   /* 垂直居中 */
+  justify-content: center;
   gap: 12px;
   color: var(--ok);
   font-size: 15px;
@@ -1418,7 +1552,7 @@ onBeforeUnmount(() => {
 }
 
 .badge {
-  position: absolute;   /* 靠右，不占中间标题的居中位 */
+  position: absolute;
   right: 16px;
   top: 50%;
   transform: translateY(-50%);
@@ -1443,7 +1577,7 @@ onBeforeUnmount(() => {
 .offline-body::-webkit-scrollbar-thumb { background: #D8DEEA; border-radius: 4px; }
 .offline-body::-webkit-scrollbar-track { background: transparent; }
 
-/* 自动巡检脚注：离线卡片底部一行小字，不参与卡片高度/列表布局 */
+/* 自动巡检脚注 */
 .monitor-foot {
   flex-shrink: 0;
   display: flex;
