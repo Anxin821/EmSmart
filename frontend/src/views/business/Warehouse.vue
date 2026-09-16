@@ -416,8 +416,9 @@
                           <el-button v-if="row.available_qty - (row.repair_qty || 0) > 0"
                             type="primary" link size="small" @click.stop="openBorrow(row)">借领</el-button>
                           <el-button v-else type="info" link size="small" disabled @click.stop="toast.warn(`「${row.name}」可借数量不足`)">借领</el-button>
-                          <el-button type="warning" link size="small"
+                          <el-button v-if="row.status === '借出'" type="warning" link size="small"
                             @click.stop="openReturn(row)">归还</el-button>
+                          <el-button v-else type="info" link size="small" disabled>归还</el-button>
                         </template>
                         <template v-else>
                           <el-button v-if="row.stock_qty > 0"
@@ -436,7 +437,7 @@
                               <el-dropdown-item v-if="row.part_type === '治具' && row.status === '借出'" command="found_back">已找回</el-dropdown-item>
                               <el-dropdown-item v-if="row.part_type === '治具' && row.status === '借出'" command="repair_damaged">已修复</el-dropdown-item>
                               <el-dropdown-item command="edit">编辑</el-dropdown-item>
-                              <el-dropdown-item v-if="userStore.isAdmin || (userStore.user?.full_name === '秦江蓉' && userStore.isEngineer)" command="delete" divided>删除</el-dropdown-item>
+                              <el-dropdown-item v-if="userStore.isAdmin || (userStore.user?.full_name === '秦江蓉' && userStore.isEngineer)" command="delete">删除</el-dropdown-item>
                             </el-dropdown-menu>
                           </template>
                         </el-dropdown>
@@ -521,6 +522,12 @@
                     <span class="cd-rec-operator">{{ rec.operator || '未知' }}</span>
                     <span class="cd-rec-line" v-if="rec.line">【{{ rec.line }}】</span>
                     <span class="cd-rec-time">{{ formatTime(rec.borrow_time) }}</span>
+                    <span class="cd-rec-actions">
+                      <el-button size="small" type="primary" link @click.stop="cartReturnRecord(item, rec)">归还</el-button>
+                      <el-button size="small" type="warning" link @click.stop="cartToRepair(item, rec)">维修</el-button>
+                      <el-button size="small" type="info" link @click.stop="cartLoss(item, rec)">报失</el-button>
+                      <el-button size="small" type="danger" link @click.stop="cartDamaged(item, rec)">报损</el-button>
+                    </span>
                   </div>
                 </div>
                 <div v-else-if="item.loadingRecords" class="cd-rec-loading">加载中…</div>
@@ -1724,7 +1731,7 @@ const openDetail = async (row) => {
 
 const onTableRowClick = (row) => {
   if (row._isFilter) return
-  showDetail(row)
+  openDetail(row)
 }
 
 const tableRowClassName = ({ row }) => {
@@ -1783,13 +1790,75 @@ watch(activeTab, () => {
 const onBorrowSearch = async () => {
   const kw = borrowKeyword.value.trim()
   if (!kw) return
-  borrowKeyword.value = ''
+  borrowKeyword.value = ''  // 清空输入让用户继续扫码
   const added = await doScanSearch(kw)
   if (added > 0) {
+    toast.success(`已添加 ${added} 件到列表`)
     if (!cartDialog.value) {
       cartDialog.value = true
     }
     nextTick(focusScanInput)
+  }
+  // doScanSearch 内部已处理无结果提示，此处无需重复提示
+}
+
+/** 归还弹框内：归还单条记录 */
+const cartReturnRecord = async (item, rec) => {
+  try {
+    await warehouseApi.returnBack(item.id, { borrow_record_id: rec.id })
+    toast.success('归还成功')
+    removeFromCart(item.id)
+    refreshAll()
+  } catch (e) {
+    toast.error(e.response?.data?.detail || '操作失败')
+  }
+}
+
+/** 归还弹框内：转维修 */
+const cartToRepair = async (item, rec) => {
+  try {
+    await warehouseApi.toRepair(item.id, { borrow_record_id: rec.id })
+    toast.success('已转维修')
+    removeFromCart(item.id)
+    refreshAll()
+  } catch (e) {
+    toast.error(e.response?.data?.detail || '操作失败')
+  }
+}
+
+/** 归还弹框内：报失 */
+const cartLoss = async (item, rec) => {
+  try {
+    const { ElMessageBox } = await import('element-plus')
+    const { value } = await ElMessageBox.prompt('请输入报失原因（选填）', '报失确认', {
+      confirmButtonText: '确认报失', cancelButtonText: '取消', inputType: 'textarea',
+    })
+    await warehouseApi.loss(item.id, { borrow_record_id: rec.id, remark: value || '' })
+    toast.success('已报失')
+    removeFromCart(item.id)
+    refreshAll()
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') {
+      toast.error(e.response?.data?.detail || '操作失败')
+    }
+  }
+}
+
+/** 归还弹框内：报损 */
+const cartDamaged = async (item, rec) => {
+  try {
+    const { ElMessageBox } = await import('element-plus')
+    const { value } = await ElMessageBox.prompt('请输入报损原因（选填）', '报损确认', {
+      confirmButtonText: '确认报损', cancelButtonText: '取消', inputType: 'textarea',
+    })
+    await warehouseApi.damaged(item.id, { borrow_record_id: rec.id, remark: value || '' })
+    toast.success('已报损')
+    removeFromCart(item.id)
+    refreshAll()
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') {
+      toast.error(e.response?.data?.detail || '操作失败')
+    }
   }
 }
 
@@ -2660,12 +2729,12 @@ const submitBatch = async () => {
   gap: 4px;
 }
 .cd-return-rec {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
   border: 1px solid var(--c-divider, #e5e7eb);
-  border-radius: 16px;
+  border-radius: 8px;
   font-size: 12px;
   cursor: pointer;
   transition: all .15s;
@@ -2681,6 +2750,7 @@ const submitBatch = async () => {
 .cd-rec-operator { font-weight: 700; font-size: 13px; }
 .cd-rec-line { opacity: .85; font-size: 11px; }
 .cd-rec-time { opacity: .7; font-size: 11px; }
+.cd-rec-actions { margin-left: auto; display: flex; gap: 4px; flex-shrink: 0; }
 .cd-rec-loading { font-size: 12px; color: #999; padding: 4px 0; }
 .cd-rec-empty { font-size: 12px; color: #ccc; padding: 4px 0; }
 .cd-return-hint {

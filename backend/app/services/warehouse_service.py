@@ -907,7 +907,6 @@ def report_damaged(db: Session, part_id: int, data: dict, request, username: str
             raise HTTPException(status_code=404, detail="借出记录不存在")
         if r.status != "借出":
             raise HTTPException(status_code=400, detail="该记录已归还或已转维修")
-        p.available_qty = max(0, (p.available_qty or 0) - r.qty)
         r.status = "损坏"
         _change_tx_type(db, p, "借出", r.borrower, r.borrow_time, "损坏", "借出后损坏")
         next_active = (db.query(BorrowRecord)
