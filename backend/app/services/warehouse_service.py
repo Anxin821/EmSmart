@@ -1128,7 +1128,7 @@ def restock(db: Session, part_id: int, data: dict, request, username: str) -> di
     if qty <= 0:
         raise HTTPException(status_code=400, detail="补货数量必须大于 0")
     p.total_qty += qty
-    _add_tx(db, p, "补货", qty, remark=data.get("remark") or "")
+    _add_tx(db, p, "补货", qty, operator=username, remark=data.get("remark") or "")
     db.commit()
     db.refresh(p)
     write_operation_log(db, username, "RESTOCK", "warehouse", str(p.id),
