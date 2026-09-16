@@ -272,7 +272,10 @@
                       <el-input v-model="consFilterName" size="small" placeholder="搜索名称" clearable
                         @change="page=1;loadData()" />
                     </div>
-                    <span v-else class="wh-name">{{ row.name }}</span>
+                    <span v-else class="wh-name-wrap">
+  <span class="wh-name">{{ row.name }}</span>
+  <span v-if="row.part_type === '耗材'" class="wh-name-sub">耗材</span>
+</span>
                   </template>
                 </el-table-column>
 
@@ -523,9 +526,10 @@
           <div v-else class="cd-list">
             <div v-for="item in cartItems" :key="item.id" class="cd-row">
               <div class="cd-row-info">
-                <span class="cd-row-name">{{ item.name }}</span>
-                <span class="cd-row-model">{{ item.model || '-' }}</span>
-              </div>
+  <span class="cd-row-name">{{ item.name }}</span>
+  <span v-if="item.part_type === '耗材'" class="cd-row-tag">耗材</span>
+  <span v-else class="cd-row-model">{{ item.model || '-' }}</span>
+</div>
               <template v-if="scanMode === 'return'">
                 <div class="cd-return-records" v-if="item.activeRecords?.length">
                   <div v-for="rec in item.activeRecords" :key="rec.id"
@@ -536,9 +540,9 @@
                     <span class="cd-rec-line" v-if="rec.line">【{{ rec.line }}】</span>
                     <span class="cd-rec-time">{{ formatTime(rec.borrow_time) }}</span>
                     <span class="cd-rec-actions">
-  <el-button size="small" plain class="cd-rec-btn" @click.stop="cartToRepair(item, rec)">维修</el-button>
-  <el-button size="small" plain class="cd-rec-btn" @click.stop="cartLoss(item, rec)">报失</el-button>
-  <el-button size="small" plain class="cd-rec-btn" @click.stop="cartDamaged(item, rec)">报损</el-button>
+  <el-button size="small" class="cd-rec-btn cd-rec-btn--repair"  @click.stop="cartToRepair(item, rec)">维修</el-button>
+  <el-button size="small" class="cd-rec-btn cd-rec-btn--loss"    @click.stop="cartLoss(item, rec)">报失</el-button>
+  <el-button size="small" class="cd-rec-btn cd-rec-btn--damaged" @click.stop="cartDamaged(item, rec)">报损</el-button>
 </span>
                   </div>
                 </div>
@@ -2265,6 +2269,17 @@ const submitBatch = async () => {
 .cd-row-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .cd-row-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cd-row-model { font-size: 12px; color: var(--c-text-mute); font-family: Consolas, monospace; }
+.cd-row-tag {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--c-text-mute, #94A3B8);
+  background: #EEF2F6;
+  padding: 1px 6px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
 .cd-row-qty { display: flex; align-items: center; gap: 8px; }
 .cd-row-qty .el-button { --el-button-size: 32px; font-size: 16px; }
 .cd-row .el-button--warning { height: 32px; font-size: 14px; padding: 0 16px; }
@@ -2531,6 +2546,21 @@ const submitBatch = async () => {
   font-size: 13px;
 }
 .wh-name { font-weight: 600; color: var(--c-text); }
+.wh-name-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1.2;
+}
+.wh-name-sub {
+  font-size: 11px;
+  color: var(--c-text-mute, #94A3B8);
+  background: #EEF2F6;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
 .wh-form-hint { margin-left: 10px; font-size: 12px; color: var(--c-text-mute); }
 .wh-form-static { font-size: 14px; font-weight: 600; color: var(--c-text, #0B1120); line-height: 32px; }
 .loc-tags { display: inline-flex; gap: 4px; flex-wrap: wrap; align-items: center; }
@@ -2845,6 +2875,42 @@ const submitBatch = async () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+/* 三种颜色：只覆盖颜色变量，不动尺寸 */
+.cd-rec-btn--repair {
+  --el-button-text-color: #D97706;
+  --el-button-border-color: #FCD34D;
+  --el-button-bg-color: #FFFBEB;
+  --el-button-hover-text-color: #FFFFFF;
+  --el-button-hover-bg-color: #F59E0B;
+  --el-button-hover-border-color: #F59E0B;
+  --el-button-active-text-color: #FFFFFF;
+  --el-button-active-bg-color: #D97706;
+  --el-button-active-border-color: #D97706;
+}
+
+.cd-rec-btn--loss {
+  --el-button-text-color: #475569;
+  --el-button-border-color: #CBD5E1;
+  --el-button-bg-color: #F8FAFC;
+  --el-button-hover-text-color: #FFFFFF;
+  --el-button-hover-bg-color: #64748B;
+  --el-button-hover-border-color: #64748B;
+  --el-button-active-text-color: #FFFFFF;
+  --el-button-active-bg-color: #475569;
+  --el-button-active-border-color: #475569;
+}
+
+.cd-rec-btn--damaged {
+  --el-button-text-color: #DC2626;
+  --el-button-border-color: #FCA5A5;
+  --el-button-bg-color: #FEF2F2;
+  --el-button-hover-text-color: #FFFFFF;
+  --el-button-hover-bg-color: #DC2626;
+  --el-button-hover-border-color: #DC2626;
+  --el-button-active-text-color: #FFFFFF;
+  --el-button-active-bg-color: #B91C1C;
+  --el-button-active-border-color: #B91C1C;
 }
 .cd-rec-loading { font-size: 12px; color: #999; padding: 4px 0; }
 .cd-rec-empty { font-size: 12px; color: #ccc; padding: 4px 0; }
