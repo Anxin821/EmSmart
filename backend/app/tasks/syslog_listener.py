@@ -98,13 +98,16 @@ def parse_syslog(data: bytes):
         mon, day, hhmmss, source, rest = m.groups()
         from app.core.timeutil import beijing_now
         year = beijing_now().year
+        # source 可能是正文的一部分（如 "[4]时间=2026-09-16"），
+        # 拼接 source + rest 得到更完整的原始内容
+        full_msg = f"{source} {rest.strip()}"
         return {
             "raw": raw,
             "timestamp": f"{year} {mon} {int(day):02d} {hhmmss}",
             "level": level,
             "source": source,
             "message": rest.strip(),
-            "full_message": rest.strip(),
+            "full_message": full_msg,
         }
     return {"raw": raw, "message": message, "level": level}
 def should_alert(parsed: dict, keywords: list[str]) -> bool:

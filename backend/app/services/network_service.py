@@ -604,9 +604,18 @@ def record_syslog_alert(db: Session, src_ip: str, parsed: dict) -> bool:
 
     cfg = get_settings(db)
     if cfg.get("dingtalk_webhook"):
-        title = _device_alert_title(dtype, name, line, src_ip)
-        # 日志详情优先转发完整原始报文（含 <PRI> 头），无原始报文时用截断后的正文
-        detail = (parsed.get("raw") or message).strip()
+        detail = (parsed.get("full_message") or parsed.get("message") or message).strip()
+        # 统一 Syslog 告警标题，说明事件来源和类型
+        import re as _re
+        # 尝试提取事件类型：格式1 "日志=登录系统"；格式2 "系统/5/LAN1端口物理连接已断开"
+        _evt = _re.search(r"日志=([^,\n]+)", detail)
+        if not _evt:
+            _evt = _re.search(r"系统/\d+/(.+)", detail)
+        _evt_str = f" {_evt.group(1)}" if _evt else ""
+        if dtype == "未知设备":
+            title = f"⚠ Syslog 事件 — {src_ip}{_evt_str}"
+        else:
+            title = f"⚠ Syslog 事件 — {line or ''}{name}{_evt_str}"
         text = _format_alert_text(title, ts, _level_cn(level), src_ip, detail)
         try:
             send_dingtalk(cfg["dingtalk_webhook"], cfg["dingtalk_secret"], text)
