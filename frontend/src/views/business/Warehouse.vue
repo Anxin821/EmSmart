@@ -1805,14 +1805,11 @@ watch(activeTab, () => {
 
 const onBorrowSearch = async () => {
   const kw = borrowKeyword.value.trim()
-  if (!kw) return
-  borrowKeyword.value = ''  // 清空输入让用户继续扫码
+  if (!kw) { toast.warn('请输入物品名称或扫码'); return }
+  borrowKeyword.value = ''
   const added = await doScanSearch(kw)
-  if (added > 0) {
-    toast.success(`已添加 ${added} 件到列表`)
-    if (!cartDialog.value) {
-      cartDialog.value = true
-    }
+  if (added > 0 && !cartDialog.value) {
+    cartDialog.value = true
     nextTick(focusScanInput)
   }
 }
@@ -1881,56 +1878,69 @@ const doScanSearch = async (kw) => {
     const res = await warehouseApi.list({ keyword: kw, page: 1, page_size: 50 })
     const items = res.data?.items || []
     if (!items.length) {
-      toast.error('未找到匹配物品')
+      toast.error(`未找到「${kw}」匹配物品`)
       return 0
     }
 
+    // 治具按型号精确过滤
     let targetItems = items
     if (items.some(i => i.part_type === '治具')) {
       const model = items.find(i => i.model === kw)?.model
-      if (model) {
-        targetItems = items.filter(i => i.model === model)
-      }
+      if (model) targetItems = items.filter(i => i.model === model)
     }
 
+    // ────────── 归还模式 ──────────
+    if (scanMode.value === 'return') {
+      const beforeLen = cartItems.value.length
+      for (const item of targetItems) addToCart(item, 1)
+      const newlyAdded = cartItems.value.length - beforeLen
+      if (newlyAdded === 0) {
+        toast.warn(`「${targetItems.map(i => i.name).join('、')}」无待归还记录`)
+        return 0
+      }
+      const removed = await loadCartItemsRecords()
+      const finalCount = cartItems.value.length - beforeLen
+      if (finalCount === 0 && removed.length) {
+        toast.warn(`「${removed.join('、')}」无待归还记录`)
+        return 0
+      }
+      toast.success(`已添加 ${finalCount} 件到归还列表`)
+      return cartItems.value.length
+    }
+
+    // ────────── 借领模式 ──────────
     let added = 0
     for (const item of targetItems) {
       const prevLen = cartItems.value.length
       addToCart(item, 1)
       if (cartItems.value.length > prevLen) added++
     }
-    if (added === 0 && scanMode.value === 'borrow' && items.length > 0) {
-      // 无可借/领数量 → 尝试自动切换到归还模式
-      scanMode.value = 'return'
-      for (const item of targetItems) {
-        const prevLen = cartItems.value.length
-        addToCart(item, 1)
-        if (cartItems.value.length > prevLen) added++
-      }
-      if (added > 0) {
-        await loadCartItemsRecords()
-        const finalCount = cartItems.value.length
-        if (finalCount > 0) {
-          toast.success(`已自动切换至归还模式，已添加 ${finalCount} 件到列表`)
-          return finalCount
-        }
-        // 添加后被 loadCartItemsRecords 全部移除 → 无待归还/领用记录
-        added = 0
-        scanMode.value = 'borrow'  // 还原模式
-        cartItems.value = []
-      }
-      // 无可借/领 且 无待归还记录
-      const isAllJig = targetItems.every(i => i.part_type === '治具')
-      toast.warn(isAllJig ? '该物品无外借记录，无法归还' : '该物品无可领数量和待归还记录')
+    if (added > 0) {
+      toast.success(`已添加 ${added} 件到列表`)
+      return cartItems.value.length
+    }
+
+    // 借领无货 → 尝试切归还
+    scanMode.value = 'return'
+    const beforeLen = cartItems.value.length
+    for (const item of targetItems) addToCart(item, 1)
+    const newlyAdded = cartItems.value.length - beforeLen
+    if (newlyAdded === 0) {
+      scanMode.value = 'borrow'
+      toast.warn('该物品当前可借/领数量不足，且无待归还记录')
       return 0
     }
-    if (added === 0 && items.length > 0) {
-      const hint = scanMode.value === 'return' ? '该物品无待归还记录' : '该物品当前可借/领数量不足'
-      toast.warn(hint)
-    } else if (added > 0 && scanMode.value === 'return') {
-      await loadCartItemsRecords()
+    const removed = await loadCartItemsRecords()
+    const finalCount = cartItems.value.length - beforeLen
+    if (finalCount > 0) {
+      toast.success(`已自动切换至归还模式，添加 ${finalCount} 件`)
+      return cartItems.value.length
     }
-    return cartItems.value.length
+    // 加进去又被清空 → 还原模式
+    scanMode.value = 'borrow'
+    cartItems.value = cartItems.value.slice(0, beforeLen)
+    toast.warn(`「${removed.join('、') || targetItems.map(i => i.name).join('、')}」无待归还记录`)
+    return 0
   } catch (e) {
     console.error(e)
     toast.error('搜索失败')
@@ -1940,18 +1950,20 @@ const doScanSearch = async (kw) => {
 
 const onScan = async () => {
   const kw = scanKeyword.value.trim()
-  if (!kw) return
+  if (!kw) { toast.warn('请输入物品名称或扫码'); return }
   scanKeyword.value = ''
-  const added = await doScanSearch(kw)
-  if (added > 0) {
-    toast.success(`已添加 ${added} 件到出入库抽屉`)
-  }
+  await doScanSearch(kw)   // 提示交给 doScanSearch 统一处理
 }
 
 const addToCart = (item, forceQty) => {
   let maxQty = 0
   if (scanMode.value === 'return') {
-    maxQty = (item.total_qty || 0) - (item.available_qty || 0)
+    if (item.part_type === '治具') {
+      maxQty = (item.total_qty || 0) - (item.available_qty || 0)
+    } else {
+      // 耗材无 total_qty/available_qty 字段，给占位值；真实记录由 loadCartItemsRecords 查
+      maxQty = 1
+    }
   } else {
     if (item.part_type === '治具') {
       maxQty = (item.available_qty || 0) - (item.repair_qty || 0)
@@ -1991,6 +2003,7 @@ const removeFromCart = (id) => { cartItems.value = cartItems.value.filter(c => c
 const clearCart = () => { cartItems.value = [] }
 
 const loadCartItemsRecords = async () => {
+  const removed = []
   for (const item of cartItems.value) {
     if (item.activeRecords) continue
     item.loadingRecords = true
@@ -2007,18 +2020,21 @@ const loadCartItemsRecords = async () => {
       item.activeRecords = active
       if (item.activeRecords.length > 0) {
         item.selectedRecordId = item.activeRecords[0].id
+      } else if (scanMode.value === 'return') {
+        removed.push(item.name)
       }
-    } catch {} finally {
+    } catch (e) {
+      console.warn('加载记录失败:', item.name, e)
+    } finally {
       item.loadingRecords = false
     }
   }
   cartItems.value = cartItems.value.filter(item => {
     const hasRecords = item.activeRecords && item.activeRecords.length > 0
-    if (!hasRecords && scanMode.value === 'return') {
-      return false
-    }
+    if (!hasRecords && scanMode.value === 'return') return false
     return true
   })
+  return removed
 }
 
 watch(scanMode, (mode) => {
