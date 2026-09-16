@@ -631,7 +631,7 @@
         <el-form-item v-if="editForm.part_type === '治具'" label="总数">
           <el-input-number v-if="!editForm.id" v-model="editForm.total_qty" :min="0" :max="9999" controls-position="right" />
           <span v-else class="wh-form-static">{{ editForm.total_qty }}</span>
-          <span class="wh-form-hint">治具总数量（新增时可用数=总数）</span>
+          <span class="wh-form-hint">治具总数量</span>
         </el-form-item>
         <template v-if="editForm.part_type === '耗材'">
           <el-form-item :label="editForm.id ? '库存数量' : '初始库存'">
@@ -910,8 +910,9 @@
           <div class="el-upload__text" style="margin-top: 8px;">将 Excel 文件拖到此处，或<em>点击上传</em></div>
         </div>
         <template #tip>
-          <div class="el-upload__tip">
-            支持 .xlsx / .xls；表头列：<b>物品名称、型号、类型、数量、货位、单位、预警值</b>（物品名称必填，类型留空默认耗材）
+          <div class="el-upload__tip wh-import-tip">
+            <span>支持 .xlsx / .xls；表头列：<b>物品名称、型号、编号、类型、数量、货位、单位、预警值</b></span>
+            <el-link type="primary" :underline="false" @click.stop="downloadTemplate">下载模板</el-link>
           </div>
         </template>
       </el-upload>
@@ -1436,6 +1437,17 @@ const handleImport = async () => {
   } finally {
     importing.value = false
   }
+}
+
+const downloadTemplate = async () => {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = ['物品名称', '型号', '编号', '类型', '数量', '货位', '单位', '预警值']
+  const example = ['点胶治具', 'PD10/TK1080', 'JIG-001', '治具', 10, 'A01-1-2', '个', 2]
+  const ws = XLSX.utils.aoa_to_sheet([headers, example])
+  ws['!cols'] = headers.map(() => ({ wch: 16 }))
+  XLSX.utils.book_append_sheet(wb, ws, '物品模板')
+  XLSX.writeFile(wb, '物品导入模板.xlsx')
 }
 
 // ---------------- 借出 / 归还 / 领用 / 补货 / 维修 ----------------
@@ -2507,6 +2519,8 @@ const submitBatch = async () => {
   font-weight: 600;
 }
 .wh-desc { margin-bottom: 4px; }
+.wh-import-tip { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; line-height: 1.2; }
+.wh-import-tip .el-link { flex-shrink: 0; }
 .wh-import-result {
   margin-top: 14px;
   border: 1px solid var(--c-divider);

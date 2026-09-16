@@ -1069,7 +1069,8 @@ def batch_import(db: Session, rows: list, request, username: str) -> dict:
     col_map: Dict[str, int] = {}
     header_aliases = {
         "name":      ("物品名称", "名称", "name"),
-        "model":     ("型号", "型号/编号", "编号", "model"),
+        "model":     ("型号", "型号/编号", "model"),
+        "code":      ("编号", "编号/编码", "编码", "code"),
         "part_type": ("类型", "part_type"),
         "total_qty": ("数量", "库存", "总数", "初始库存", "total_qty"),
         "location":  ("货位", "货位编码", "location"),
