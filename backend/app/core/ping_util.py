@@ -1,6 +1,6 @@
 """Ping 探测 + 日志记录
 
-日志按天切割，保留 30 天，存放于 backend/logs/ping/ping.log
+日志按天切割，保留最近 3 天（当天、昨天、前天），
 历史文件自动归入 archive/ 子目录，不干扰日常查看。
 """
 
@@ -9,20 +9,32 @@ import os
 import platform
 import re
 import subprocess
+from datetime import datetime, timedelta
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from typing import Optional
 
-# ── 日志配置（TimedRotatingFileHandler：线程安全、自动跨天、保留 30 天） ──────
+# ── 日志配置（TimedRotatingFileHandler：线程安全、自动跨天、保留 3 天） ──────
 _LOG_DIR = Path(__file__).resolve().parent.parent.parent / "logs" / "ping"
 _LOG_ARCHIVE = _LOG_DIR / "archive"
-_LOG_DIR.mkdir(parents=True, exist_ok=True)
+_LOG_ARCHIVE.mkdir(parents=True, exist_ok=True)
+
+# ★ 启动时清理超过 3 天的旧归档文件
+_CLEANUP_CUTOFF = datetime.now() - timedelta(days=3)
+if _LOG_ARCHIVE.exists():
+    for f in _LOG_ARCHIVE.iterdir():
+        if f.is_file():
+            try:
+                mtime = datetime.fromtimestamp(f.stat().st_mtime)
+                if mtime < _CLEANUP_CUTOFF:
+                    f.unlink()
+            except Exception:
+                pass
 
 
 def _rotator_namer(default_name: str) -> str:
     """轮转时把旧文件放入 archive/ 子目录，避免污染 ping.log 同层目录。"""
     p = Path(default_name)
-    _LOG_ARCHIVE.mkdir(parents=True, exist_ok=True)
     return str(_LOG_ARCHIVE / p.name)
 
 
@@ -32,7 +44,7 @@ if not _logger.handlers:
     _handler = TimedRotatingFileHandler(
         _LOG_DIR / "ping.log",
         when="midnight",
-        backupCount=30,
+        backupCount=2,
         encoding="utf-8",
     )
     _handler.namer = _rotator_namer
