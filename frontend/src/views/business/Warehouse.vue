@@ -77,6 +77,7 @@
                       <el-input v-model="txFilterPart" size="small" placeholder="搜索" clearable
                         @change="txPage=1;loadTxData()" />
                     </div>
+                    <span v-else-if="row.part_type === '治具' && row.model">{{ txPartDisplay(row) }}</span>
                     <span v-else>{{ row.part_name }}</span>
                   </template>
                 </el-table-column>
@@ -523,10 +524,9 @@
                     <span class="cd-rec-line" v-if="rec.line">【{{ rec.line }}】</span>
                     <span class="cd-rec-time">{{ formatTime(rec.borrow_time) }}</span>
                     <span class="cd-rec-actions">
-                      <el-button size="small" type="primary" link @click.stop="cartReturnRecord(item, rec)">归还</el-button>
-                      <el-button size="small" type="warning" link @click.stop="cartToRepair(item, rec)">维修</el-button>
-                      <el-button size="small" type="info" link @click.stop="cartLoss(item, rec)">报失</el-button>
-                      <el-button size="small" type="danger" link @click.stop="cartDamaged(item, rec)">报损</el-button>
+                      <el-button size="small" plain type="warning" class="cd-rec-btn" @click.stop="cartToRepair(item, rec)">维修</el-button>
+                      <el-button size="small" plain type="info" class="cd-rec-btn" @click.stop="cartLoss(item, rec)">报失</el-button>
+                      <el-button size="small" plain type="danger" class="cd-rec-btn" @click.stop="cartDamaged(item, rec)">报损</el-button>
                     </span>
                   </div>
                 </div>
@@ -1188,6 +1188,17 @@ const statusTagType = (row) => {
   return { '正常': 'success', '预警': 'warning', '缺货': 'danger', '维修': 'info', '报损': 'danger', '报失': 'danger' }[row.status] || 'info'
 }
 const txTagType = (t) => ({ '借出': 'primary', '归还': 'success', '领用': 'primary', '补货': 'success', '维修': 'info', '丢失': 'danger', '损坏': 'danger' }[t] || 'info')
+/** 治具流水显示：优先去掉 part_name 末尾重复的 ` - {model}` 再判断是否拼接 */
+const txPartDisplay = (row) => {
+  let name = row.part_name || ''
+  if (row.model && name.endsWith(` - ${row.model}`)) {
+    name = name.slice(0, -(row.model.length + 3))
+  }
+  if (!name.startsWith(row.model)) {
+    name = `${row.model}-${name}`
+  }
+  return name
+}
 
 // ---------------- 看板统计 ----------------
 const sd = ref({
@@ -1799,7 +1810,6 @@ const onBorrowSearch = async () => {
     }
     nextTick(focusScanInput)
   }
-  // doScanSearch 内部已处理无结果提示，此处无需重复提示
 }
 
 /** 归还弹框内：归还单条记录 */
@@ -1817,12 +1827,18 @@ const cartReturnRecord = async (item, rec) => {
 /** 归还弹框内：转维修 */
 const cartToRepair = async (item, rec) => {
   try {
-    await warehouseApi.toRepair(item.id, { borrow_record_id: rec.id })
+    const { ElMessageBox } = await import('element-plus')
+    const { value } = await ElMessageBox.prompt('请输入维修原因（选填）', '维修确认', {
+      confirmButtonText: '确认维修', cancelButtonText: '取消', inputType: 'textarea',
+    })
+    await warehouseApi.toRepair(item.id, { borrow_record_id: rec.id, remark: value || '' })
     toast.success('已转维修')
     removeFromCart(item.id)
     refreshAll()
   } catch (e) {
-    toast.error(e.response?.data?.detail || '操作失败')
+    if (e !== 'cancel' && e !== 'close') {
+      toast.error(e.response?.data?.detail || '操作失败')
+    }
   }
 }
 
@@ -1887,10 +1903,39 @@ const doScanSearch = async (kw) => {
 
     let added = 0
     for (const item of targetItems) {
+      const prevLen = cartItems.value.length
       addToCart(item, 1)
-      added++
+      if (cartItems.value.length > prevLen) added++
     }
-    if (added > 0 && scanMode.value === 'return') {
+    if (added === 0 && scanMode.value === 'borrow' && items.length > 0) {
+      // 无可借/领数量 → 尝试自动切换到归还模式
+      scanMode.value = 'return'
+      for (const item of targetItems) {
+        const prevLen = cartItems.value.length
+        addToCart(item, 1)
+        if (cartItems.value.length > prevLen) added++
+      }
+      if (added > 0) {
+        await loadCartItemsRecords()
+        const finalCount = cartItems.value.length
+        if (finalCount > 0) {
+          toast.success(`已自动切换至归还模式，已添加 ${finalCount} 件到列表`)
+          return finalCount
+        }
+        // 添加后被 loadCartItemsRecords 全部移除 → 无待归还/领用记录
+        added = 0
+        scanMode.value = 'borrow'  // 还原模式
+        cartItems.value = []
+      }
+      // 无可借/领 且 无待归还记录
+      const isAllJig = targetItems.every(i => i.part_type === '治具')
+      toast.warn(isAllJig ? '该物品无外借记录，无法归还' : '该物品无可领数量和待归还记录')
+      return 0
+    }
+    if (added === 0 && items.length > 0) {
+      const hint = scanMode.value === 'return' ? '该物品无待归还记录' : '该物品当前可借/领数量不足'
+      toast.warn(hint)
+    } else if (added > 0 && scanMode.value === 'return') {
       await loadCartItemsRecords()
     }
     return cartItems.value.length
@@ -2750,7 +2795,8 @@ const submitBatch = async () => {
 .cd-rec-operator { font-weight: 700; font-size: 13px; }
 .cd-rec-line { opacity: .85; font-size: 11px; }
 .cd-rec-time { opacity: .7; font-size: 11px; }
-.cd-rec-actions { margin-left: auto; display: flex; gap: 4px; flex-shrink: 0; }
+.cd-rec-actions { margin-left: auto; display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.cd-rec-btn { min-width: 42px; padding: 4px 6px; font-size: 12px; text-align: center; }
 .cd-rec-loading { font-size: 12px; color: #999; padding: 4px 0; }
 .cd-rec-empty { font-size: 12px; color: #ccc; padding: 4px 0; }
 .cd-return-hint {

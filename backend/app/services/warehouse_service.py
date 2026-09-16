@@ -96,8 +96,9 @@ def _part_to_dict(p: WarehousePart, troubled_status: Optional[str] = None) -> Di
     }
 
 
-def _tx_to_dict(t: PartTransaction) -> Dict[str, Any]:
-    return {
+def _tx_to_dict(t: PartTransaction, part_info: dict = None) -> Dict[str, Any]:
+    """part_info: {part_id: {model, part_type}} — 由调用方传入以补充型号/类型。"""
+    d = {
         "id": t.id,
         "part_id": t.part_id,
         "part_name": t.part_name,
@@ -113,6 +114,11 @@ def _tx_to_dict(t: PartTransaction) -> Dict[str, Any]:
         "remark": t.remark or "",
         "created_at": t.created_at.strftime("%Y-%m-%d %H:%M:%S") if t.created_at else None,
     }
+    # 补充物品型号与类型（用于前端展示）
+    if part_info and t.part_id in part_info:
+        d["model"] = part_info[t.part_id].get("model") or ""
+        d["part_type"] = part_info[t.part_id].get("part_type") or ""
+    return d
 
 
 def _borrow_to_dict(r: BorrowRecord) -> Dict[str, Any]:
@@ -396,7 +402,13 @@ def list_transactions(db: Session, page: int = 1, page_size: int = 50,
     else:
         items = (q.order_by(PartTransaction.id.desc())
                   .offset((page - 1) * page_size).limit(page_size).all())
-    return [_tx_to_dict(t) for t in items], total
+    # 批量查询 part_type / model 以补充给前端
+    part_ids = {t.part_id for t in items}
+    part_info = {}
+    if part_ids:
+        parts = db.query(WarehousePart).filter(WarehousePart.id.in_(part_ids)).all()
+        part_info = {p.id: {"model": p.model or "", "part_type": p.part_type or ""} for p in parts}
+    return [_tx_to_dict(t, part_info) for t in items], total
 
 
 def list_borrow_records(db: Session, part_id: int, active_only: bool = True) -> List[dict]:
@@ -676,7 +688,8 @@ def to_repair(db: Session, part_id: int, data: dict, request, username: str) -> 
         if r.status != "借出":
             raise HTTPException(status_code=400, detail="该记录已归还或已转维修")
         r.status = "维修"
-        _change_tx_type(db, p, "借出", r.borrower, r.borrow_time, "维修", "设备维修中")
+        remark = data.get("remark") or "设备维修中"
+        _change_tx_type(db, p, "借出", r.borrower, r.borrow_time, "维修", remark)
         p.repair_qty = (p.repair_qty or 0) + r.qty
         next_active = (db.query(BorrowRecord)
                          .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
@@ -695,7 +708,7 @@ def to_repair(db: Session, part_id: int, data: dict, request, username: str) -> 
         if tx.tx_type != "领用":
             raise HTTPException(status_code=400, detail="该记录不是领用状态，无法转维修")
         tx.tx_type = "维修"
-        tx.remark = "耗材转维修中"
+        tx.remark = data.get("remark") or "耗材转维修中"
     
     db.commit()
     db.refresh(p)
@@ -803,7 +816,8 @@ def report_loss(db: Session, part_id: int, data: dict, request, username: str) -
         p.total_qty = max(0, (p.total_qty or 0) - r.qty)
         p.available_qty = max(0, min(p.available_qty, p.total_qty))
         r.status = "丢失"
-        _change_tx_type(db, p, "借出", r.borrower, r.borrow_time, "丢失", "借出后丢失")
+        remark = data.get("remark") or "借出后丢失"
+        _change_tx_type(db, p, "借出", r.borrower, r.borrow_time, "丢失", remark)
         next_active = (db.query(BorrowRecord)
                          .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
                          .order_by(BorrowRecord.id.desc()).first())
@@ -821,7 +835,7 @@ def report_loss(db: Session, part_id: int, data: dict, request, username: str) -
         if tx.tx_type != "领用":
             raise HTTPException(status_code=400, detail="该记录不是领用状态，无法报失")
         tx.tx_type = "丢失"
-        tx.remark = "耗材报失"
+        tx.remark = data.get("remark") or "耗材报失"
 
     db.commit()
     db.refresh(p)
@@ -908,7 +922,8 @@ def report_damaged(db: Session, part_id: int, data: dict, request, username: str
         if r.status != "借出":
             raise HTTPException(status_code=400, detail="该记录已归还或已转维修")
         r.status = "损坏"
-        _change_tx_type(db, p, "借出", r.borrower, r.borrow_time, "损坏", "借出后损坏")
+        remark = data.get("remark") or "借出后损坏"
+        _change_tx_type(db, p, "借出", r.borrower, r.borrow_time, "损坏", remark)
         next_active = (db.query(BorrowRecord)
                          .filter(BorrowRecord.part_id == p.id, BorrowRecord.status == "借出")
                          .order_by(BorrowRecord.id.desc()).first())
@@ -926,7 +941,7 @@ def report_damaged(db: Session, part_id: int, data: dict, request, username: str
         if tx.tx_type != "领用":
             raise HTTPException(status_code=400, detail="该记录不是领用状态，无法报损")
         tx.tx_type = "损坏"
-        tx.remark = "耗材报损"
+        tx.remark = data.get("remark") or "耗材报损"
 
     db.commit()
     db.refresh(p)
