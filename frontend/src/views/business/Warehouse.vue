@@ -364,7 +364,11 @@
                       <el-input v-model="consFilterLocation" size="small" placeholder="搜索货位" clearable
                         @change="page=1;loadData()" />
                     </div>
-                    <span v-else>{{ row.location || '-' }}</span>
+                    <span v-else-if="row.location" class="loc-tags">
+                      <el-tag v-for="loc in row.location.split(',').map(s=>s.trim()).filter(Boolean)" :key="loc"
+                        size="small" class="loc-tag">{{ loc }}</el-tag>
+                    </span>
+                    <span v-else>-</span>
                   </template>
                 </el-table-column>
 
@@ -634,7 +638,8 @@
           </el-form-item>
         </template>
         <el-form-item label="货位">
-          <el-input v-model="editForm.location" placeholder="如 A01-1-2" maxlength="50" />
+          <el-select v-model="editLocationList" multiple filterable allow-create default-first-option
+            placeholder="输入货位后回车添加" style="width:100%;" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -930,7 +935,13 @@
           <el-descriptions-item label="类型">{{ detail.part.part_type }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.part.part_type !== '耗材'" label="型号">{{ detail.part.model || '-' }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.part.part_type !== '耗材'" label="编号">{{ detail.part.code || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="货位">{{ detail.part.location || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="货位">
+            <span v-if="detail.part.location" class="loc-tags">
+              <el-tag v-for="loc in detail.part.location.split(',').map(s=>s.trim()).filter(Boolean)" :key="loc"
+                size="small" class="loc-tag">{{ loc }}</el-tag>
+            </span>
+            <span v-else>-</span>
+          </el-descriptions-item>
           <el-descriptions-item label="数量">{{ detail.part.qty_text }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.part.part_type === '治具'" label="维修中">
             <el-tag :type="detail.part.repair_qty > 0 ? 'danger' : 'success'" size="small">
@@ -1325,6 +1336,7 @@ const editForm = reactive({
   id: null, name: '', model: '', code: '', part_type: '治具',
   total_qty: 1, unit: '个', location: '', warn_qty: 0,
 })
+const editLocationList = ref([])
 
 const openEdit = (row) => {
   if (row) {
@@ -1333,11 +1345,13 @@ const openEdit = (row) => {
       total_qty: row.total_qty, unit: row.unit, location: row.location,
       warn_qty: row.warn_qty,
     })
+    editLocationList.value = row.location ? row.location.split(',').map(s => s.trim()).filter(Boolean) : []
   } else {
     Object.assign(editForm, {
       id: null, name: '', model: '', code: '', part_type: '治具',
       total_qty: 1, unit: '个', location: '', warn_qty: 0,
     })
+    editLocationList.value = []
   }
   editDialog.value = true
 }
@@ -1351,6 +1365,8 @@ const submitEdit = async () => {
   saving.value = true
   try {
     const payload = { ...editForm }
+    // 货位从标签列表合并为逗号分隔字符串
+    payload.location = editLocationList.value.join(', ')
     if (editForm.id) {
       await warehouseApi.update(editForm.id, payload)
       toast.success('修改成功')
@@ -2509,6 +2525,8 @@ const submitBatch = async () => {
 .wh-name { font-weight: 600; color: var(--c-text); }
 .wh-form-hint { margin-left: 10px; font-size: 12px; color: var(--c-text-mute); }
 .wh-form-static { font-size: 14px; font-weight: 600; color: var(--c-text, #0B1120); line-height: 32px; }
+.loc-tags { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.loc-tag { white-space: nowrap; }
 .ok-text { color: #059669; }
 .warn-text { color: #D97706; }
 .danger-text { color: #DC2626; }
