@@ -524,10 +524,10 @@
                     <span class="cd-rec-line" v-if="rec.line">【{{ rec.line }}】</span>
                     <span class="cd-rec-time">{{ formatTime(rec.borrow_time) }}</span>
                     <span class="cd-rec-actions">
-                      <el-button size="small" plain type="warning" class="cd-rec-btn" @click.stop="cartToRepair(item, rec)">维修</el-button>
-                      <el-button size="small" plain type="info" class="cd-rec-btn" @click.stop="cartLoss(item, rec)">报失</el-button>
-                      <el-button size="small" plain type="danger" class="cd-rec-btn" @click.stop="cartDamaged(item, rec)">报损</el-button>
-                    </span>
+  <el-button size="small" plain class="cd-rec-btn" @click.stop="cartToRepair(item, rec)">维修</el-button>
+  <el-button size="small" plain class="cd-rec-btn" @click.stop="cartLoss(item, rec)">报失</el-button>
+  <el-button size="small" plain class="cd-rec-btn" @click.stop="cartDamaged(item, rec)">报损</el-button>
+</span>
                   </div>
                 </div>
                 <div v-else-if="item.loadingRecords" class="cd-rec-loading">加载中…</div>
@@ -2795,8 +2795,30 @@ const submitBatch = async () => {
 .cd-rec-operator { font-weight: 700; font-size: 13px; }
 .cd-rec-line { opacity: .85; font-size: 11px; }
 .cd-rec-time { opacity: .7; font-size: 11px; }
-.cd-rec-actions { margin-left: auto; display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-.cd-rec-btn { min-width: 42px; padding: 4px 6px; font-size: 12px; text-align: center; }
+.cd-rec-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.cd-rec-actions .cd-rec-btn + .cd-rec-btn {
+  margin-left: 0;
+}
+.cd-rec-btn {
+  flex: 0 0 auto;
+  width: 52px;
+  min-width: 52px;
+  height: 24px;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 12px;
+  line-height: 1;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 .cd-rec-loading { font-size: 12px; color: #999; padding: 4px 0; }
 .cd-rec-empty { font-size: 12px; color: #ccc; padding: 4px 0; }
 .cd-return-hint {
