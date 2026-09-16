@@ -23,7 +23,7 @@ class WarehousePart(Base):
     available_qty = Column(Integer, default=0)          # 治具=在库数量（含维修，不含借出）
     repair_qty = Column(Integer, default=0)              # 治具维修中数量（计入库存但不可借出）
     unit = Column(String(20))                           # 耗材单位（个/卷/包…）
-    location = Column(String(50))                       # 货位编码（如 A01-1-2）
+    location = Column(String(200))                      # 货位编码（多货位逗号分隔，如 "A01-1-2, A01-1-3"）
     warn_qty = Column(Integer, default=0)               # 耗材低库存预警值
     current_borrower = Column(String(50))               # 治具最近借用人（仅展示用）
     borrow_time = Column(DateTime)                      # 最近借出时间

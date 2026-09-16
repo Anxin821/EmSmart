@@ -365,8 +365,16 @@
                         @change="page=1;loadData()" />
                     </div>
                     <span v-else-if="row.location" class="loc-tags">
-                      <el-tag v-for="loc in row.location.split(',').map(s=>s.trim()).filter(Boolean)" :key="loc"
-                        size="small" class="loc-tag">{{ loc }}</el-tag>
+                      <el-tag size="small" class="loc-tag">{{ row.location.split(/[,，、]/)[0].trim() }}</el-tag>
+                      <el-popover v-if="row.location.split(/[,，、]/).length > 1" placement="bottom" trigger="click" :width="200">
+                        <template #reference>
+                          <span class="loc-more">+{{ row.location.split(/[,，、]/).length - 1 }}</span>
+                        </template>
+                        <div class="loc-tags" style="padding:4px 0;">
+                          <el-tag v-for="loc in row.location.split(/[,，、]/).map(s=>s.trim()).filter(Boolean).slice(1)"
+                            :key="loc" size="small" class="loc-tag" style="margin:2px;">{{ loc }}</el-tag>
+                        </div>
+                      </el-popover>
                     </span>
                     <span v-else>-</span>
                   </template>
@@ -937,7 +945,7 @@
           <el-descriptions-item v-if="detail.part.part_type !== '耗材'" label="编号">{{ detail.part.code || '-' }}</el-descriptions-item>
           <el-descriptions-item label="货位">
             <span v-if="detail.part.location" class="loc-tags">
-              <el-tag v-for="loc in detail.part.location.split(',').map(s=>s.trim()).filter(Boolean)" :key="loc"
+              <el-tag v-for="loc in detail.part.location.split(/[,，、]/).map(s=>s.trim()).filter(Boolean)" :key="loc"
                 size="small" class="loc-tag">{{ loc }}</el-tag>
             </span>
             <span v-else>-</span>
@@ -1345,7 +1353,7 @@ const openEdit = (row) => {
       total_qty: row.total_qty, unit: row.unit, location: row.location,
       warn_qty: row.warn_qty,
     })
-    editLocationList.value = row.location ? row.location.split(',').map(s => s.trim()).filter(Boolean) : []
+    editLocationList.value = row.location ? row.location.split(/[,，、]/).map(s => s.trim()).filter(Boolean) : []
   } else {
     Object.assign(editForm, {
       id: null, name: '', model: '', code: '', part_type: '治具',
@@ -2525,8 +2533,9 @@ const submitBatch = async () => {
 .wh-name { font-weight: 600; color: var(--c-text); }
 .wh-form-hint { margin-left: 10px; font-size: 12px; color: var(--c-text-mute); }
 .wh-form-static { font-size: 14px; font-weight: 600; color: var(--c-text, #0B1120); line-height: 32px; }
-.loc-tags { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.loc-tags { display: inline-flex; gap: 4px; flex-wrap: wrap; align-items: center; }
 .loc-tag { white-space: nowrap; }
+.loc-more { cursor: pointer; font-size: 12px; color: var(--el-color-primary); font-weight: 600; white-space: nowrap; }
 .ok-text { color: #059669; }
 .warn-text { color: #D97706; }
 .danger-text { color: #DC2626; }
