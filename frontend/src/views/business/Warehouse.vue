@@ -338,7 +338,7 @@
         </div>
 
         <!-- 全部为空 -->
-        <div v-else class="pending-empty">
+        <div v-if="!sd.overdue_items?.length" class="panel-empty panel-empty--good">
           <span class="empty-emoji">🎉</span>
           <span>暂无待办</span>
         </div>
