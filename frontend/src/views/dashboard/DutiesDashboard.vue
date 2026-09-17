@@ -677,7 +677,38 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
-  grid-auto-rows: 280px;   /* ✅ 去掉底部按钮后，280 就够 */
+  grid-auto-rows: 280px;
+}
+
+/* ── 大屏适配（≥1600px） ── */
+@media (min-width: 1600px) {
+  .duties-board { padding: 0px 32px 24px; }
+  .duty-card { padding: 20px 22px 20px; border-radius: 16px; }
+  .duty-card-name { font-size: 20px; }
+  .duty-card-title { font-size: 13px; padding: 5px 12px; }
+  .duty-section-title { font-size: 20px; }
+  .duty-line { font-size: 15px; padding: 6px 8px 6px 26px; }
+  .duty-line::before { width: 10px; height: 10px; top: 13px; left: 8px; }
+  .duty-cards { gap: 16px; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); grid-auto-rows: 320px; }
+  .duty-section { gap: 12px; }
+  .duty-section-icon { width: 36px; height: 36px; font-size: 19px; }
+}
+
+/* ── 中屏适配（1200–1599px） ── */
+@media (min-width: 1200px) and (max-width: 1599px) {
+  .duty-cards { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+}
+
+/* ── 小屏适配（≤768px） ── */
+@media (max-width: 768px) {
+  .duties-board { padding: 0px 12px 14px; }
+  .duty-card { padding: 12px 14px 12px; border-radius: 12px; }
+  .duty-card-name { font-size: 15px; }
+  .duty-section-title { font-size: 15px; }
+  .duty-section { gap: 8px; }
+  .duty-cards { gap: 10px; grid-auto-rows: 260px; }
+  .duty-line { font-size: 13px; padding: 3px 4px 3px 20px; }
+  .duty-card-head { gap: 8px; flex-wrap: wrap; }
 }
 
 /* ================================================================
