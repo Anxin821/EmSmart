@@ -220,6 +220,16 @@ def list_department_managers(
     return ApiResponse(data=service.get_department_managers(db))
 
 
+@router.get("/unreturned/{borrower}")
+def check_unreturned(
+    borrower: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """查询某个借用人当前未归还的所有治具（借出时不还又来借时的提醒）。"""
+    return ApiResponse(data=service.check_unreturned_by_borrower(db, borrower))
+
+
 @router.get("/transactions")
 def list_all_transactions(
     page: int = Query(1, ge=1),

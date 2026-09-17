@@ -42,6 +42,8 @@ export const warehouseApi = {
   operators: () => api.get('/warehouse/operators'),
   // 历史部门负责人列表（el-select allow-create 记忆）
   departmentManagers: () => api.get('/warehouse/department-managers'),
+  // 查询某借用人未归还的治具（借出提醒用）
+  unreturnedCheck: (borrower) => api.get(`/warehouse/unreturned/${encodeURIComponent(borrower)}`),
   // 编辑出入库记录备注
   updateTxRemark: (txId, remark) => api.put(`/warehouse/transactions/${txId}/remark`, { remark }),
 }

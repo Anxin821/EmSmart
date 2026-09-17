@@ -213,7 +213,7 @@
           <span class="kpi-label">维修</span>
         </div>
         <div class="kpi-value">{{ sd.repair_count || 0 }}</div>
-        <div class="kpi-sub">{{ kpiSub(sd.repair_count, '无进行中') }}</div>
+        <div class="kpi-sub">{{ kpiSub(sd.repair_count, '无维修') }}</div>
       </div>
 
       <div class="kpi-card kpi-card--lost" @click="onKpiClick('lost')">
@@ -1345,18 +1345,27 @@ const onPendingAction = (it) => {
 const kpiSub = (count, emptyText) => (count > 0 ? '点击查看明细' : emptyText)
 const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 
-const STATS_POLL_INTERVAL = 15000
+const STATS_POLL_INTERVAL = 30000  // 30s 无感轮询
 const statsTimer = ref(null)
 const startStatsPolling = () => {
   stopStatsPolling()
+  // 页面不可见时不轮询
+  if (document.hidden) return
+  loadStats()  // 立即刷新一次
   statsTimer.value = setInterval(() => {
-    if (activeTab.value === '首页') loadStats()
+    if (activeTab.value === '首页' && !document.hidden) loadStats()
   }, STATS_POLL_INTERVAL)
 }
 const stopStatsPolling = () => {
   if (statsTimer.value) {
     clearInterval(statsTimer.value)
     statsTimer.value = null
+  }
+}
+/** 页面可见性变化 → 切回前台时立即刷新首页数据 */
+const onVisibilityChange = () => {
+  if (!document.hidden && activeTab.value === '首页') {
+    startStatsPolling()  // 重新启动轮询 + 立即刷新
   }
 }
 
@@ -1954,10 +1963,12 @@ onMounted(() => {
   loadTxData()
   loadOperators()
   loadDepartmentManagers()
+  document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
 onUnmounted(() => {
   stopStatsPolling()
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 
 // ---------------- 扫码出入库弹框 ----------------
@@ -2215,6 +2226,31 @@ const submitBatch = async () => {
   scanSubmitting.value = true
   const results = { ok: 0, fail: 0, errors: [] }
   try {
+    // ── 借出提醒：检查操作人是否有未归还的治具 ──
+    if (scanMode.value === 'borrow') {
+      const jigItems = cartItems.value.filter(i => i.part_type === '治具')
+      if (jigItems.length > 0 && scanForm.operator?.trim()) {
+        const unreturned = (await warehouseApi.unreturnedCheck(scanForm.operator.trim())).data || []
+        // 排除本次正要借出的物品（不重复提醒）
+        const toBorrowIds = new Set(jigItems.map(i => i.id))
+        const otherUnreturned = unreturned.filter(u => !toBorrowIds.has(u.part_id))
+        if (otherUnreturned.length > 0) {
+          const { ElMessageBox } = await import('element-plus')
+          const itemList = otherUnreturned.map(u =>
+            `　· ${u.part_name}${u.part_model ? `（${u.part_model}）` : ''} ×${u.qty}`
+          ).join('\n')
+          const msg = `"${scanForm.operator}" 尚有未归还的治具：\n\n${itemList}\n\n确定继续借出吗？`
+          try {
+            await ElMessageBox.confirm(msg, '借出提醒', {
+              confirmButtonText: '继续借出', cancelButtonText: '取消', type: 'warning',
+            })
+          } catch {
+            scanSubmitting.value = false
+            return  // 用户取消
+          }
+        }
+      }
+    }
     for (const item of cartItems.value) {
       try {
         const payload = { qty: item.qty, remark: scanForm.remark }

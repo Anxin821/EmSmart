@@ -590,6 +590,30 @@ def _borrow_to_repair_qty(p: WarehousePart) -> int:
     return p.repair_qty or 0
 
 
+def check_unreturned_by_borrower(db: Session, borrower: str) -> List[dict]:
+    """查询某个借用人当前未归还的所有治具借出记录（跨物品）。"""
+    records = db.query(BorrowRecord).filter(
+        BorrowRecord.borrower == borrower,
+        BorrowRecord.status == "借出"
+    ).all()
+    if not records:
+        return []
+    part_ids = list(set(r.part_id for r in records))
+    parts = {p.id: p for p in db.query(WarehousePart).filter(WarehousePart.id.in_(part_ids)).all()}
+    result = []
+    for r in records:
+        p = parts.get(r.part_id)
+        result.append({
+            "part_id": r.part_id,
+            "part_name": p.name if p else "未知",
+            "part_model": p.model if p else "",
+            "borrow_time": r.borrow_time.strftime("%Y-%m-%d %H:%M:%S") if r.borrow_time else None,
+            "qty": r.qty,
+            "borrow_record_id": r.id,
+        })
+    return result
+
+
 def borrow(db: Session, part_id: int, data: dict, request, username: str) -> dict:
     """治具借出：每次借出创建一条 BorrowRecord，支持多人分别归还。"""
     p = _get_part(db, part_id)
