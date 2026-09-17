@@ -10,27 +10,29 @@
 
     <!-- 顶部 4 张统计卡：统一走 StatCard 组件（与其它看板观感一致） -->
     <div class="stat-grid kpi-row">
-      <StatCard centered color="blue" icon="bi bi-pc-display" :num="stats.total_devices" label="设备总数" />
-      <StatCard centered color="green" icon="bi bi-check-circle-fill" :num="stats.done_count" label="已杀毒" />
-      <StatCard
-        centered
-        color="yellow"
-        icon="bi bi-clock-history"
-        :num="stats.pending_count"
-        label="待杀毒"
-        clickable
-        @click="showPendingModal(null)"
-      />
-      <StatCard
-        centered
-        color="red"
-        icon="bi bi-shield-exclamation"
-        :num="stats.overdue_count"
-        label="超时未杀毒"
-        clickable
-        @click="showOverdueModal(null)"
-      />
-    </div>
+  <StatCard
+    class="kpi-card kpi-card--blue"
+    centered color="blue" icon="bi bi-pc-display"
+    :num="stats.total_devices" label="设备总数"
+  />
+  <StatCard
+    class="kpi-card kpi-card--green"
+    centered color="green" icon="bi bi-check-circle-fill"
+    :num="stats.done_count" label="已杀毒"
+  />
+  <StatCard
+    class="kpi-card kpi-card--yellow"
+    centered color="yellow" icon="bi bi-clock-history"
+    :num="stats.pending_count" label="待杀毒"
+    clickable @click="showPendingModal(null)"
+  />
+  <StatCard
+    class="kpi-card kpi-card--red"
+    centered color="red" icon="bi bi-shield-exclamation"
+    :num="stats.overdue_count" label="超时未杀毒"
+    clickable @click="showOverdueModal(null)"
+  />
+</div>
 
     <!-- 按线体分布：Element Plus el-table 表格（卡内滚动，不被一屏 overflow 裁切） -->
     <section class="page-section table-section">
@@ -266,7 +268,130 @@ const exportPPT = async () => {
   gap: var(--gap-block);
   padding: 0;
 }
-.kpi-row { flex-shrink: 0; }
+/* ================================================================
+   顶部 KPI 卡片：现代高级风格
+   ================================================================ */
+/* ================================================================
+   顶部 KPI 卡片：定高 108px，不挤压下方表格
+   ================================================================ */
+.kpi-row {
+  flex-shrink: 0;
+  height: 108px;              /* ✅ 关键：定高 */
+  padding-top: 4px;
+  margin-top: -4px;
+}
+
+/* 卡片本体：撑满 108px，垂直居中堆叠 */
+.kpi-row :deep(.kpi-card) {
+  --kpi-accent: #4f46e5;
+  position: relative;
+  height: 100%;               /* ✅ 撑满 kpi-row 的 108px */
+  border-radius: 14px;
+  padding: 10px 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+
+  /* 淡 accent 渐变背景 */
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--kpi-accent) 6%, #fff) 0%,
+    #ffffff 62%);
+  /* accent 描边 */
+  border: 1px solid color-mix(in srgb, var(--kpi-accent) 18%, #e8ecf0) !important;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, .02),
+    0 8px 20px -12px color-mix(in srgb, var(--kpi-accent) 26%, transparent) !important;
+  transition:
+    transform .24s cubic-bezier(.2,.7,.2,1),
+    box-shadow .24s cubic-bezier(.2,.7,.2,1),
+    border-color .24s;
+}
+
+/* 右上角柔和光晕 */
+.kpi-row :deep(.kpi-card)::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--kpi-accent) 22%, transparent) 0%,
+    transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* hover 上浮 */
+.kpi-row :deep(.kpi-card):hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--kpi-accent) 45%, transparent) !important;
+  box-shadow:
+    0 4px 8px rgba(15, 23, 42, .04),
+    0 20px 36px -14px color-mix(in srgb, var(--kpi-accent) 42%, transparent) !important;
+}
+
+/* ================================================================
+   卡片内部三元素：图标 / 数字 / 标签
+   ================================================================ */
+
+/* 图标：小尺寸，居中，在数字上方 */
+.kpi-row :deep(.kpi-card .icon-box) {
+  position: relative;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--kpi-accent) 12%, #fff);
+  color: var(--kpi-accent);
+  font-size: 14px;
+  box-shadow: 0 2px 6px -2px color-mix(in srgb, var(--kpi-accent) 30%, transparent);
+  flex-shrink: 0;
+}
+.kpi-row :deep(.kpi-card .icon-box i),
+.kpi-row :deep(.kpi-card .icon-box span) {
+  color: var(--kpi-accent) !important;
+  font-size: inherit;
+  line-height: 1;
+}
+
+/* 数字：30px 粗体 accent 色 */
+.kpi-row :deep(.kpi-card .num) {
+  position: relative;
+  z-index: 1;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1;
+  color: var(--kpi-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 标签：12px 灰色 */
+.kpi-row :deep(.kpi-card .label) {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: .2px;
+  line-height: 1;
+}
+
+/* 四色变体 */
+.kpi-card--blue   { --kpi-accent: #4f46e5; }
+.kpi-card--green  { --kpi-accent: #10b981; }
+.kpi-card--yellow { --kpi-accent: #d97706; }
+.kpi-card--red    { --kpi-accent: #dc2626; }
 .table-section {
   flex: 1;
   min-height: 0;
