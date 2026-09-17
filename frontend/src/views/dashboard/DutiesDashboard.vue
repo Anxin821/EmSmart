@@ -66,10 +66,6 @@
                   class="duty-line duty-line--primary"
                 >
                   <span class="duty-line-text">{{ item.content }}</span>
-                  <div v-if="userStore.isAdmin" class="duty-line-actions">
-                    <button class="duty-mini-btn" @click.stop="openItemEditModal(duty, idx, item)">编辑</button>
-                    <button class="duty-mini-btn danger" @click.stop="openItemDeleteModal(duty, idx)">删除</button>
-                  </div>
                 </div>
               </div>
 
@@ -81,16 +77,6 @@
                   class="duty-line"
                 >
                   <span class="duty-line-text">{{ item.content }}</span>
-                  <div v-if="userStore.isAdmin" class="duty-line-actions">
-                    <button
-                      class="duty-mini-btn"
-                      @click.stop="openItemEditModal(duty, primaryItems(duty).length + idx, item)"
-                    >编辑</button>
-                    <button
-                      class="duty-mini-btn danger"
-                      @click.stop="openItemDeleteModal(duty, primaryItems(duty).length + idx)"
-                    >删除</button>
-                  </div>
                 </div>
               </div>
 
@@ -859,7 +845,7 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 4px 6px 4px 15px;
+  padding: 4px 6px 4px 22px;
   border-radius: 6px;
   font-size: 13.5px;
   line-height: 1.55;
@@ -870,28 +856,24 @@ onMounted(() => {
 .duty-line::before {
   content: '';
   position: absolute;
-  left: 4px;
-  top: 12px;
-  width: 4px;
-  height: 4px;
+  left: 6px;
+  top: 11px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #cbd5e1;
+  background: transparent;
+  border: 1.5px solid #cbd5e1;
+  box-sizing: border-box;
 }
 
 .duty-line--primary {
-  color: #1e293b;
+  color: #0f172a;
   font-weight: 600;
 }
 .duty-line--primary::before {
-  top: 7px;
-  left: 3px;
-  width: 3px;
-  height: 15px;
-  border-radius: 2px;
-  background: linear-gradient(180deg,
-    var(--duty-accent),
-    color-mix(in srgb, var(--duty-accent) 55%, #cbd5e1));
-  box-shadow: 0 0 6px color-mix(in srgb, var(--duty-accent) 30%, transparent);
+  background: var(--duty-accent);
+  border: none;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--duty-accent) 40%, transparent);
 }
 
 .duty-line-text {
@@ -904,29 +886,7 @@ onMounted(() => {
   word-break: break-word;
 }
 
-.duty-line-actions {
-  display: flex;
-  gap: 1px;
-  opacity: 0;
-  transition: opacity .15s;
-  flex-shrink: 0;
-}
 .duty-line:hover { background: rgba(15, 23, 42, .025); }
-.duty-line:hover .duty-line-actions { opacity: 1; }
-
-.duty-mini-btn {
-  border: none;
-  background: transparent;
-  color: var(--primary, #2C5CE8);
-  font-size: 12.5px;
-  padding: 2px 5px;
-  cursor: pointer;
-  border-radius: 3px;
-  line-height: 1.4;
-}
-.duty-mini-btn:hover { background: rgba(44, 92, 232, .08); }
-.duty-mini-btn.danger { color: #DC2626; }
-.duty-mini-btn.danger:hover { background: rgba(220, 38, 38, .08); }
 
 /* ================================================================
    卡片内空态
