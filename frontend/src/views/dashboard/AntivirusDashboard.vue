@@ -262,11 +262,12 @@ const exportPPT = async () => {
 /* 一屏驾驶舱：KPI 行固定，表格卡吃掉剩余高度并在卡内滚动，行多也不被裁切 */
 .page {
   height: 100%;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: var(--gap-block);
   padding: 0;
+  padding-top: 6px;        /* ✅ 新增：给卡片顶部光晕 + hover 上浮预留空间 */
+  overflow: hidden;
 }
 /* ================================================================
    顶部 KPI 卡片：现代高级风格
@@ -289,7 +290,6 @@ const exportPPT = async () => {
   border-radius: 14px;
   padding: 10px 16px;
   box-sizing: border-box;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -316,13 +316,13 @@ const exportPPT = async () => {
 .kpi-row :deep(.kpi-card)::before {
   content: '';
   position: absolute;
-  top: -50px;
-  right: -50px;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: radial-gradient(circle,
-    color-mix(in srgb, var(--kpi-accent) 22%, transparent) 0%,
+  top: 0;
+  right: 0;
+  width: 110px;
+  height: 110px;
+  border-radius: 0 14px 0 0;
+  background: radial-gradient(circle at top right,
+    color-mix(in srgb, var(--kpi-accent) 24%, transparent) 0%,
     transparent 70%);
   pointer-events: none;
   z-index: 0;
@@ -397,6 +397,7 @@ const exportPPT = async () => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .table-title {
   flex-shrink: 0;

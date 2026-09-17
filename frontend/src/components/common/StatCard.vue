@@ -94,7 +94,6 @@ const onClick = () => { if (props.clickable) emit('click') }
   align-items: center;
   min-height: 96px;
   transition: transform .15s, box-shadow .15s;
-  overflow: hidden;
 }
 .stat-card:hover {
   transform: var(--stat-hover-transform, translateY(-1px));
