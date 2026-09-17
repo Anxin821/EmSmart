@@ -33,13 +33,15 @@ def list_parts(
     stock_status: Optional[str] = None,
     sort_by: Optional[str] = None,
     sort_order: Optional[str] = None,
+    status: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     items, total = service.list_parts(db, page=page, page_size=page_size,
                                       keyword=keyword, part_type=part_type,
                                       low_stock=low_stock, stock_status=stock_status,
-                                      sort_by=sort_by, sort_order=sort_order)
+                                      sort_by=sort_by, sort_order=sort_order,
+                                      status=status)
     return ApiResponse(data=PaginatedData(total=total, page=page, page_size=page_size, items=items))
 
 
@@ -223,9 +225,12 @@ def list_all_transactions(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     tx_type: Optional[str] = None,
+    is_returned: bool = Query(False),
     keyword: Optional[str] = None,
     borrow_date: Optional[str] = None,
     return_date: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     sort_by: Optional[str] = None,
     sort_order: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -233,8 +238,10 @@ def list_all_transactions(
 ):
     """查询所有物品的借出/领用/归还/补货流水。"""
     items, total = service.list_transactions(db, page=page, page_size=page_size,
-                                             tx_type=tx_type, keyword=keyword,
+                                             tx_type=tx_type, is_returned=is_returned,
+                                             keyword=keyword,
                                              borrow_date=borrow_date, return_date=return_date,
+                                             date_from=date_from, date_to=date_to,
                                              sort_by=sort_by, sort_order=sort_order)
     return ApiResponse(data=PaginatedData(total=total, page=page, page_size=page_size, items=items))
 

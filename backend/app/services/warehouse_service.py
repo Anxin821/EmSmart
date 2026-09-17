@@ -148,7 +148,8 @@ def list_parts(db: Session, page: int = 1, page_size: int = 20,
                low_stock: bool = False,
                stock_status: Optional[str] = None,
                sort_by: Optional[str] = None,
-               sort_order: Optional[str] = None) -> Tuple[List[dict], int]:
+               sort_order: Optional[str] = None,
+               status: Optional[str] = None) -> Tuple[List[dict], int]:
     q = db.query(WarehousePart)
     if part_type in (JIG, CONSUMABLE):
         q = q.filter(WarehousePart.part_type == part_type)
@@ -158,8 +159,6 @@ def list_parts(db: Session, page: int = 1, page_size: int = 20,
             WarehousePart.warn_qty > 0,
             WarehousePart.total_qty <= WarehousePart.warn_qty,
         )
-    # 统计卡联动筛选：口径与 get_stats 完全一致
-    # borrowed：治具维修中/已借出/部分借出，或耗材缺货；in_stock：其余
     if stock_status == "borrowed":
         q = q.filter(or_(
             and_(WarehousePart.part_type == JIG,
@@ -187,8 +186,31 @@ def list_parts(db: Session, page: int = 1, page_size: int = 20,
                 db.query(PartTransaction.part_id).filter(PartTransaction.operator.like(kw))
             ),
         ))
-    total = q.count()
-    # 排序
+
+    # 从原始匹配数开始
+    total_raw = q.count()
+
+    # 状态筛选：状态为计算字段，需在 Python 层处理
+    if status:
+        # 获取所有匹配 ID，计算状态后再按状态过滤、分页
+        all_ids = [r[0] for r in q.with_entities(WarehousePart.id).all()]
+        troubled_map = _get_troubled_status_map(db, all_ids) if all_ids else {}
+        # 查出全部记录
+        all_parts = q.order_by(WarehousePart.part_type.asc(), WarehousePart.id.desc()).all()
+        filtered_parts = []
+        for p in all_parts:
+            ts = troubled_map.get(p.id)
+            computed = _part_to_dict(p, ts)["status"]
+            if computed == status:
+                filtered_parts.append(p)
+        total = len(filtered_parts)
+        # 内存分页
+        start = (page - 1) * page_size
+        items = filtered_parts[start:start + page_size]
+        troubled_map = _get_troubled_status_map(db, [p.id for p in items]) if items else {}
+        return [_part_to_dict(p, troubled_map.get(p.id)) for p in items], total
+
+    # 排序（无状态筛选时走原逻辑）
     sort_map = {
         'total_qty': WarehousePart.total_qty,
         'available_qty': WarehousePart.available_qty,
@@ -203,9 +225,8 @@ def list_parts(db: Session, page: int = 1, page_size: int = 20,
     else:
         items = (q.order_by(WarehousePart.part_type.asc(), WarehousePart.id.desc())
                   .offset((page - 1) * page_size).limit(page_size).all())
-    # 批量预加载异常状态（报失/报损/维修）
     troubled_map = _get_troubled_status_map(db, [p.id for p in items]) if items else {}
-    return [_part_to_dict(p, troubled_map.get(p.id)) for p in items], total
+    return [_part_to_dict(p, troubled_map.get(p.id)) for p in items], total_raw
 
 
 def get_stats(db: Session, part_type: Optional[str] = None) -> Dict[str, Any]:
@@ -357,15 +378,23 @@ def get_department_managers(db: Session, limit: int = 50) -> List[str]:
 
 def list_transactions(db: Session, page: int = 1, page_size: int = 50,
                       tx_type: Optional[str] = None,
+                      is_returned: bool = False,
                       keyword: Optional[str] = None,
                       borrow_date: Optional[str] = None,
                       return_date: Optional[str] = None,
+                      date_from: Optional[str] = None,
+                      date_to: Optional[str] = None,
                       sort_by: Optional[str] = None,
                       sort_order: Optional[str] = None) -> Tuple[List[dict], int]:
     """查询所有物品的借出/领用/归还/补货流水（按时间倒序）。"""
     from datetime import datetime
     q = db.query(PartTransaction)
-    if tx_type in ("借出", "归还", "领用", "补货", "维修", "丢失", "损坏"):
+    if is_returned:
+        q = q.filter(or_(
+            PartTransaction.tx_type == '归还',
+            and_(PartTransaction.tx_type.in_(['借出', '领用']), PartTransaction.return_time.isnot(None))
+        ))
+    elif tx_type in ("借出", "归还", "领用", "补货", "维修", "丢失", "损坏"):
         q = q.filter(PartTransaction.tx_type == tx_type)
     if keyword:
         kw = f"%{keyword.strip()}%"
@@ -390,6 +419,19 @@ def list_transactions(db: Session, page: int = 1, page_size: int = 50,
             d_end = d.replace(hour=23, minute=59, second=59)
             q = q.filter(PartTransaction.return_time >= d,
                          PartTransaction.return_time <= d_end)
+        except ValueError:
+            pass
+    if date_from:
+        try:
+            d = datetime.strptime(date_from.strip(), "%Y-%m-%d")
+            q = q.filter(PartTransaction.created_at >= d)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            d = datetime.strptime(date_to.strip(), "%Y-%m-%d")
+            d = d.replace(hour=23, minute=59, second=59)
+            q = q.filter(PartTransaction.created_at <= d)
         except ValueError:
             pass
     total = q.count()
