@@ -55,7 +55,7 @@
 
         <el-table-column label="操作" width="210" align="center" fixed="right">
           <template #default="{ row }">
-            <template v-if="userStore.isAdmin">
+            <template v-if="userStore.canWrite('users')">
               <el-button type="primary" link size="small" @click="showModal(row)">
                 <el-icon><Edit /></el-icon>编辑
               </el-button>
