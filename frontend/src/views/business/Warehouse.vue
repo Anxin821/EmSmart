@@ -240,7 +240,7 @@
       <!-- 左侧：超期未还 -->
       <div class="panel panel--overdue">
                 <div class="panel-head">
-          <span class="panel-indicator"></span>
+
           <span class="panel-title">借出超期未还</span>
         </div>
 
@@ -292,7 +292,6 @@
                   <!-- 右侧：待处理卡片 -->
       <div class="pending-card">
         <div class="pending-head">
-          <span class="pending-indicator"></span>
           <span class="pending-title">待处理</span>
         </div>
 
