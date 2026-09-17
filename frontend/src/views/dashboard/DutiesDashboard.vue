@@ -207,12 +207,10 @@
           </div>
           <div class="duty-form-row">
             <el-form-item label="岗位职称" required>
-              <el-select v-model="dutyForm.title" placeholder="请选择或输入职称" clearable filterable allow-create size="default" style="width:100%;">
-                <el-option label="工程师" value="工程师" />
-                <el-option label="高级工程师" value="高级工程师" />
+              <el-select v-model="dutyForm.title" placeholder="请选择职称" clearable filterable size="default" style="width:100%;">
+                <el-option label="MES工程师" value="MES工程师" />
                 <el-option label="助理工程师" value="助理工程师" />
                 <el-option label="技术员" value="技术员" />
-                <el-option label="组长" value="组长" />
               </el-select>
             </el-form-item>
           </div>
@@ -308,7 +306,7 @@ const TITLE_GROUPS = [
     title: '工程师',
     icon: 'bi-cpu-fill',
     accent: '#4f46e5',
-    titles: ['高级工程师', '工程师', '组长', '助理工程师'],
+    titles: ['MES工程师', '助理工程师'],
   },
   {
     key: 'technician',
@@ -328,11 +326,9 @@ const OTHER_GROUP = {
 }
 
 const titleTheme = {
-  '高级工程师': { icon: 'bi-clipboard2-data-fill', accent: '#7c3aed' },
-  '工程师':     { icon: 'bi-cpu-fill',             accent: '#4f46e5' },
-  '组长':       { icon: 'bi-person-badge-fill',    accent: '#059669' },
-  '助理工程师': { icon: 'bi-mortarboard-fill',     accent: '#0d9488' },
-  '技术员':     { icon: 'bi-tools',                accent: '#0891b2' },
+  'MES工程师':   { icon: 'bi-cpu-fill',          accent: '#4f46e5' },
+  '助理工程师':  { icon: 'bi-mortarboard-fill',  accent: '#0d9488' },
+  '技术员':      { icon: 'bi-tools',             accent: '#0891b2' },
 }
 const fallbackTheme = { icon: 'bi-person-fill', accent: '#0ea5e9' }
 
