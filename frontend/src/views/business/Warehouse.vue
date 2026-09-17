@@ -207,16 +207,16 @@
         <div class="kpi-sub">{{ kpiSub(sd.low_stock, '库存充足') }}</div>
       </div>
 
-      <div class="kpi-card kpi-card--repair" @click="activeTab = '治具'">
+      <div class="kpi-card kpi-card--repair" @click="onKpiClick('repair')">
         <div class="kpi-head">
           <span class="kpi-icon"><el-icon><Tools /></el-icon></span>
-          <span class="kpi-label">维修中</span>
+          <span class="kpi-label">维修</span>
         </div>
         <div class="kpi-value">{{ sd.repair_count || 0 }}</div>
         <div class="kpi-sub">{{ kpiSub(sd.repair_count, '无进行中') }}</div>
       </div>
 
-      <div class="kpi-card kpi-card--lost" @click="activeTab = '治具'">
+      <div class="kpi-card kpi-card--lost" @click="onKpiClick('lost')">
         <div class="kpi-head">
           <span class="kpi-icon"><el-icon><Search /></el-icon></span>
           <span class="kpi-label">丢失</span>
@@ -225,7 +225,7 @@
         <div class="kpi-sub">{{ kpiSub(sd.lost_count, '无丢失') }}</div>
       </div>
 
-      <div class="kpi-card kpi-card--damaged" @click="activeTab = '治具'">
+      <div class="kpi-card kpi-card--damaged" @click="onKpiClick('damaged')">
         <div class="kpi-head">
           <span class="kpi-icon"><el-icon><Warning /></el-icon></span>
           <span class="kpi-label">损坏</span>
@@ -281,7 +281,7 @@
           </div>
 
           <div v-if="sd.overdue_items?.length > 20" class="overdue-more">
-            <el-button text type="primary" size="small" @click="activeTab = '治具'">
+            <el-button text type="primary" size="small" @click="onKpiClick('overdue')">
               查看全部（{{ sd.overdue_items.length }} 条）
             </el-button>
           </div>
@@ -325,7 +325,12 @@
             >
               <span class="mini-tag" :class="'mini-tag--' + it._type">{{ it._label }}</span>
               <span class="mini-name">{{ it.name }}</span>
-              <span v-if="it.borrower" class="mini-info">{{ it.borrower }}</span>
+              <span v-if="it.current_borrower || it.borrower" class="mini-info">
+                {{ it.current_borrower || it.borrower }}
+              </span>
+              <span v-if="it.borrow_time || it.borrow_time" class="mini-time">
+                {{ (it.borrow_time || '').slice(0, 10) }}
+              </span>
               <el-button size="small" plain @click.stop="onPendingAction(it)">
                 {{ it._actionText }}
               </el-button>
@@ -541,7 +546,7 @@
                           <template #dropdown>
                             <el-dropdown-menu>
                               <el-dropdown-item command="restock">补货</el-dropdown-item>
-                              <el-dropdown-item v-if="row.part_type === '治具' && row.repair_qty > 0" command="finish_repair">维修完成</el-dropdown-item>
+                              <el-dropdown-item v-if="row.part_type === '治具' && row.repair_qty > 0" command="finish_repair">已维修</el-dropdown-item>
                               <el-dropdown-item v-if="row.part_type === '治具' && row.status === '借出'" command="loss">报失</el-dropdown-item>
                               <el-dropdown-item v-if="row.part_type === '治具' && row.status === '借出'" command="damaged">报损</el-dropdown-item>
                               <el-dropdown-item v-if="row.part_type === '治具' && row.status === '借出'" command="found_back">已找回</el-dropdown-item>
@@ -851,7 +856,7 @@
                   <el-button type="info" link size="small" @click="submitLoss(row)">报失</el-button>
                   <el-button type="danger" link size="small" @click="submitDamaged(row)">报损</el-button>
                 </template>
-                <el-button v-else-if="!row.return_time && row.tx_type === '维修'" type="warning" link size="small" @click="openFinishRepair(row)">维修完成</el-button>
+                <el-button v-else-if="!row.return_time && row.tx_type === '维修'" type="warning" link size="small" @click="openFinishRepair(row)">已维修</el-button>
                 <el-button v-else-if="!row.return_time && row.tx_type === '丢失'" type="success" link size="small" @click="submitFoundBack(row)">已找回</el-button>
                 <el-button v-else-if="!row.return_time && row.tx_type === '损坏'" type="success" link size="small" @click="submitRepairDamaged(row)">已修复</el-button>
                 <span v-else style="color: var(--c-text-mute); font-size: 12px;">已处理</span>
@@ -864,7 +869,7 @@
                   <el-button type="info" link size="small" @click="submitLoss(row)">报失</el-button>
                   <el-button type="danger" link size="small" @click="submitDamaged(row)">报损</el-button>
                 </template>
-                <el-button v-else-if="row.status === '维修'" type="warning" link size="small" @click="openFinishRepair(row)">维修完成</el-button>
+                <el-button v-else-if="row.status === '维修'" type="warning" link size="small" @click="openFinishRepair(row)">已维修</el-button>
                 <el-button v-else-if="row.status === '丢失'" type="success" link size="small" @click="submitFoundBack(row)">已找回</el-button>
                 <el-button v-else-if="row.status === '损坏'" type="success" link size="small" @click="submitRepairDamaged(row)">已修复</el-button>
               </template>
@@ -957,8 +962,8 @@
       </template>
     </el-dialog>
 
-    <!-- 维修完成 -->
-    <el-dialog v-model="finishRepairDialog" title="维修完成" width="420px" destroy-on-close :close-on-click-modal="true">
+    <!-- 已维修 -->
+    <el-dialog v-model="finishRepairDialog" title="已维修" width="420px" destroy-on-close :close-on-click-modal="true">
       <div class="wh-action-info" v-if="actionRow">
         <p><b>{{ actionRow.name }}</b>（{{ actionRow.model || '无型号' }}）</p>
         <p>当前维修中数量：<b class="danger-text">{{ actionRow.repair_qty || 0 }}</b></p>
@@ -1321,7 +1326,7 @@ const loadStats = async () => {
 const pendingMixedItems = computed(() => {
   const rows = []
   sd.value.repair_items?.forEach(it => rows.push({
-    ...it, _type: 'repair', _label: '维修', _actionText: '维修完成',
+    ...it, _type: 'repair', _label: '维修', _actionText: '已维修',
   }))
   sd.value.lost_items?.forEach(it => rows.push({
     ...it, _type: 'lost', _label: '丢失', _actionText: '已找回',
@@ -1358,11 +1363,28 @@ const stopStatsPolling = () => {
 
 /** KPI 卡片点击 → 跳对应 Tab */
 const onKpiClick = (type) => {
-  if (type === 'overdue') {
-    activeTab.value = '治具'
-  } else if (type === 'lowstock') {
-    activeTab.value = '耗材'
+  const STATUS_MAP = {
+    overdue: { tab: '治具', status: '借出' },
+    lowstock: { tab: '耗材', status: '预警' },
+    repair: { tab: '治具', status: '维修' },
+    lost: { tab: '治具', status: '报失' },
+    damaged: { tab: '治具', status: '报损' },
   }
+  const cfg = STATUS_MAP[type]
+  if (!cfg) return
+  // 设置筛选
+  if (cfg.tab === '治具') {
+    jigFilterStatus.value = cfg.status
+    consFilterStatus.value = ''
+  } else {
+    consFilterStatus.value = cfg.status
+    jigFilterStatus.value = ''
+  }
+  activeTab.value = cfg.tab
+  // 直接加载数据（不走 onTabChange，避免手动切 Tab 时被清空）
+  loadData()
+  loadStats()
+  if (cfg.tab === '治具' || cfg.tab === '耗材') stopStatsPolling()
 }
 
 /** 催还：复制文案到剪贴板（后续可换成调后端通知接口） */
@@ -1441,6 +1463,9 @@ const refreshAll = () => {
 }
 
 const onTabChange = () => {
+  // 手动切 Tab — 清空当前 Tab 的状态筛选，避免 KPI 带入的过滤残留
+  jigFilterStatus.value = ''
+  consFilterStatus.value = ''
   if (activeTab.value === '出入库记录') {
     stopStatsPolling()
     if (txPage.value !== 1) txPage.value = 1; else loadTxData()
@@ -1777,14 +1802,14 @@ const submitDamaged = async (record) => {
 const submitFoundBack = async (record) => {
   try {
     const { ElMessageBox } = await import('element-plus')
-    await ElMessageBox.confirm('确认该治具已找回？', '已找回确认', {
-      confirmButtonText: '确认', cancelButtonText: '取消', type: 'success',
+    const { value } = await ElMessageBox.prompt('请输入备注（选填）', '已找回确认', {
+      confirmButtonText: '确认', cancelButtonText: '取消', inputType: 'textarea',
     })
     actionLoading.value = true
     const borrowRecordId = record.borrow_record_id || record.id
     const partId = record.borrow_record_id ? record.id : actionRow.value?.id
     if (!partId) { toast.error('无法获取物品信息'); return }
-    await warehouseApi.foundBack(partId, { borrow_record_id: borrowRecordId })
+    await warehouseApi.foundBack(partId, { borrow_record_id: borrowRecordId, remark: value || '' })
     toast.success('已找回')
     removeFromCart(partId)
     await loadBorrowRecords()
@@ -1802,14 +1827,14 @@ const submitFoundBack = async (record) => {
 const submitRepairDamaged = async (record) => {
   try {
     const { ElMessageBox } = await import('element-plus')
-    await ElMessageBox.confirm('确认该治具已修复？', '已修复确认', {
-      confirmButtonText: '确认', cancelButtonText: '取消', type: 'success',
+    const { value } = await ElMessageBox.prompt('请输入备注（选填）', '已修复确认', {
+      confirmButtonText: '确认', cancelButtonText: '取消', inputType: 'textarea',
     })
     actionLoading.value = true
     const borrowRecordId = record.borrow_record_id || record.id
     const partId = record.borrow_record_id ? record.id : actionRow.value?.id
     if (!partId) { toast.error('无法获取物品信息'); return }
-    await warehouseApi.repairDamaged(partId, { borrow_record_id: borrowRecordId })
+    await warehouseApi.repairDamaged(partId, { borrow_record_id: borrowRecordId, remark: value || '' })
     toast.success('已修复')
     removeFromCart(partId)
     await loadBorrowRecords()
@@ -1855,7 +1880,7 @@ const submitFinishRepair = async () => {
   actionLoading.value = true
   try {
     await warehouseApi.finishRepair(actionRow.value.id, { ...finishRepairForm })
-    toast.success('维修完成')
+    toast.success('已维修')
     finishRepairDialog.value = false
     refreshAll()
   } catch (e) {
@@ -2944,7 +2969,7 @@ const submitBatch = async () => {
 
 .wh-dashboard-body {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
   flex: 1;
   min-height: 0;
@@ -3184,6 +3209,12 @@ const submitBatch = async () => {
   max-width: 60px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.mini-time {
+  font-size: 11px;
+  color: #CBD5E1;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .mini-tag {
   display: inline-flex;
