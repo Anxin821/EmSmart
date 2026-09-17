@@ -1,91 +1,112 @@
 <template>
   <div class="page" style="width:100%; min-width:0; box-sizing:border-box;">
-    <!-- 操作按钮通过 Teleport 注入全局顶栏左侧空白区，不占用看板纵向空间 -->
     <Teleport defer to=".topbar-actions">
       <button v-if="userStore.isAdmin" class="btn btn-sm btn-outline-primary" @click="openDutyAddModal">
         <span class="bi bi-person-plus"></span>新增岗位
       </button>
     </Teleport>
 
-    <div class="duties-grid" style="width:100%; min-width:0; box-sizing:border-box;">
-      <div
-        class="duty-col"
-        v-for="duty in duties"
-        :key="duty.id"
-        :style="{ '--duty-accent': getAccent(duty), width:'100%' }"
+    <div class="duties-board">
+      <!-- 空态 -->
+      <div v-if="!duties.length" class="board-empty">
+        <div class="board-empty-icon">
+          <i class="bi bi-inbox"></i>
+        </div>
+        <div class="board-empty-text">暂无岗位</div>
+        <button v-if="userStore.isAdmin" class="btn btn-primary" @click="openDutyAddModal">
+          <span class="bi bi-person-plus"></span>新增岗位
+        </button>
+      </div>
+
+      <!-- 职称分组 -->
+      <section
+        v-for="group in groupedByTitle"
+        :key="group.key"
+        class="duty-section"
+        :style="{ '--duty-accent': group.accent }"
       >
-        <el-card class="duty-el-card">
-          <template #header>
-            <div class="duty-header">
-              <div class="duty-header-row">
-                <span class="duty-icon">{{ getIcon(duty) }}</span>
-                <div class="duty-title">
-                  <div class="duty-name">{{ duty.name }}</div>
-                  <div class="duty-role">{{ duty.title }}</div>
-                </div>
-                <!-- 去掉 header 右上角编辑删除按钮，操作移至 footer -->
+        <!-- 分组标题行 -->
+        <header class="duty-section-head">
+          <span class="duty-section-icon">
+            <i class="bi" :class="group.icon"></i>
+          </span>
+          <span class="duty-section-title">{{ group.title }}</span>
+          <span class="duty-section-count">{{ group.duties.length }}</span>
+          <span class="duty-section-line"></span>
+        </header>
+
+        <!-- 岗位卡片网格 -->
+        <div class="duty-cards">
+          <article
+            v-for="duty in group.duties"
+            :key="duty.id"
+            class="duty-card"
+          >
+            <!-- 卡片头：姓名 + 职称 chip + hover 操作 -->
+            <div class="duty-card-head">
+              <span class="duty-card-name">{{ duty.name }}</span>
+              <span class="duty-card-title">{{ duty.title }}</span>
+              <div v-if="userStore.isAdmin" class="duty-card-actions">
+                <button class="duty-card-btn" title="编辑岗位" @click.stop="openDutyEditModal(duty)">
+                  <span class="bi bi-pencil"></span>
+                </button>
+                <button class="duty-card-btn danger" title="删除岗位" @click.stop="openDutyDeleteModal(duty)">
+                  <span class="bi bi-trash3"></span>
+                </button>
               </div>
             </div>
-          </template>
 
-          <el-scrollbar class="duty-scroll">
-            <div class="duty-body">
-              <template v-if="sortedItems(duty.items).length">
+            <!-- 卡片主体：唯一滚动区，职责超出时内部滚动 -->
+            <div class="duty-card-body">
+              <!-- 主要职责 -->
+              <div v-if="primaryItems(duty).length" class="duty-block">
                 <div
-                  v-for="(item, idx) in sortedItems(duty.items)"
-                  :key="idx"
-                  class="duty-item-row"
-                  :class="{ primary: item.is_primary, compact: true, active: isRowActive(duty.id, idx) }"
-                  :style="isRowActive(duty.id, idx) ? { background: 'color-mix(in srgb, var(--duty-accent) 8%, #fff) !important', borderColor: 'color-mix(in srgb, var(--duty-accent) 35%, rgba(15,23,42,.12)) !important' } : {}"
-                  @click="toggleActiveRow(duty.id, idx)"
+                  v-for="(item, idx) in primaryItems(duty)"
+                  :key="'p' + idx"
+                  class="duty-line duty-line--primary"
                 >
-                  <span
-                    class="duty-item-marker"
-                    :class="{ primary: item.is_primary }"
-                  >{{ item.is_primary ? '⭐' : '•' }}</span>
-                  <el-tooltip
-                    :content="item.content"
-                    placement="top"
-                    effect="light"
-                    :show-after="200"
-                    :disabled="!item.content || item.content.length < 12"
-                  >
-                    <div class="duty-item-content single-line" :class="{ primary: item.is_primary }">
-                      {{ item.content }}
-                    </div>
-                  </el-tooltip>
-                  <div
-                    v-if="userStore.isAdmin && isRowActive(duty.id, idx)"
-                    class="duty-item-actions duty-item-actions-visible"
-                  >
-                    <el-button link type="primary" size="small" @click.stop="openItemEditModal(duty, idx, item)">编辑</el-button>
-                    <el-button link type="danger"  size="small" @click.stop="openItemDeleteModal(duty, idx)">删除</el-button>
+                  <span class="duty-line-text">{{ item.content }}</span>
+                  <div v-if="userStore.isAdmin" class="duty-line-actions">
+                    <button class="duty-mini-btn" @click.stop="openItemEditModal(duty, idx, item)">编辑</button>
+                    <button class="duty-mini-btn danger" @click.stop="openItemDeleteModal(duty, idx)">删除</button>
                   </div>
                 </div>
-              </template>
-              <div v-else class="duty-empty">
-                <div class="duty-empty-icon">📭</div>
-                <div class="duty-empty-title">暂无职责条目</div>
-                <div class="duty-empty-hint" v-if="userStore.isAdmin">点击下方按钮添加主要/次要职责</div>
+              </div>
+
+              <!-- 次要职责 -->
+              <div v-if="secondaryItems(duty).length" class="duty-block">
+                <div
+                  v-for="(item, idx) in secondaryItems(duty)"
+                  :key="'s' + idx"
+                  class="duty-line"
+                >
+                  <span class="duty-line-text">{{ item.content }}</span>
+                  <div v-if="userStore.isAdmin" class="duty-line-actions">
+                    <button
+                      class="duty-mini-btn"
+                      @click.stop="openItemEditModal(duty, primaryItems(duty).length + idx, item)"
+                    >编辑</button>
+                    <button
+                      class="duty-mini-btn danger"
+                      @click.stop="openItemDeleteModal(duty, primaryItems(duty).length + idx)"
+                    >删除</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 空态 -->
+              <div v-if="!duty.items?.length" class="duty-empty">
+                <span class="bi bi-inbox"></span>
+                <span>暂无职责</span>
               </div>
             </div>
-          </el-scrollbar>
-
-          <template #footer v-if="userStore.isAdmin">
-            <div class="duty-footer-actions">
-              <el-button class="duty-edit-btn" @click="openDutyEditModal(duty)">
-                <span class="bi bi-pencil-square" style="margin-right:5px;"></span>编辑
-              </el-button>
-              <el-button class="duty-delete-btn" @click="openDutyDeleteModal(duty)">
-                <span class="bi bi-trash3" style="margin-right:5px;"></span>删除
-              </el-button>
-            </div>
-          </template>
-        </el-card>
-      </div>
+          </article>
+        </div>
+      </section>
     </div>
 
-    <!-- 职责条目：新增 / 编辑 Modal —— 视觉优化：更精致的只读 chip、更宽输入、居中 footer —— -->
+    <!-- ============ Modal 区 ============ -->
+
     <CommonModal
       v-model:visible="itemModalVisible"
       :title="itemMode === 'add' ? '添加职责' : '编辑职责'"
@@ -96,16 +117,16 @@
     >
       <div class="item-modal-inner">
         <el-form :model="itemForm" label-width="84px" label-position="right">
-          <!-- 所属岗位：改成只读 chip（不再用 disabled input，更美观） -->
           <el-form-item label="所属岗位">
             <div class="item-duty-chip" :style="{ '--duty-accent': getAccent(itemDuty) }">
-              <span class="item-duty-avatar">{{ getIcon(itemDuty) }}</span>
+              <span class="item-duty-avatar">
+                <i class="bi" :class="getIcon(itemDuty)"></i>
+              </span>
               <span class="item-duty-name">{{ itemDuty?.name }}</span>
               <span class="item-duty-dot">/</span>
               <span class="item-duty-title">{{ itemDuty?.title }}</span>
             </div>
           </el-form-item>
-          <!-- 职责内容：4 行文本域，字数统计 + 柔色焦点框 -->
           <el-form-item label="职责内容" required>
             <el-input
               v-model="itemForm.content"
@@ -118,29 +139,24 @@
               class="item-content-textarea"
             />
           </el-form-item>
-          <!-- 职责等级：切换用更大的块状按钮（主/次 更分明） -->
           <el-form-item label="职责等级">
             <div class="item-level-switch">
-              <div
-                class="item-level-card"
-                :class="{ active: itemForm.is_primary === true }"
-                @click="itemForm.is_primary = true"
-              >
-                <div class="item-level-icon">⭐</div>
+              <div class="item-level-card" :class="{ active: itemForm.is_primary === true }" @click="itemForm.is_primary = true">
+                <div class="item-level-icon">
+                  <i class="bi bi-star-fill"></i>
+                </div>
                 <div class="item-level-meta">
                   <div class="item-level-name"><span>主要职责</span></div>
                   <div class="item-level-hint">关键职责，靠前展示</div>
                 </div>
                 <div class="item-level-check" :class="{ show: itemForm.is_primary === true }">✓</div>
               </div>
-              <div
-                class="item-level-card"
-                :class="{ active: itemForm.is_primary === false }"
-                @click="itemForm.is_primary = false"
-              >
-                <div class="item-level-icon" style="background:#F1F5F9;">•</div>
+              <div class="item-level-card" :class="{ active: itemForm.is_primary === false }" @click="itemForm.is_primary = false">
+                <div class="item-level-icon secondary">
+                  <i class="bi bi-dash-lg"></i>
+                </div>
                 <div class="item-level-meta">
-                  <div class="item-level-name"><span style="color:#334155;">次要职责</span></div>
+                  <div class="item-level-name"><span class="text-slate">次要职责</span></div>
                   <div class="item-level-hint">辅助性工作，靠后展示</div>
                 </div>
                 <div class="item-level-check" :class="{ show: itemForm.is_primary === false }">✓</div>
@@ -162,7 +178,6 @@
       </template>
     </CommonModal>
 
-    <!-- 职责条目：删除确认 Modal -->
     <CommonModal
       v-model:visible="itemDeleteVisible"
       title="确认删除职责"
@@ -171,20 +186,13 @@
       @ok="submitItemDelete"
     >
       <div style="display:flex;gap:14px;align-items:flex-start;">
-        <div style="
-          width:44px;height:44px;flex-shrink:0;border-radius:50%;
-          background:#FEF3C7;color:#D97706;font-size:22px;
-          display:inline-flex;align-items:center;justify-content:center;
-        ">
+        <div style="width:44px;height:44px;flex-shrink:0;border-radius:50%;background:#FEF3C7;color:#D97706;font-size:22px;display:inline-flex;align-items:center;justify-content:center;">
           <span class="bi bi-exclamation-triangle-fill"></span>
         </div>
         <div>
-          <div style="font-size:15px;font-weight:600;color:#0f172a;margin-bottom:6px;">
-            确定要删除此职责？
-          </div>
+          <div style="font-size:15px;font-weight:600;color:#0f172a;margin-bottom:6px;">确定要删除此职责？</div>
           <div style="font-size:13px;color:var(--c-text-3);line-height:1.6;">
-            您即将删除 <b style="color:var(--c-text-2);">"{{ itemDeleteContent }}"</b> 职责条目，
-            该操作无法撤销，是否继续？
+            您即将删除 <b style="color:var(--c-text-2);">"{{ itemDeleteContent }}"</b> 职责条目，该操作无法撤销，是否继续？
           </div>
         </div>
       </div>
@@ -196,7 +204,6 @@
       </template>
     </CommonModal>
 
-    <!-- 岗位组：新增 / 编辑 Modal —— 更居中 + 更简约：label 上方居中、宽度收紧、分隔线极简、条目素雅 —— -->
     <CommonModal
       v-model:visible="dutyModalVisible"
       :title="dutyMode === 'add' ? '新增岗位' : '编辑岗位'"
@@ -205,47 +212,30 @@
       @ok="submitDutyModal"
       align-footer="center"
     >
-      <!-- 外层：一个居中盒子即可，max-width + margin:0 auto，上下左右留白一致，视觉更聚焦 -->
       <div class="duty-modal-box">
-        <!-- label-position="top"：标签在上、输入框在下，整体视觉居中，不再有 label 右对齐造成的左偏感 -->
         <el-form :model="dutyForm" label-position="top" class="duty-form-mini">
           <div class="duty-form-row">
             <el-form-item label="人员姓名" required>
-              <el-input
-                v-model="dutyForm.name"
-                placeholder="例如：张三"
-                maxlength="20"
-                clearable
-                size="default"
-              />
+              <el-input v-model="dutyForm.name" placeholder="例如：张三" maxlength="20" clearable size="default" />
             </el-form-item>
           </div>
           <div class="duty-form-row">
             <el-form-item label="岗位职称" required>
               <el-select v-model="dutyForm.title" placeholder="请选择或输入职称" clearable filterable allow-create size="default" style="width:100%;">
                 <el-option label="工程师" value="工程师" />
-                <el-option label="技术员" value="技术员" />
                 <el-option label="高级工程师" value="高级工程师" />
-                <el-option label="主管" value="主管" />
+                <el-option label="助理工程师" value="助理工程师" />
+                <el-option label="技术员" value="技术员" />
                 <el-option label="组长" value="组长" />
               </el-select>
             </el-form-item>
           </div>
 
-          <!-- 分隔线极简：细灰线 + 居中短标题，无图标、无多余留白 -->
-          <div class="duty-mini-divider">
-            <span>职责条目管理</span>
-          </div>
+          <div class="duty-mini-divider"><span>职责条目管理</span></div>
 
-          <!-- 条目管理区：纯白 + 极淡圆角，无渐变无厚边框，保持简约清爽 -->
           <div class="duty-items-wrap">
             <div class="duty-items-stack">
-              <div
-                v-for="(row, idx) in dutyForm.items"
-                :key="idx"
-                class="duty-row-simple"
-              >
-                <!-- 序号小方块：简约灰底 + 数字，不花哨 -->
+              <div v-for="(row, idx) in dutyForm.items" :key="idx" class="duty-row-simple">
                 <div class="duty-row-index" :class="{ p: row.is_primary }">{{ idx + 1 }}</div>
                 <el-input
                   v-model="row.content"
@@ -257,33 +247,16 @@
                   resize="none"
                   class="duty-row-input"
                 />
-                <!-- 主次切换：改为更小更紧凑的 tag 样式按钮 -->
                 <div class="duty-row-level">
-                  <div
-                    class="level-chip"
-                    :class="{ on: row.is_primary === true }"
-                    @click="row.is_primary = true"
-                  >主</div>
-                  <div
-                    class="level-chip"
-                    :class="{ on: row.is_primary === false }"
-                    @click="row.is_primary = false"
-                  >次</div>
+                  <div class="level-chip" :class="{ on: row.is_primary === true }" @click="row.is_primary = true">主</div>
+                  <div class="level-chip" :class="{ on: row.is_primary === false }" @click="row.is_primary = false">次</div>
                 </div>
-                <button
-                  class="duty-row-del"
-                  type="button"
-                  :title="`删除第 ${idx + 1} 条`"
-                  @click="removeFormItem(idx)"
-                >
+                <button class="duty-row-del" type="button" :title="`删除第 ${idx + 1} 条`" @click="removeFormItem(idx)">
                   <span class="bi bi-x-lg"></span>
                 </button>
               </div>
-              <div v-if="!dutyForm.items.length" class="duty-empty-mini">
-                暂无职责条目，点击下方按钮添加
-              </div>
+              <div v-if="!dutyForm.items.length" class="duty-empty-mini">暂无职责条目，点击下方按钮添加</div>
             </div>
-            <!-- 添加一条职责：简约的小尺寸 outline 按钮，居中，不抢视觉 -->
             <div class="duty-add-center">
               <el-button size="small" class="duty-add-link-btn" @click="addFormItem">
                 <span class="bi bi-plus" style="margin-right:4px;"></span>添加一条职责
@@ -302,7 +275,6 @@
       </template>
     </CommonModal>
 
-    <!-- 岗位组：删除确认 Modal -->
     <CommonModal
       v-model:visible="dutyDeleteVisible"
       title="确认删除岗位"
@@ -311,20 +283,14 @@
       @ok="submitDutyDelete"
     >
       <div style="display:flex;gap:14px;align-items:flex-start;">
-        <div style="
-          width:44px;height:44px;flex-shrink:0;border-radius:50%;
-          background:#FEE2E2;color:#DC2626;font-size:22px;
-          display:inline-flex;align-items:center;justify-content:center;
-        ">
+        <div style="width:44px;height:44px;flex-shrink:0;border-radius:50%;background:#FEE2E2;color:#DC2626;font-size:22px;display:inline-flex;align-items:center;justify-content:center;">
           <span class="bi bi-exclamation-diamond-fill"></span>
         </div>
         <div>
-          <div style="font-size:15px;font-weight:600;color:#0f172a;margin-bottom:6px;">
-            确定要删除整个岗位？
-          </div>
+          <div style="font-size:15px;font-weight:600;color:#0f172a;margin-bottom:6px;">确定要删除整个岗位？</div>
           <div style="font-size:13px;color:var(--c-text-3);line-height:1.6;">
             您即将删除 <b style="color:var(--c-text-2);">{{ dutyDeleteTarget?.name }} - {{ dutyDeleteTarget?.title }}</b>
-            以及其下 <b style="color:var(--c-text-2);">{{ sortedItems(dutyDeleteTarget?.items).length }} 条职责</b>。
+            以及其下 <b style="color:var(--c-text-2);">{{ dutyDeleteTarget?.items?.length || 0 }} 条职责</b>。
             该操作无法撤销，是否继续？
           </div>
         </div>
@@ -349,31 +315,64 @@ import CommonModal from '@/components/common/CommonModal.vue'
 const userStore = useUserStore()
 const duties = ref([])
 
-// 点击某条职责才展开"编辑/删除"按钮的激活行：`${dutyId}-${idx}`，null 表示全部收起
-const activeRowKey = ref(null)
-const toggleActiveRow = (dutyId, idx) => {
-  const key = `${dutyId}-${idx}`
-  activeRowKey.value = activeRowKey.value === key ? null : key
-}
-const isRowActive = (dutyId, idx) => activeRowKey.value === `${dutyId}-${idx}`
+/* ================= 职称分组配置 ================= */
+const TITLE_GROUPS = [
+  {
+    key: 'engineer',
+    title: '工程师',
+    icon: 'bi-cpu-fill',
+    accent: '#4f46e5',
+    titles: ['高级工程师', '工程师', '组长', '助理工程师'],
+  },
+  {
+    key: 'technician',
+    title: '技术员',
+    icon: 'bi-tools',
+    accent: '#0891b2',
+    titles: ['技术员'],
+  },
+]
 
-// 按岗位职称固定映射图标与主题色（同职称 → 同图标同色，不再随列表顺序变化）
-const titleTheme = {
-  '工程师':     { icon: '💻', accent: '#4f46e5' },
-  '高级工程师': { icon: '🔬', accent: '#7c3aed' },
-  '技术员':     { icon: '🔧', accent: '#0891b2' },
-  '主管':       { icon: '🎯', accent: '#d97706' },
-  '组长':       { icon: '👷', accent: '#059669' },
+const OTHER_GROUP = {
+  key: 'other',
+  title: '其他',
+  icon: 'bi-person-fill',
+  accent: '#0ea5e9',
+  titles: [],
 }
-// 未知/自定义职称的兜底样式
-const fallbackTheme = { icon: '👤', accent: '#0ea5e9' }
+
+const titleTheme = {
+  '高级工程师': { icon: 'bi-clipboard2-data-fill', accent: '#7c3aed' },
+  '工程师':     { icon: 'bi-cpu-fill',             accent: '#4f46e5' },
+  '组长':       { icon: 'bi-person-badge-fill',    accent: '#059669' },
+  '助理工程师': { icon: 'bi-mortarboard-fill',     accent: '#0d9488' },
+  '技术员':     { icon: 'bi-tools',                accent: '#0891b2' },
+}
+const fallbackTheme = { icon: 'bi-person-fill', accent: '#0ea5e9' }
 
 const getAccent = (duty) => (titleTheme[duty?.title] || fallbackTheme).accent
 const getIcon   = (duty) => (titleTheme[duty?.title] || fallbackTheme).icon
 
-// ================= 职责条目弹窗 =================
+const groupedByTitle = computed(() => {
+  const groups = TITLE_GROUPS.map((g) => ({ ...g, duties: [] }))
+  const other = { ...OTHER_GROUP, duties: [] }
+  for (const d of duties.value) {
+    const t = d.title || ''
+    const g = groups.find((grp) => grp.titles.includes(t))
+    if (g) g.duties.push(d)
+    else other.duties.push(d)
+  }
+  const result = groups.filter((g) => g.duties.length > 0)
+  if (other.duties.length) result.push(other)
+  return result
+})
+
+const sortedItems   = (items) => [...(items || [])].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0))
+const primaryItems  = (duty) => (duty?.items || []).filter((it) => it.is_primary)
+const secondaryItems = (duty) => (duty?.items || []).filter((it) => !it.is_primary)
+
 const itemModalVisible = ref(false)
-const itemMode = ref('add') // 'add' | 'edit'
+const itemMode = ref('add')
 const itemSaving = ref(false)
 const itemForm = ref({ content: '', is_primary: true })
 const itemDuty = ref(null)
@@ -385,9 +384,8 @@ const itemDeleteTarget = ref(null)
 const itemDeleteIndex = ref(null)
 const itemDeleteContent = ref('')
 
-// ================= 岗位组弹窗 =================
 const dutyModalVisible = ref(false)
-const dutyMode = ref('add') // 'add' | 'edit'
+const dutyMode = ref('add')
 const dutySaving = ref(false)
 const dutyForm = ref({ name: '', title: '', items: [] })
 const dutyEditTarget = ref(null)
@@ -396,22 +394,16 @@ const dutyDeleteVisible = ref(false)
 const dutyDeleteSaving = ref(false)
 const dutyDeleteTarget = ref(null)
 
-// 在弹窗内就地添加/删除一条职责条目（仅修改表单内存，不立即请求后端）
 const addFormItem = () => {
   if (!Array.isArray(dutyForm.value.items)) dutyForm.value.items = []
   dutyForm.value.items.push({
     content: '',
-    is_primary: dutyForm.value.items.filter(r => r.is_primary).length < 2, // 前两条默认主要
+    is_primary: dutyForm.value.items.filter((r) => r.is_primary).length < 2,
   })
 }
 const removeFormItem = (idx) => {
   if (!Array.isArray(dutyForm.value.items)) return
   dutyForm.value.items.splice(idx, 1)
-}
-
-// ================= 工具函数 =================
-const sortedItems = (items) => {
-  return [...(items || [])].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0))
 }
 
 const loadData = async () => {
@@ -423,7 +415,6 @@ const loadData = async () => {
   }
 }
 
-// ================= 职责条目：增删改 =================
 const openItemAddModal = (duty) => {
   itemDuty.value = duty
   itemMode.value = 'add'
@@ -466,6 +457,7 @@ const submitItemModal = async () => {
     }
     await dutiesApi.update(duty.id, { items })
     itemModalVisible.value = false
+    itemEditIndex.value = null
     ElMessage.success(itemMode.value === 'add' ? '添加成功' : '修改成功')
     loadData()
   } catch (e) {
@@ -495,6 +487,7 @@ const submitItemDelete = async () => {
     if (originalIdx >= 0) items.splice(originalIdx, 1)
     await dutiesApi.update(duty.id, { items })
     itemDeleteVisible.value = false
+    itemDeleteIndex.value = null
     ElMessage.success('删除成功')
     loadData()
   } catch (e) {
@@ -505,7 +498,6 @@ const submitItemDelete = async () => {
   }
 }
 
-// ================= 岗位组：增删改 =================
 const openDutyAddModal = () => {
   dutyMode.value = 'add'
   dutyForm.value = { name: '', title: '工程师', items: [] }
@@ -516,7 +508,6 @@ const openDutyAddModal = () => {
 const openDutyEditModal = (duty) => {
   dutyMode.value = 'edit'
   dutyEditTarget.value = duty
-  // 深拷贝当前所有职责条目到表单，支持一次编辑多条（保留原 id 用于提交时的映射，没有 id 也没关系，后端以 items 全量覆盖）
   dutyForm.value = {
     name: duty.name,
     title: duty.title,
@@ -538,7 +529,6 @@ const submitDutyModal = async () => {
     ElMessage.warning('请选择/输入岗位职称')
     return
   }
-  // 校验：职责条目不能有空白内容（防止提交无效行）
   const items = (dutyForm.value.items || []).map((r) => ({
     id: r.id,
     content: (r.content || '').trim(),
@@ -560,7 +550,6 @@ const submitDutyModal = async () => {
       })
       ElMessage.success('岗位创建成功，已同步保存职责条目')
     } else {
-      // 编辑模式：同时更新元信息（name/title）+ 全量更新 items
       await Promise.all([
         dutiesApi.patch(dutyEditTarget.value.id, {
           name: dutyForm.value.name.trim(),
@@ -607,170 +596,383 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 溢出修复：全局 .page 高度为 100vh，比内容区（已减去顶栏 56px + 内边距）高，
-   岗位 >4 个换行时第二行会被裁掉且无法滚动。这里让 .page 撑满内容区，
-   并把滚动交给 .duties-grid，多行时可纵向滚动查看全部岗位。 */
+/* ================================================================
+   页面骨架：固定不滚
+   ================================================================ */
 .page {
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.duties-grid {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  align-content: flex-start;
-}
-
-/* —— 卡片本体：height:100% 撑满列 → 与同 row 最长的那条卡严格等高；min-height 保底（Header + 4条 Body） —— */
-.duty-el-card {
-  display: flex;
-  flex-direction: column;
-  width: 100% !important;
-  min-width: 0;
-  height: 100% !important;
-  min-height: 280px;              /* 保底：Header(60) + Body(20 内边距 + 200 滚动区) ≈ 280px（无 footer）；含 Footer 约 340px，由内容自然撑开 */
-  max-height: none !important;
-  border-radius: 18px !important;
   overflow: hidden;
-  border: 1px solid rgba(15,23,42,0.08) !important;
-  background: #fff;
-  box-shadow:
-    0 1px 2px rgba(15,23,42,.04),
-    0 6px 20px -8px rgba(15,23,42,.12) !important;
-  transition: transform .22s cubic-bezier(.2,.7,.2,1), box-shadow .22s cubic-bezier(.2,.7,.2,1), border-color .22s;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  position: relative;
 }
-.duty-el-card::before {
-  /* hover 时外框泛 accent 微光，不动原 border 避免抖动 */
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--duty-accent, #4f46e5) 50%, transparent),
-    transparent 40%,
-    transparent 60%,
-    color-mix(in srgb, var(--duty-accent, #4f46e5) 30%, transparent)
-  );
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask-composite: exclude;
-  opacity: 0;
-  transition: opacity .22s;
-  pointer-events: none;
-}
-.duty-el-card:hover {
-  transform: translateY(-4px);
-  box-shadow:
-    0 2px 6px rgba(15,23,42,.05),
-    0 20px 40px -14px color-mix(in srgb, var(--duty-accent, #4f46e5) 38%, rgba(15,23,42,.18)) !important;
-  border-color: color-mix(in srgb, var(--duty-accent, #4f46e5) 32%, rgba(15,23,42,0.08)) !important;
-}
-.duty-el-card:hover::before { opacity: 1; }
 
-.duty-el-card :deep(.el-card__header) {
-  padding: 0 !important;
-  border-bottom: 0 !important;
-  border-radius: 18px 18px 0 0;
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  overflow: hidden;          /* 把 header 里的装饰光斑裁在渐变条内，不溢出卡片外 */
-  position: relative;
-}
-.duty-el-card :deep(.el-card__header)::before,
-.duty-el-card :deep(.el-card__header)::after {
-  /* 两个装饰光斑：一个在左上淡圆，一个在右下亮斜条，让渐变不单调 */
-  content: "";
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(2px);
-  opacity: .55;
-  pointer-events: none;
-}
-.duty-el-card :deep(.el-card__header)::before {
-  width: 180px; height: 180px;
-  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.55), transparent 60%);
-  left: -60px; top: -70px;
-}
-.duty-el-card :deep(.el-card__header)::after {
-  width: 220px; height: 220px;
-  background: radial-gradient(circle at 70% 70%, rgba(255,255,255,.22), transparent 60%);
-  right: -80px; bottom: -100px;
-  opacity: .7;
-  filter: blur(4px);
-}
-.duty-header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  position: relative;   /* 盖在装饰层之上 */
-  z-index: 1;
-}
-.duty-header-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 0 14px 10px;
-  border-top: 1px solid rgba(255,255,255,0.18);
-  margin-top: 2px;
-}
-.duty-header-actions .el-button {
-  font-size: 12px !important;
-  padding: 2px 8px !important;
-  height: 24px !important;
-  line-height: 1 !important;
-  border-radius: 6px !important;
-  background: rgba(255,255,255,.10) !important;
-  color: #fff !important;
-  opacity: .92;
-  transition: background .18s, transform .18s;
-}
-.duty-header-actions .el-button:hover {
-  background: rgba(255,255,255,.22) !important;
-  transform: translateY(-1px);
-}
-/* —— body：flex:1 吃掉剩余 → 滚动内容区固定（4 条高度），footer 贴底 —— */
-.duty-el-card :deep(.el-card__body) {
-  flex: 1 1 auto;
+.duties-board {
+  flex: 1;
   min-height: 0;
-  min-width: 0;
-  max-width: 100%;
-  width: 100%;
-  background: linear-gradient(180deg, #F8FAFD 0%, #FFFFFF 50%);
-  padding: 10px 10px 10px 10px !important;
+  overflow: hidden;
+  padding: 0px 22px 18px;
   display: flex;
   flex-direction: column;
+  gap: 5px;
   box-sizing: border-box;
-}
-.duty-el-card :deep(.el-card__footer) {
-  border-top: 1px solid rgba(15,23,42,0.06) !important;
-  padding: 10px 14px 14px !important;
-  background: #ffffff;
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
+  background:
+    radial-gradient(ellipse 55% 40% at 12% 0%, rgba(79, 70, 229, .045), transparent 65%),
+    radial-gradient(ellipse 50% 40% at 88% 100%, rgba(8, 145, 178, .035), transparent 65%),
+    #F7F9FC;
 }
 
 /* ================================================================
-   单条职责编辑弹窗（itemModal）美化样式：居中 + 精致 chip + 块状等级卡
+   分组头
+   ================================================================ */
+.duty-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.duty-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px;
+}
+
+.duty-section-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  color: var(--duty-accent);
+  background: color-mix(in srgb, var(--duty-accent) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--duty-accent) 22%, transparent);
+  box-shadow: 0 2px 6px -2px color-mix(in srgb, var(--duty-accent) 35%, transparent);
+  flex-shrink: 0;
+}
+
+.duty-section-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #0B1120;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.duty-section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--duty-accent) 78%, #1e293b);
+  background: color-mix(in srgb, var(--duty-accent) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--duty-accent) 20%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+
+.duty-section-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--duty-accent) 40%, transparent) 0%,
+    color-mix(in srgb, var(--duty-accent) 12%, transparent) 30%,
+    transparent 100%);
+}
+
+/* ================================================================
+   卡片网格：所有卡片统一高度，内部职责超出时滚动
+   ================================================================ */
+.duty-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  grid-auto-rows: 280px;   /* ✅ 去掉底部按钮后，280 就够 */
+}
+
+/* ================================================================
+   岗位卡片：两段式（头固定 + 主体滚动）
+   ================================================================ */
+.duty-card {
+  position: relative;
+  height: 100%;
+  border-radius: 14px;
+  padding: 14px 16px 14px;   /* ✅ 去底部按钮后底部 padding 恢复为 14 */
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--duty-accent) 5%, #fff) 0%,
+    #ffffff 60%);
+  border: 1px solid color-mix(in srgb, var(--duty-accent) 18%, #E8ECF0);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, .02),
+    0 8px 20px -12px color-mix(in srgb, var(--duty-accent) 24%, transparent);
+  transition:
+    transform .22s cubic-bezier(.2,.7,.2,1),
+    box-shadow .22s cubic-bezier(.2,.7,.2,1),
+    border-color .22s;
+}
+
+.duty-card::before {
+  content: '';
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--duty-accent) 22%, transparent) 0%,
+    transparent 70%);
+  pointer-events: none;
+  opacity: .9;
+}
+
+.duty-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--duty-accent) 45%, transparent);
+  box-shadow:
+    0 4px 8px rgba(15, 23, 42, .04),
+    0 20px 36px -14px color-mix(in srgb, var(--duty-accent) 42%, transparent);
+}
+
+/* 卡片头 */
+.duty-card-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--duty-accent) 12%, #EEF2F7);
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.duty-card-name {
+  font-size: 17px;
+  font-weight: 800;
+  color: #0B1120;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.duty-card-title {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 9px;
+  border-radius: 6px;
+  color: color-mix(in srgb, var(--duty-accent) 82%, #1e293b);
+  background: color-mix(in srgb, var(--duty-accent) 9%, #fff);
+  border: 1px solid color-mix(in srgb, var(--duty-accent) 22%, transparent);
+  white-space: nowrap;
+}
+
+.duty-card-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity .18s;
+  flex-shrink: 0;
+}
+.duty-card:hover .duty-card-actions { opacity: 1; }
+.duty-card-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  padding: 0;
+  font-size: 12.5px;
+}
+.duty-card-btn:hover { background: rgba(15, 23, 42, .06); color: #475569; }
+.duty-card-btn.danger:hover { background: #FEE2E2; color: #DC2626; }
+
+/* ================================================================
+   卡片主体：唯一滚动区
+   ================================================================ */
+.duty-card-body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+
+.duty-card-body::-webkit-scrollbar { width: 6px; }
+.duty-card-body::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--duty-accent) 25%, #D8DEEA);
+  border-radius: 3px;
+}
+.duty-card-body::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--duty-accent) 40%, #B8C2D2);
+}
+.duty-card-body::-webkit-scrollbar-track { background: transparent; }
+
+/* ================================================================
+   职责行
+   ================================================================ */
+.duty-block {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.duty-block + .duty-block {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed color-mix(in srgb, var(--duty-accent) 10%, #EEF2F7);
+}
+
+.duty-line {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 6px 4px 15px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #64748b;
+  transition: background .15s;
+}
+
+.duty-line::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 12px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+
+.duty-line--primary {
+  color: #1e293b;
+  font-weight: 600;
+}
+.duty-line--primary::before {
+  top: 7px;
+  left: 3px;
+  width: 3px;
+  height: 15px;
+  border-radius: 2px;
+  background: linear-gradient(180deg,
+    var(--duty-accent),
+    color-mix(in srgb, var(--duty-accent) 55%, #cbd5e1));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--duty-accent) 30%, transparent);
+}
+
+.duty-line-text {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.duty-line-actions {
+  display: flex;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity .15s;
+  flex-shrink: 0;
+}
+.duty-line:hover { background: rgba(15, 23, 42, .025); }
+.duty-line:hover .duty-line-actions { opacity: 1; }
+
+.duty-mini-btn {
+  border: none;
+  background: transparent;
+  color: var(--primary, #2C5CE8);
+  font-size: 12.5px;
+  padding: 2px 5px;
+  cursor: pointer;
+  border-radius: 3px;
+  line-height: 1.4;
+}
+.duty-mini-btn:hover { background: rgba(44, 92, 232, .08); }
+.duty-mini-btn.danger { color: #DC2626; }
+.duty-mini-btn.danger:hover { background: rgba(220, 38, 38, .08); }
+
+/* ================================================================
+   卡片内空态
+   ================================================================ */
+.duty-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 100%;
+  padding: 16px 0;
+  color: #cbd5e1;
+  font-size: 13.5px;
+}
+.duty-empty .bi { font-size: 22px; }
+
+/* ================================================================
+   看板空态
+   ================================================================ */
+.board-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #94a3b8;
+  padding: 40px 20px;
+}
+.board-empty-icon {
+  font-size: 48px;
+  color: #CBD5E1;
+  line-height: 1;
+}
+
+.board-empty-text { font-size: 16px; }
+
+/* ================================================================
+   Modal 内样式
    ================================================================ */
 .item-modal-inner {
   background: #fff;
   border-radius: 12px;
   padding: 6px 2px 2px;
 }
-/* 所属岗位 chip：柔和渐变底 + 圆形图标 + 斜杠分隔 */
 .item-duty-chip {
   --duty-accent: #4f46e5;
   display: inline-flex;
@@ -778,33 +980,30 @@ onMounted(() => {
   gap: 8px;
   padding: 6px 14px 6px 6px;
   border-radius: 999px;
-  background:
-    linear-gradient(90deg,
-      color-mix(in srgb, var(--duty-accent) 10%, #fff),
-      color-mix(in srgb, var(--duty-accent) 4%, #fff)
-    );
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--duty-accent) 10%, #fff),
+    color-mix(in srgb, var(--duty-accent) 4%, #fff));
   border: 1px solid color-mix(in srgb, var(--duty-accent) 24%, #e2e8f0);
 }
 .item-duty-avatar {
-  width: 28px; height: 28px; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: #fff;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--duty-accent) 28%, #e2e8f0),
-              0 2px 6px color-mix(in srgb, var(--duty-accent) 18%, transparent);
-  font-size: 15px;
+  color: var(--duty-accent);
+  font-size: 14px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--duty-accent) 28%, #e2e8f0),
+    0 2px 6px color-mix(in srgb, var(--duty-accent) 18%, transparent);
+  flex-shrink: 0;
 }
-.item-duty-name {
-  font-weight: 600; color: #0f172a; font-size: 13.5px;
-  letter-spacing: .2px;
-}
-.item-duty-dot {
-  color: #cbd5e1; font-weight: 600;
-}
-.item-duty-title {
-  color: color-mix(in srgb, var(--duty-accent) 70%, #334155);
-  font-size: 12.5px; font-weight: 500;
-}
-/* 职责内容文本域：柔色边框 + 圆角 + 聚焦时 accent 描边 */
+.item-duty-name { font-weight: 600; color: #0f172a; font-size: 13.5px; }
+.item-duty-dot { color: #cbd5e1; font-weight: 600; }
+.item-duty-title { color: color-mix(in srgb, var(--duty-accent) 70%, #334155); font-size: 12.5px; font-weight: 500; }
+
 .item-content-textarea :deep(.el-textarea__inner) {
   border-radius: 10px !important;
   border: 1px solid #dbe2ea !important;
@@ -818,17 +1017,8 @@ onMounted(() => {
   border-color: var(--primary, #2C5CE8) !important;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #2C5CE8) 14%, transparent) !important;
 }
-.item-content-textarea :deep(.el-input__count) {
-  font-size: 11px;
-  color: #94a3b8;
-}
 
-/* 职责等级：两张块状卡片并排（主/次 一眼区分） */
-.item-level-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
+.item-level-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .item-level-card {
   display: flex;
   align-items: center;
@@ -841,77 +1031,58 @@ onMounted(() => {
   transition: all .18s cubic-bezier(.2,.7,.2,1);
   position: relative;
 }
-.item-level-card:hover {
-  border-color: #cbd5e1;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px -8px rgba(15,23,42,.15);
-}
-.item-level-card.active {
-  border-color: #d97706;
-  background: linear-gradient(180deg, #fff7ed, #ffffff);
-  box-shadow: 0 8px 20px -10px rgba(217,119,6,.42), 0 1px 2px rgba(217,119,6,.08);
-}
-.item-level-card:nth-of-type(2).active {
-  border-color: #0f766e;
-  background: linear-gradient(180deg, #f0fdfa, #ffffff);
-  box-shadow: 0 8px 20px -10px rgba(15,118,110,.42), 0 1px 2px rgba(15,118,110,.08);
-}
+.item-level-card:hover { border-color: #cbd5e1; transform: translateY(-1px); box-shadow: 0 6px 16px -8px rgba(15,23,42,.15); }
+.item-level-card.active { border-color: #d97706; background: linear-gradient(180deg, #fff7ed, #ffffff); box-shadow: 0 8px 20px -10px rgba(217,119,6,.42); }
+.item-level-card:nth-of-type(2).active { border-color: #0f766e; background: linear-gradient(180deg, #f0fdfa, #ffffff); box-shadow: 0 8px 20px -10px rgba(15,118,110,.42); }
+
 .item-level-icon {
-  width: 34px; height: 34px; border-radius: 9px;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 16px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
   background: linear-gradient(180deg, #fef3c7, #fde68a);
-  box-shadow: inset 0 0 0 1px rgba(253,224,71,.4),
-              0 2px 6px rgba(250,204,21,.15);
+  color: #B45309;
+  box-shadow: inset 0 0 0 1px rgba(253,224,71,.4), 0 2px 6px rgba(250,204,21,.15);
   flex-shrink: 0;
 }
-.item-level-meta {
-  flex: 1; min-width: 0;
-  display: flex; flex-direction: column; gap: 2px;
+.item-level-icon.secondary {
+  background: #F1F5F9;
+  color: #475569;
+  box-shadow: inset 0 0 0 1px #E2E8F0;
 }
-.item-level-name {
-  font-size: 13.5px; font-weight: 600; color: #0f172a; line-height: 1.25;
-}
-.item-level-name span:first-child {
-  color: #b45309;
-}
-.item-level-hint {
-  font-size: 11.5px; color: #64748b; letter-spacing: .1px;
-}
+
+.item-level-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.item-level-name { font-size: 13.5px; font-weight: 600; color: #0f172a; line-height: 1.25; }
+.item-level-name span:first-child { color: #b45309; }
+.item-level-name .text-slate { color: #334155; }
+.item-level-hint { font-size: 11.5px; color: #64748b; }
+
 .item-level-check {
-  width: 20px; height: 20px; border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700; color: #fff;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
   background: #e2e8f0;
   transform: scale(.8);
   opacity: 0;
   transition: all .2s cubic-bezier(.2,.7,.2,1);
   flex-shrink: 0;
 }
-.item-level-check.show {
-  opacity: 1; transform: scale(1);
-  background: #d97706;
-  box-shadow: 0 0 0 3px rgba(217,119,6,.14);
-}
-.item-level-card:nth-of-type(2) .item-level-check.show {
-  background: #0f766e;
-  box-shadow: 0 0 0 3px rgba(15,118,110,.14);
-}
+.item-level-check.show { opacity: 1; transform: scale(1); background: #d97706; box-shadow: 0 0 0 3px rgba(217,119,6,.14); }
+.item-level-card:nth-of-type(2) .item-level-check.show { background: #0f766e; box-shadow: 0 0 0 3px rgba(15,118,110,.14); }
 
-/* ================================================================
-   岗位编辑弹窗（职责条目管理）—— 更居中 + 更简约样式
-   ================================================================ */
-.duty-modal-box {
-  width: 100%;
-  max-width: 460px;              /* 有效表单宽度收紧，视觉更居中紧凑 */
-  margin: 0 auto;                /* 水平居中：关键 */
-  padding: 4px 2px 2px;
-}
-/* label-position=top 的 form：label 文字居中对齐，整体观感不偏左 */
+/* 岗位编辑弹窗 */
+.duty-modal-box { width: 100%; max-width: 460px; margin: 0 auto; padding: 4px 2px 2px; }
 .duty-form-mini { width: 100%; }
-.duty-form-mini :deep(.el-form-item) {
-  margin-bottom: 14px;
-}
+.duty-form-mini :deep(.el-form-item) { margin-bottom: 14px; }
 .duty-form-mini :deep(.el-form-item__label) {
   width: 100% !important;
   text-align: center !important;
@@ -919,27 +1090,19 @@ onMounted(() => {
   font-size: 13px !important;
   font-weight: 500 !important;
   color: #475569 !important;
-  letter-spacing: .2px;
   padding-bottom: 4px !important;
 }
 .duty-form-mini :deep(.el-input__wrapper),
 .duty-form-mini :deep(.el-select__wrapper) {
   border-radius: 10px !important;
   box-shadow: 0 0 0 1px #e2e8f0 inset !important;
-  transition: box-shadow .18s;
 }
 .duty-form-mini :deep(.el-input__wrapper.is-focus),
 .duty-form-mini :deep(.el-select__wrapper.is-focused) {
   box-shadow: 0 0 0 1px var(--primary, #2C5CE8) inset !important;
 }
-.duty-form-row { width: 100%; }
 
-/* 分隔线极简：细灰线穿过 + 中间小字文字灰底衬 */
-.duty-mini-divider {
-  position: relative;
-  text-align: center;
-  margin: 8px 0 14px;
-}
+.duty-mini-divider { position: relative; text-align: center; margin: 8px 0 14px; }
 .duty-mini-divider::before {
   content: "";
   position: absolute;
@@ -958,57 +1121,29 @@ onMounted(() => {
   letter-spacing: .6px;
 }
 
-/* 条目管理区：纯白 + 4px 内边距 + 极小圆角，无渐变无厚框 */
-.duty-items-wrap {
-  width: 100%;
-  padding: 4px 2px 2px;
-  background: transparent;
-  border: none;
-  box-sizing: border-box;
-}
-.duty-items-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;                        /* 条目间距从 10px 压缩到 8px，更紧凑 */
-  align-items: stretch;
-}
+.duty-items-wrap { width: 100%; padding: 4px 2px 2px; background: transparent; border: none; box-sizing: border-box; }
+.duty-items-stack { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
 
-/* 单条职责行：极简四列，无阴影、线框极淡 */
 .duty-row-simple {
   display: grid;
   grid-template-columns: 26px 1fr 62px 28px;
   gap: 8px;
   align-items: start;
-  padding: 8px 8px 8px 8px;
+  padding: 8px;
   border-radius: 10px;
   border: 1px solid #f1f5f9;
   background: #ffffff;
   transition: border-color .16s, background .16s;
 }
-.duty-row-simple:hover {
-  border-color: #e2e8f0;
-  background: #fafbfc;
-}
-/* 序号小方块：极简 */
+.duty-row-simple:hover { border-color: #e2e8f0; background: #fafbfc; }
 .duty-row-index {
-  width: 26px; height: 26px;
-  border-radius: 7px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: #94a3b8;
-  background: #f8fafc;
+  width: 26px; height: 26px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; color: #94a3b8; background: #f8fafc;
   flex-shrink: 0;
 }
-.duty-row-index.p {
-  color: #d97706;
-  background: #FFF7ED;
-  box-shadow: inset 0 0 0 1px #FEF3C7;
-}
+.duty-row-index.p { color: #d97706; background: #FFF7ED; box-shadow: inset 0 0 0 1px #FEF3C7; }
 
-/* 文本域：更简约 */
 .duty-row-input :deep(.el-textarea__inner) {
   border-radius: 8px !important;
   border: 1px solid #e2e8f0 !important;
@@ -1022,94 +1157,43 @@ onMounted(() => {
 .duty-row-input :deep(.el-textarea__inner:focus) {
   border-color: var(--primary, #2C5CE8) !important;
   box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--primary, #2C5CE8) 12%, transparent) !important;
-  background: #ffffff;
-}
-.duty-row-input :deep(.el-input__count) {
-  font-size: 10.5px;
-  color: #94a3b8;
-  padding-top: 2px;
 }
 
-/* 主次切换：两格 chip，"主"选中琥珀、"次"选中青灰 */
-.duty-row-level {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  margin-top: 2px;
-}
+.duty-row-level { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 2px; }
 .level-chip {
-  height: 26px;
-  border-radius: 7px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 500;
-  color: #94a3b8;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  cursor: pointer;
-  user-select: none;
+  height: 26px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 500;
+  color: #94a3b8; background: #f8fafc; border: 1px solid #e2e8f0;
+  cursor: pointer; user-select: none;
   transition: all .16s;
 }
-.level-chip:hover {
-  color: #64748b;
-  border-color: #cbd5e1;
-}
-.level-chip.on {
-  color: #ffffff;
-  border-color: transparent;
-  background: #64748b;
-}
-.duty-row-level .level-chip:first-child.on {
-  background: #d97706;
-}
-.duty-row-level .level-chip:nth-child(2).on {
-  background: #0f766e;
-}
+.level-chip:hover { color: #64748b; border-color: #cbd5e1; }
+.level-chip.on { color: #ffffff; border-color: transparent; background: #64748b; }
+.duty-row-level .level-chip:first-child.on { background: #d97706; }
+.duty-row-level .level-chip:nth-child(2).on { background: #0f766e; }
 
-/* 删除按钮：小尺寸 × 圆形灰色，hover 变红，极简 */
 .duty-row-del {
-  width: 28px; height: 28px;
-  margin-top: 1px;
-  border-radius: 50%;
-  border: none;
-  background: #f8fafc;
-  color: #94a3b8;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
+  width: 28px; height: 28px; margin-top: 1px;
+  border-radius: 50%; border: none;
+  background: #f8fafc; color: #94a3b8;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
   transition: all .16s;
   padding: 0;
 }
-.duty-row-del:hover {
-  background: #FEE2E2;
-  color: #dc2626;
-}
+.duty-row-del:hover { background: #FEE2E2; color: #dc2626; }
 .duty-row-del .bi { font-size: 12px; }
 
-/* 空状态：简约一行文字 */
 .duty-empty-mini {
-  text-align: center;
-  padding: 18px 10px;
-  border: 1px dashed #e2e8f0;
-  border-radius: 10px;
-  color: #94a3b8;
-  font-size: 12.5px;
-  background: #fafbfc;
+  text-align: center; padding: 18px 10px;
+  border: 1px dashed #e2e8f0; border-radius: 10px;
+  color: #94a3b8; font-size: 12.5px; background: #fafbfc;
 }
 
-/* 添加职责按钮：居中 + 小尺寸 outline 风格（不抢视觉） */
-.duty-add-center {
-  display: flex;
-  justify-content: center;
-  margin-top: 12px;
-}
+.duty-add-center { display: flex; justify-content: center; margin-top: 12px; }
 .duty-add-link-btn {
-  height: 32px !important;
-  min-width: 150px;
+  height: 32px !important; min-width: 150px;
   border-radius: 999px !important;
   background: #ffffff !important;
   border: 1px dashed #cbd5e1 !important;
