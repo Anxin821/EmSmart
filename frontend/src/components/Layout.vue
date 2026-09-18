@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout">
+  <div class="app-layout" :class="{ 'sidebar-hidden': sidebarHidden }">
     <!-- 侧边栏 -->
     <aside class="sidebar">
       <div class="brand" @click="go(HOME_PATH)" style="cursor: pointer;">
@@ -66,11 +66,18 @@
     <!-- 主内容区 -->
     <main class="main">
       <div class="topbar">
-        <!-- 看板操作按钮承载区：各看板通过 <Teleport to=".topbar-actions"> 注入 -->
-        <div class="topbar-actions"></div>
+  <button
+    type="button"
+    class="sidebar-toggle"
+    @click="toggleSidebar"
+    :title="sidebarHidden ? '显示侧边栏' : '隐藏侧边栏'"
+  >
+    <span class="bi bi-list"></span>
+  </button>
 
-        <!-- 用户区 -->
-        <div class="user-right">
+  <div class="topbar-actions"></div>
+
+  <div class="user-right">
           <div class="user" @mouseenter="showMenu = true" @mouseleave="showMenu = false">
             <span class="avatar">{{ avatarText }}</span>
             <span class="username">{{ userStore.user?.full_name || userStore.user?.username }}</span>
@@ -145,9 +152,25 @@ import { authApi } from '@/api'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-
+onMounted(() => {
+  // 恢复上次的隐藏状态
+  try {
+    sidebarHidden.value = localStorage.getItem(SIDEBAR_HIDDEN_KEY) === '1'
+  } catch { /* 忽略 */ }
+})
 // 下拉菜单显示状态
 const showMenu = ref(false)
+// 侧边栏是否隐藏（false = 显示，true = 隐藏）
+const sidebarHidden = ref(false)
+const SIDEBAR_HIDDEN_KEY = 'app_sidebar_hidden'
+
+// 切换显示/隐藏
+const toggleSidebar = () => {
+  sidebarHidden.value = !sidebarHidden.value
+  try {
+    localStorage.setItem(SIDEBAR_HIDDEN_KEY, sidebarHidden.value ? '1' : '0')
+  } catch { /* 隐私模式忽略 */ }
+}
 const profileDialogVisible = ref(false)
 const profileSaving = ref(false)
 const profileForm = ref({
@@ -253,6 +276,68 @@ const handleLogout = () => {
 </script>
 
 <style scoped>
+/* ================================================================
+   侧边栏隐藏：宽度过渡到 0
+   ================================================================ */
+.sidebar {
+  transition:
+    width .28s cubic-bezier(.4, 0, .2, 1),
+    flex-basis .28s cubic-bezier(.4, 0, .2, 1),
+    padding .28s cubic-bezier(.4, 0, .2, 1),
+    opacity .18s cubic-bezier(.4, 0, .2, 1);
+  overflow: hidden;
+  will-change: width;
+  flex-shrink: 0;
+}
+
+.app-layout.sidebar-hidden .sidebar {
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  flex-basis: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 主内容区自动撑满 */
+.main {
+  transition: all .28s cubic-bezier(.4, 0, .2, 1);
+  min-width: 0;
+}
+
+/* ================================================================
+   顶栏的侧边栏开关按钮
+   ================================================================ */
+.sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  color: var(--c-text-3, #64748B);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0;
+  margin-right: 8px;
+  flex-shrink: 0;
+  transition: background .15s, color .15s;
+  font-family: inherit;
+}
+.sidebar-toggle:hover {
+  background: rgba(15, 23, 42, .06);
+  color: var(--c-text, #0f172a);
+}
+.sidebar-toggle:active {
+  transform: scale(.96);
+}
+.sidebar-toggle .bi {
+  line-height: 1;
+}
 .profile-dialog :deep(.el-dialog) {
   border-radius: 18px;
   overflow: hidden;
