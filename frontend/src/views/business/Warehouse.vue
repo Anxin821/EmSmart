@@ -60,6 +60,7 @@
                             <el-dropdown-item command="归还">归还</el-dropdown-item>
                             <el-dropdown-item command="领用">领用</el-dropdown-item>
                             <el-dropdown-item command="补货">补货</el-dropdown-item>
+                            <el-dropdown-item command="减少">减少</el-dropdown-item>
                             <el-dropdown-item command="维修">维修</el-dropdown-item>
                             <el-dropdown-item command="丢失">丢失</el-dropdown-item>
                             <el-dropdown-item command="损坏">损坏</el-dropdown-item>
@@ -1294,7 +1295,7 @@ const statusTagType = (row) => {
   }
   return { '正常': 'success', '预警': 'warning', '缺货': 'danger', '维修': 'info', '报损': 'danger', '报失': 'danger' }[row.status] || 'info'
 }
-const txTagType = (t) => ({ '借出': 'primary', '归还': 'success', '领用': 'primary', '补货': 'success', '维修': 'info', '丢失': 'danger', '损坏': 'danger' }[t] || 'info')
+const txTagType = (t) => ({ '借出': 'primary', '归还': 'success', '领用': 'primary', '补货': 'success', '减少': 'warning', '维修': 'info', '丢失': 'danger', '损坏': 'danger' }[t] || 'info')
 /** 治具流水显示：优先去掉 part_name 末尾重复的 ` - {model}` 再判断是否拼接 */
 const txPartDisplay = (row) => {
   let name = row.part_name || ''

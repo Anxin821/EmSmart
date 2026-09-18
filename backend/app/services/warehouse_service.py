@@ -14,6 +14,7 @@ from sqlalchemy import or_, and_, func, text, asc, desc
 from app.core.timeutil import beijing_now
 from app.core.crud import write_operation_log
 from app.models import WarehousePart, BorrowRecord, PartTransaction
+from app.models.users import User, UserPermission
 
 JIG = "治具"
 CONSUMABLE = "耗材"
@@ -517,6 +518,20 @@ def create_part(db: Session, data: dict, request, username: str) -> dict:
     return _part_to_dict(p)
 
 
+def _user_can_edit_qty(db: Session, username: str) -> bool:
+    """检查用户是否有权编辑治具/耗材的库存数量（admin 或拥有 warehouse 写权限）。"""
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        return False
+    if user.role == "admin":
+        return True
+    perm = db.query(UserPermission).filter(
+        UserPermission.user_id == user.id,
+        UserPermission.module_key == "warehouse",
+    ).first()
+    return perm is not None and perm.can_write
+
+
 def update_part(db: Session, part_id: int, data: dict, request, username: str, role: str = "viewer") -> Optional[dict]:
     p = _get_part(db, part_id)
     if "name" in data and data["name"]:
@@ -531,8 +546,8 @@ def update_part(db: Session, part_id: int, data: dict, request, username: str, r
         p.unit = (data.get("unit") or "").strip()
     if "warn_qty" in data and p.part_type == CONSUMABLE:
         p.warn_qty = max(0, int(data.get("warn_qty") or 0))
-    # 只有 admin 可修改治具/耗材数量，非 admin 忽略 total_qty 字段
-    if "total_qty" in data and role == "admin":
+    # 有权限的用户（admin 或仓库写权限）可修改治具/耗材数量，否则忽略 total_qty 字段
+    if "total_qty" in data and _user_can_edit_qty(db, username):
         new_total = max(0, int(data.get("total_qty") or 0))
         if p.part_type == JIG:
             delta = new_total - p.total_qty
