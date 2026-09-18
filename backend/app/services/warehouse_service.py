@@ -394,7 +394,10 @@ def list_transactions(db: Session, page: int = 1, page_size: int = 50,
             PartTransaction.tx_type == '归还',
             and_(PartTransaction.tx_type.in_(['借出', '领用']), PartTransaction.return_time.isnot(None))
         ))
-    elif tx_type in ("借出", "归还", "领用", "补货", "维修", "丢失", "损坏"):
+    elif tx_type in ("借出", "领用"):
+        # 只显示尚未归还的（return_time IS NULL），已归还的记录不混入
+        q = q.filter(PartTransaction.tx_type == tx_type, PartTransaction.return_time.is_(None))
+    elif tx_type in ("归还", "补货", "维修", "丢失", "损坏"):
         q = q.filter(PartTransaction.tx_type == tx_type)
     if keyword:
         kw = f"%{keyword.strip()}%"
