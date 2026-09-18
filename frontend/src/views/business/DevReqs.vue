@@ -25,6 +25,7 @@
     </div>
 
     <div class="page-content">
+    <div class="table-wrap">
     <el-table
         v-loading="loading"
         :data="items"
@@ -32,11 +33,11 @@
         border
         style="width: 100%"
         :header-cell-style="{ fontWeight: 600 }"
-        :height="'calc(100vh - 210px)'"
+        height="100%"
         @row-click="openDetail"
       >
 
-        <el-table-column label="需求ID" prop="request_id" width="80" align="center" class-name="cell-clip" show-overflow-tooltip>
+        <el-table-column label="需求ID" prop="request_id" width="80" align="center" show-overflow-tooltip>
           <template #default="s">
             <code style="display: inline-block; max-width: 100%; background: var(--primary-50); padding: 1px 5px; border-radius: 4px; font-size: 12px; line-height: 1.6; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;">{{ s.row.request_id }}</code>
           </template>
@@ -99,7 +100,7 @@
           </el-empty>
         </template>
       </el-table>
-
+    </div>
       <CommonPagination
         v-model:page="page"
         v-model:page-size="pageSize"
@@ -118,10 +119,6 @@
       @ok="handleSave"
     >
       <div class="row g-3">
-        <div v-if="false" class="col-6">
-          <label class="small">需求ID</label>
-          <el-input v-model="form.request_id" :disabled="true" clearable placeholder="需求编号" />
-        </div>
         <div class="col-6">
           <label class="small">标题</label>
           <el-input v-model="form.title" clearable />
@@ -132,7 +129,7 @@
             <el-option label="紧急" value="紧急" />
             <el-option label="高" value="高" />
             <el-option label="中" value="中" />
-            <el-option label="低" value="低" />
+
           </el-select>
         </div>
         <div class="col-6">
@@ -208,7 +205,6 @@ import { mesApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { Search, Edit, Delete, Refresh, Plus, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import PageLayout       from '@/components/common/PageLayout.vue'
 import CommonFilterBar  from '@/components/common/CommonFilterBar.vue'
 import CommonPagination from '@/components/common/CommonPagination.vue'
 import CommonModal      from '@/components/common/CommonModal.vue'
@@ -227,10 +223,9 @@ const form = ref({})
 const detailVisible = ref(false)
 const detailRow = ref(null)
 
-// 用于取消请求的 AbortController
-let abortController = null
+// 请求序号，用于丢弃过期响应
+let currentRequestId = 0
 
-const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 
 const filterFields = computed(() => [
   {
@@ -252,8 +247,7 @@ const filterFields = computed(() => [
       { label: '全部', value: '' },
       { label: '紧急', value: '紧急' },
       { label: '高', value: '高' },
-      { label: '中', value: '中' },
-      { label: '低', value: '低' }
+      { label: '中', value: '中' }
     ],
     autoSearch: true
   },
@@ -289,20 +283,16 @@ const formatTime = (v) => {
 }
 
 const getStatusClass = (s) => {
-  const map = { '紧急': 'severe', '高': 'severe', '中': 'info', '低': 'muted', '收集评估': 'info', '开发测试中': 'progress', '上线': 'normal' }
+  const map = { '紧急': 'severe', '高': 'severe', '中': 'info', '收集评估': 'info', '开发测试中': 'progress', '上线': 'normal' }
   return map[s] || 'muted'
 }
 
 const defaultForm = () => ({
   request_id: '', title: '', priority: '中', status: '收集评估',
-  submitter: '', assignee: '', expected_date: null
+  submitter: '', assignee: '', expected_date: null,
+  description: ''
 })
 
-const resetFilters = () => {
-  filters.value = { keyword: '', priority: '', status: '' }
-  page.value = 1
-  loadData()
-}
 // 搜索/筛选：先回到第 1 页再加载，避免停留在旧页码导致“筛选不生效”（筛选后结果变少，旧页码往往为空）
 const onSearch = () => {
   page.value = 1
@@ -310,19 +300,14 @@ const onSearch = () => {
 }
 
 const onResetFromFilterBar = () => {
+  filters.value = { keyword: '', priority: '', status: '' }
   page.value = 1
   loadData()
 }
 
 const loadData = async () => {
-  // 取消之前的请求（如果有）
-  if (abortController) {
-    abortController.abort()
-  }
-
-  abortController = new AbortController()
+  const requestId = ++currentRequestId
   loading.value = true
-
   try {
     const params = { page: page.value, page_size: pageSize.value }
     if (filters.value.keyword)  params.keyword  = filters.value.keyword
@@ -330,23 +315,31 @@ const loadData = async () => {
     if (filters.value.status)   params.status   = filters.value.status
 
     const res = await mesApi.devreqs(params)
+    if (requestId !== currentRequestId) return
     items.value = res.data?.items || []
     total.value = res.data?.total || 0
   } catch(e) {
-    // 忽略AbortError
-    if (e.name !== 'AbortError') {
-      console.error(e)
-    }
+    if (requestId === currentRequestId) console.error(e)
   } finally {
-    loading.value = false
-    abortController = null
+    if (requestId === currentRequestId) {
+      loading.value = false
+    }
   }
 }
 
 const showModal = (s = null) => {
   if (s) {
     editingId.value = s.request_id
-    form.value = { ...s }
+    form.value = {
+      request_id: s.request_id,
+      title: s.title,
+      priority: s.priority,
+      status: s.status,
+      submitter: s.submitter,
+      assignee: s.assignee,
+      expected_date: s.expected_date ? s.expected_date.slice(0, 10) : null,
+      description: s.description
+    }
   } else {
     editingId.value = null
     form.value = defaultForm()
@@ -416,40 +409,89 @@ const handleDelete = async (row) => {
 }
 
 const handleFlow = async (s) => {
-  const { value } = await ElMessageBox.prompt(
-    '请输入新状态 (收集评估/开发测试中/上线)',
-    '需求流转',
-    {
-      confirmButtonText: '确认流转',
-      cancelButtonText: '取消',
-      inputPattern: /^(收集评估|开发测试中|上线)$/,
-      inputErrorMessage: '状态值不正确',
-      inputValue: s.status,
-      center: true
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入新状态 (收集评估/开发测试中/上线)',
+      '需求流转',
+      {
+        confirmButtonText: '确认流转',
+        cancelButtonText: '取消',
+        inputPattern: /^(收集评估|开发测试中|上线)$/,
+        inputErrorMessage: '状态值不正确',
+        inputValue: s.status,
+        center: true
+      }
+    )
+    await mesApi.update('dev-requests', s.request_id, { status: value })
+    ElMessage.success('需求流转成功')
+    loadData()
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') {
+      ElMessage.error(e?.response?.data?.detail || '流转失败')
     }
-  )
-  await mesApi.update('dev-requests', s.request_id, { status: value })
-  ElMessage.success('需求流转成功')
-  loadData()
+  }
 }
 
 const onPagerChange = () => loadData()
 
 onMounted(() => {
-  console.log('DevReqs组件挂载')
   loadData()
 })
 
 onUnmounted(() => {
-  console.log('DevReqs组件卸载，清理资源')
-  // 取消正在进行的请求
-  if (abortController) {
-    abortController.abort()
-  }
-  
-  // 清理引用
-  items.value = []
-  form.value = {}
-  filters.value = { keyword: '', priority: '', status: '' }
+  currentRequestId++
 })
 </script>
+<style scoped>
+/* ================================================================
+   页面骨架：撑满父容器 + 表格区自动撑高
+   ================================================================ */
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.page-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+
+.table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ================================================================
+   ✅ status-badge：详情弹窗/表格里都不被裁
+   ================================================================ */
+.status-badge {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap !important;
+  height: 22px !important;
+  padding: 0 8px !important;
+  line-height: 1 !important;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+/* 详情弹窗描述项：不裁剪 */
+:deep(.el-descriptions__content) {
+  overflow: visible !important;
+  white-space: nowrap !important;
+}
+
+/* 表格单元格：不裁剪 */
+:deep(.el-table .cell) {
+  overflow: visible !important;
+}
+</style>
