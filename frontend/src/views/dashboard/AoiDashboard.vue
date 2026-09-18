@@ -159,9 +159,31 @@ const yieldDelta = computed(() => {
 })
 
 let chartYield = null, chartOutput = null
+let resizeObserver = null           // ✅ 新增
+let resizeDebounce = null           // ✅ 新增
+
 const resizeCharts = () => {
   chartYield && chartYield.resize()
   chartOutput && chartOutput.resize()
+}
+
+// ✅ 新增：监听图表容器尺寸变化（侧边栏折叠、窗口变化、DevTools 打开等都会触发）
+const setupResizeObserver = () => {
+  if (typeof ResizeObserver === 'undefined') return
+
+  resizeObserver = new ResizeObserver(() => {
+    // debounce 120ms：侧边栏动画 280ms 会触发多次，等稳定后再 resize
+    clearTimeout(resizeDebounce)
+    resizeDebounce = setTimeout(() => {
+      resizeCharts()
+    }, 120)
+  })
+
+  // 观察两个图表容器（懒加载：元素可能还没渲染，加判空）
+  const yieldEl = document.getElementById('chart-yield')
+  const outputEl = document.getElementById('chart-output')
+  if (yieldEl) resizeObserver.observe(yieldEl)
+  if (outputEl) resizeObserver.observe(outputEl)
 }
 
 const loadData = async () => {
@@ -358,11 +380,16 @@ onMounted(() => {
   window.addEventListener('resize', resizeCharts)
   document.addEventListener('visibilitychange', onVisible)
   refreshTimer = setInterval(loadData, REFRESH_INTERVAL)
+
+  // ✅ 新增：等 DOM 渲染完成后启动 ResizeObserver
+  nextTick(() => setupResizeObserver())
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeCharts)
   document.removeEventListener('visibilitychange', onVisible)
   if (refreshTimer) clearInterval(refreshTimer)
+  if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null }   // ✅ 新增
+  if (resizeDebounce) { clearTimeout(resizeDebounce); resizeDebounce = null }  // ✅ 新增
   chartYield && chartYield.dispose()
   chartOutput && chartOutput.dispose()
 })

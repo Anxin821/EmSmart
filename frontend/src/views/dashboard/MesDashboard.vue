@@ -172,6 +172,8 @@ const openBugCount = ref(0)
 const overdueReqCount = ref(0)
 const exporting = ref(false)
 let cBugs = null, cReqs = null
+let resizeObserver = null           // ✅ 新增
+let resizeDebounce = null           // ✅ 新增
 // 未关闭 BUG 弹窗数据
 const openBugModalVisible = ref(false)
 const openBugTitle = ref('未关闭 BUG')
@@ -333,6 +335,23 @@ const showOverdueReqModal = async () => {
 const resize = () => {
   cBugs && cBugs.resize()
   cReqs && cReqs.resize()
+}
+
+// ✅ 新增：监听图表容器尺寸变化（侧边栏折叠、窗口变化、DevTools 打开等都会触发）
+const setupResizeObserver = () => {
+  if (typeof ResizeObserver === 'undefined') return
+
+  resizeObserver = new ResizeObserver(() => {
+    clearTimeout(resizeDebounce)
+    resizeDebounce = setTimeout(() => {
+      resize()
+    }, 120)
+  })
+
+  const bugsEl = document.getElementById('chart-bugs')
+  const reqsEl = document.getElementById('chart-reqs')
+  if (bugsEl) resizeObserver.observe(bugsEl)
+  if (reqsEl) resizeObserver.observe(reqsEl)
 }
 let loading = false   // 防止轮询与手动刷新并发
 const loadData = async () => {
@@ -513,11 +532,16 @@ onMounted(() => {
   window.addEventListener('resize', resize)
   document.addEventListener('visibilitychange', onVisible)
   refreshTimer = setInterval(loadData, REFRESH_INTERVAL)
+
+  // ✅ 新增
+  nextTick(() => setupResizeObserver())
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resize)
   document.removeEventListener('visibilitychange', onVisible)
   if (refreshTimer) clearInterval(refreshTimer)
+  if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null }   // ✅ 新增
+  if (resizeDebounce) { clearTimeout(resizeDebounce); resizeDebounce = null }  // ✅ 新增
   cBugs && cBugs.dispose()
   cReqs && cReqs.dispose()
 })
