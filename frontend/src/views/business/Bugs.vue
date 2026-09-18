@@ -18,18 +18,19 @@
     </div>
 
     <div class="page-content">
+    <div class="table-wrap">
     <el-table
-        v-loading="loading"
-        :data="items"
-        stripe
-        border
-        style="width: 100%"
-        :header-cell-style="{ fontWeight: 600 }"
-        :height="'calc(100vh - 210px)'"
-        @row-click="openDetail"
-      >
+  v-loading="loading"
+  :data="items"
+  stripe
+  border
+  style="width: 100%"
+  :header-cell-style="{ fontWeight: 600 }"
+  height="100%"
+  @row-click="openDetail"
+>
 
-        <el-table-column label="BUG ID" prop="bug_id" width="80" align="center" class-name="cell-clip" show-overflow-tooltip>
+        <el-table-column label="BUG ID" prop="bug_id" width="80" align="center" show-overflow-tooltip>
           <template #default="{ row }">
             <code style="display: inline-block; max-width: 100%; background: var(--primary-50); padding: 1px 5px; border-radius: 4px; font-size: 12px; line-height: 1.6; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;">{{ row.bug_id }}</code>
           </template>
@@ -91,7 +92,7 @@
           </template>
         </el-table-column>
       </el-table>
-
+     </div>
       <CommonPagination
         v-model:page="page"
         v-model:page-size="pageSize"
@@ -109,12 +110,6 @@
       @ok="handleSave"
     >
       <div class="row g-3">
-        <div v-if="false" class="col-6">
-          <label class="small form-label" :style="labelStyleNormal">
-            BUG ID
-          </label>
-          <el-input v-model="form.bug_id" :disabled="true" clearable placeholder="BUG编号" />
-        </div>
         <div class="col-6">
           <label class="small form-label"><span style="color:var(--danger);">*</span> 标题</label>
           <el-input v-model="form.title" clearable placeholder="请输入BUG标题" maxlength="200" show-word-limit />
@@ -125,7 +120,6 @@
             <el-option label="致命" value="致命" />
             <el-option label="严重" value="严重" />
             <el-option label="一般" value="一般" />
-            <el-option label="建议" value="建议" />
           </el-select>
         </div>
         <div class="col-6">
@@ -184,7 +178,10 @@
         </el-form-item>
         <el-form-item label="流转到" required>
           <el-radio-group v-model="flowStatus">
-            <el-radio-button v-for="s in FLOW_STATUSES" :key="s" :value="s">{{ s }}</el-radio-button>
+            <el-radio-button
+  v-for="s in FLOW_STATUSES.filter(x => x !== flowRow?.status)"
+  :key="s" :value="s"
+>{{ s }}</el-radio-button>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -250,18 +247,15 @@ const form = ref({})
 const detailVisible = ref(false)
 const detailRow = ref(null)
 
-// 用于取消请求的 AbortController
-let abortController = null
+// 请求序号，用于丢弃过期响应
+let currentRequestId = 0
 
 // 流转弹窗
 const flowModalVisible = ref(false)
 const flowRow = ref(null)
 const flowStatus = ref('')
 const FLOW_STATUSES = ['确认新增', '修复中', '解决关闭']
-const labelStyleNormal      = { color: 'var(--c-text-2)' }
-const labelStyleNoRequired  = { color: 'var(--c-text-2)', '--required': 'none' }
 
-const totalPages = computed(() => Math.ceil(total.value / pageSize.value))
 
 const filterFields = [
   { type: 'input', key: 'keyword', label: '', placeholder: 'BUG ID / 标题 / 模块 / 指派', autoSearch: false, clearable: true, minWidth: 220 },
@@ -270,8 +264,7 @@ const filterFields = [
       { label: '全部', value: '' },
       { label: '致命', value: '致命' },
       { label: '严重', value: '严重' },
-      { label: '一般', value: '一般' },
-      { label: '建议', value: '建议' }
+      { label: '一般', value: '一般' }
     ] },
   { type: 'select', key: 'status', label: '状态', placeholder: '全部', autoSearch: true, clearable: true, width: 100,
     options: [
@@ -299,7 +292,7 @@ const formatTime = (v) => {
 }
 
 const getStatusClass = (s) => {
-  const map = { '致命': 'severe', '严重': 'severe', '一般': 'muted', '建议': 'muted', '确认新增': 'severe', '修复中': 'progress', '解决关闭': 'normal' }
+  const map = { '致命': 'severe', '严重': 'severe', '一般': 'muted', '确认新增': 'severe', '修复中': 'progress', '解决关闭': 'normal' }
   return map[s] || 'muted'
 }
 
@@ -322,14 +315,8 @@ const onSearch = () => {
 }
 
 const loadData = async () => {
-  // 取消之前的请求（如果有）
-  if (abortController) {
-    abortController.abort()
-  }
-
-  abortController = new AbortController()
+  const requestId = ++currentRequestId
   loading.value = true
-
   try {
     const params = { page: page.value, page_size: pageSize.value }
     if (filters.value.keyword)  params.keyword  = filters.value.keyword
@@ -337,16 +324,16 @@ const loadData = async () => {
     if (filters.value.status)   params.status   = filters.value.status
 
     const res = await mesApi.bugs(params)
+    // 过期请求（期间又发起了新请求）丢弃结果
+    if (requestId !== currentRequestId) return
     items.value = res.data?.items || []
     total.value = res.data?.total || 0
   } catch(e) {
-    // 忽略AbortError
-    if (e.name !== 'AbortError') {
-      console.error(e)
-    }
+    if (requestId === currentRequestId) console.error(e)
   } finally {
-    loading.value = false
-    abortController = null
+    if (requestId === currentRequestId) {
+      loading.value = false
+    }
   }
 }
 
@@ -421,7 +408,7 @@ const handleDelete = async (row) => {
 // ---------- 流转 ----------
 const handleFlow = (row) => {
   flowRow.value = row
-  flowStatus.value = row.status || '确认新增'
+  flowStatus.value = ''   // ✅ 默认不选，避免把状态"流转"成同状态
   flowModalVisible.value = true
 }
 
@@ -444,33 +431,79 @@ const submitFlow = async () => {
   }
 }
 
-const onPagerChange = () => loadData()
 
 onMounted(() => {
-  console.log('Bugs组件挂载')
   loadData()
 })
 
 onUnmounted(() => {
-  console.log('Bugs组件卸载，清理资源')
-  // 取消正在进行的请求
-  if (abortController) {
-    abortController.abort()
-  }
-  
-  // 清理引用
-  items.value = []
-  form.value = {}
-  filters.value = { keyword: '', severity: '', status: '' }
+  // 让进行中的请求彻底失效
+  currentRequestId++
 })
 </script>
 
 <style scoped>
+/* ================================================================
+   页面骨架：撑满父容器 + 表格区域自己滚动
+   ================================================================ */
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.page-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+
+/* 表格包裹层：撑满剩余空间 */
+.table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ================================================================
+   表格内标题省略号
+   ================================================================ */
 .title-cell .title-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
   display: block;
+}
+
+/* ================================================================
+   ✅ 关键修复：status-badge 在 el-descriptions / el-table 里不被裁
+   ================================================================ */
+.status-badge {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap !important;
+  height: 22px !important;               /* 固定高度，防压缩 */
+  padding: 0 8px !important;             /* 固定内边距 */
+  line-height: 1 !important;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+/* 详情弹窗里的描述项内容不裁剪 */
+:deep(.el-descriptions__content) {
+  overflow: visible !important;
+  white-space: nowrap !important;
+}
+
+/* 表格单元格也不裁 */
+:deep(.el-table .cell) {
+  overflow: visible !important;
 }
 </style>
