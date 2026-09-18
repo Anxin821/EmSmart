@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="page-header">
-      <h1 class="page-title"><span class="emoji">📦</span> 治具仓系统</h1>
+      <h1 class="page-title"><span class="emoji">📦</span></h1>
 
       <div class="ph-right-group">
         <el-input v-model="borrowKeyword" placeholder="扫码搜索物品，回车添加至借领/归还列表" clearable

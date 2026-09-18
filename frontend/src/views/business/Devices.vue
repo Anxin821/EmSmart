@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 16px; flex-wrap: nowrap;">
-      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center;"><span class="emoji">🔍</span> AOI&AI 设备管理</h1>
+      <h1 class="page-title"><span class="emoji">🔍</span></h1>
       <CommonFilterBar :model-value="filters" :fields="filterFields" @update:model-value="val => Object.assign(filters, val)" @search="onSearch">
         <template #actions="{ search, reset }">
           <el-button type="primary" @click="search">

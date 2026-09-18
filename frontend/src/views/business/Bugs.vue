@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">🐛</span>MES BUG 管理</h1>
+      <h1 class="page-title"><span class="emoji">🐛</span></h1>
       <CommonFilterBar v-model="filters" :fields="filterFields" @search="onSearch">
         <template #actions="{ search, reset }">
           <el-button type="primary" @click="search">

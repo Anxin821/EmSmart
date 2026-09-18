@@ -2,7 +2,7 @@
   <div class="page">
     <!-- 头部：标题 + 筛选栏 + 操作按钮 同行排列，与 Monthly.vue 保持一致 -->
     <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">🔧</span> 异常履历管理</h1>
+      <h1 class="page-title"><span class="emoji">🔧</span></h1>
       <CommonFilterBar v-model="filters" :fields="filterFields" @search="onSearch">
         <template #actions="{ search, reset }">
           <el-button type="primary" @click="search"><el-icon><Search /></el-icon>搜索</el-button>

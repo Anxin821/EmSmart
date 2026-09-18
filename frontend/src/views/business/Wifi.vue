@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="page-header" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-      <h1 class="page-title" style="margin: 0; white-space: nowrap; display: flex; align-items: center; font-size: 16px;"><span class="emoji">📡</span> WiFi AP 管理</h1>
+      <h1 class="page-title"><span class="emoji">📡</span></h1>
       <CommonFilterBar :fields="filterFields" v-model:model-value="filters" @search="onSearch" @reset="onResetFromFilterBar">
         <template #actions="scope">
           <el-button type="primary" size="default" @click="scope.search"><el-icon style="margin-right:6px;"><Search /></el-icon>搜索</el-button>
