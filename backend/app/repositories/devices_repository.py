@@ -1,12 +1,14 @@
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 from io import BytesIO
 from datetime import datetime
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.crud import (
     get_aoi_devices_paginated, create_aoi_device, update_aoi_device,
     delete_aoi_device, get_aoi_device_by_id, get_aoi_device_by_pk, batch_import_devices,
 )
+from app.models.device import AoiAiDevice
 
 __all__ = [
     "get_aoi_devices_paginated",
@@ -16,7 +18,28 @@ __all__ = [
     "get_aoi_device_by_id",
     "get_aoi_device_by_pk",
     "batch_import_devices",
+    "count_devices_by_status",
 ]
+
+
+def count_devices_by_status(db: Session) -> Dict[str, int]:
+    """统计各状态设备数量，返回 { normal: N, fault: N, maintenance: N, total: N }。"""
+    rows = (
+        db.query(AoiAiDevice.status, func.count(AoiAiDevice.id))
+        .group_by(AoiAiDevice.status)
+        .all()
+    )
+    status_map = {"正常": "normal", "故障": "fault", "保养中": "maintenance"}
+    result = {"normal": 0, "fault": 0, "maintenance": 0}
+    total = 0
+    for status, cnt in rows:
+        key = str(status).strip() if status else "正常"
+        eng_key = status_map.get(key)
+        if eng_key:
+            result[eng_key] = cnt
+        total += cnt
+    result["total"] = total
+    return result
 
 # Thin wrapper exposing existing core.crud functions for service layer
 

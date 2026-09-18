@@ -18,5 +18,6 @@ export const devicesApi = {
   import: (formData) => api.post('/devices/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  export: (params) => window.open(`/api/v1/devices/export/excel?${new URLSearchParams(params)}`, '_blank')
+  export: (params) => window.open(`/api/v1/devices/export/excel?${new URLSearchParams(params)}`, '_blank'),
+  stats: () => api.get('/devices/stats')
 }

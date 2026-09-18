@@ -71,6 +71,11 @@ def import_devices(db: Session, rows_data: List[dict], request, username: str):
     return count
 
 
+def get_device_stats(db: Session) -> dict:
+    """获取设备三态统计数据。"""
+    return repo.count_devices_by_status(db)
+
+
 def export_devices_rows(db: Session, items):
     from openpyxl import Workbook
     wb = Workbook()

@@ -29,13 +29,18 @@
           {{ outputLabel }} (pcs) · 年累 {{ summary.total_output.toLocaleString() }}
         </template>
       </StatCard>
-      <StatCard centered :color="yieldColor" icon="bi bi-bullseye" :num="`${latestYield}%`">
+      <StatCard centered :color="yieldColor" icon="bi bi-bullseye" :num="latestYield">
+      const latestYield = computed(() => {
+  const v = boardMonth.value?.yield_rate
+  return (v === null || v === undefined) ? '—' : `${v}%`
+})
         <template #label>
           <span class="kpi-sub">
             {{ yieldLabel }} · 年均 {{ summary.yield_rate }}%
-            <span :class="yieldDelta >= 0 ? 'kpi-up' : 'kpi-down'">
-              {{ yieldDelta >= 0 ? '↑' : '↓' }}{{ Math.abs(yieldDelta).toFixed(1) }}%
+            <span v-if="yieldDelta !== null" :class="yieldDelta >= 0 ? 'kpi-up' : 'kpi-down'">
+             {{ yieldDelta >= 0 ? '↑' : '↓' }}{{ Math.abs(yieldDelta).toFixed(1) }}%
             </span>
+<span v-else class="kpi-mute">暂无对比</span>
           </span>
         </template>
       </StatCard>
@@ -78,6 +83,7 @@ import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { devicesApi, productionApi } from '@/api'
 import StatCard from '@/components/common/StatCard.vue'
+import { ElMessage } from 'element-plus'
 import { createPresentation, addFullImageSlide, savePresentation, captureElement } from '@/utils/pptExport'
 
 const router = useRouter()
@@ -111,8 +117,9 @@ const availabilityColor = computed(() => {
 
 // 本月直通率配色：≥95 绿 / ≥90 蓝 / ≥80 黄 / 其余红
 const yieldColor = computed(() => {
-  const v = Number(latestYield.value)
-  if (isNaN(v)) return 'blue'
+  const raw = boardMonth.value?.yield_rate
+  const v = Number(raw)
+  if (raw === null || raw === undefined || isNaN(v)) return 'blue'
   if (v >= 95) return 'green'
   if (v >= 90) return 'blue'
   if (v >= 80) return 'yellow'
@@ -133,15 +140,20 @@ const yieldLabel = computed(() => {
   return m === cur ? '本月直通率' : `${m}月直通率`
 })
 
-const latestOutput = computed(() => boardMonth.value ? (boardMonth.value.total_output || 0).toLocaleString() : '0')
+const latestOutput = computed(() => {
+  if (!boardMonth.value) return '—'
+  return (boardMonth.value.total_output || 0).toLocaleString()
+})
 const latestYield = computed(() => {
   const v = boardMonth.value?.yield_rate
-  return (v === null || v === undefined) ? '—' : v
+  return (v === null || v === undefined) ? '—' : `${v}%`
 })
 
 // 本月直通率 vs 年均的差值：正数=本月好于年均，负数=本月差于年均
 const yieldDelta = computed(() => {
-  const cur = Number(latestYield.value) || 0
+  const raw = boardMonth.value?.yield_rate
+  if (raw === null || raw === undefined || raw === '') return null
+  const cur = Number(raw) || 0
   const avg = Number(summary.value.yield_rate) || 0
   return cur - avg
 })
@@ -164,18 +176,17 @@ const loadData = async () => {
 
 const doLoadData = async () => {
   const [devResult, trendResult] = await Promise.allSettled([
-    devicesApi.list({ page_size: 100 }),
+    devicesApi.stats(),
     productionApi.monthlyTrend(),
   ])
 
-  // 设备数据
+  // 设备三态统计数据（后端实时聚合，不受分页限制）
   if (devResult.status === 'fulfilled') {
-    const devRes = devResult.value
-    const list = devRes?.data?.items || []
-    stats.total = list.length
-    stats.normal = list.filter(d => d.status === '正常').length
-    stats.fault = list.filter(d => d.status === '故障').length
-    stats.maintenance = list.filter(d => d.status === '保养中').length
+    const s = devResult.value?.data || {}
+    stats.total = s.total ?? 0
+    stats.normal = s.normal ?? 0
+    stats.fault = s.fault ?? 0
+    stats.maintenance = s.maintenance ?? 0
   } else {
     console.error('[AOI Dashboard] devices API failed:', devResult.reason)
   }
@@ -203,8 +214,14 @@ const doLoadData = async () => {
       }
     }
     // 本月：当前自然月有数据则取当月，否则回退最新月份
-    boardMonth.value = payload.current_month || payload.latest_month ||
-      (trend.value.length ? trend.value[trend.value.length - 1] : null)
+    const current = payload.current_month
+const latest = payload.latest_month
+const last = trend.value.length ? trend.value[trend.value.length - 1] : null
+
+boardMonth.value =
+  (current && (current.total_output !== undefined || current.yield_rate !== undefined)) ? current :
+  (latest && (latest.total_output !== undefined || latest.yield_rate !== undefined)) ? latest :
+  last
   } else {
     console.error('[AOI Dashboard] monthlyTrend API failed:', trendResult.reason)
   }
@@ -215,13 +232,13 @@ const doLoadData = async () => {
 
 const renderCharts = () => {
   const trendData = trend.value || []
-  // 12 个月窗口可能跨年，跨年时 X 轴标签加年份（如 25/9），避免两个“9月”无法区分
   const years = new Set(trendData.map(d => d.year))
   const labels = trendData.map(d => years.size > 1 ? `${String(d.year).slice(2)}/${d.month}` : `${d.month}月`)
 
-  // ===== 直通率折线 =====
-  if (chartYield) chartYield.dispose()
-  chartYield = echarts.init(document.getElementById('chart-yield'))
+  // ===== 直通率折线（懒初始化） =====
+  if (!chartYield) {
+    chartYield = echarts.init(document.getElementById('chart-yield'))
+  }
   chartYield.setOption({
     tooltip: {
       trigger: 'axis',
@@ -274,11 +291,12 @@ const renderCharts = () => {
       },
       data: trendData.map(d => d.yield_rate),
     }],
-  })
+  }, { notMerge: true })
 
-  // ===== 产量柱状（最新月份高亮） =====
-  if (chartOutput) chartOutput.dispose()
-  chartOutput = echarts.init(document.getElementById('chart-output'))
+  // ===== 产量柱状（懒初始化） =====
+  if (!chartOutput) {
+    chartOutput = echarts.init(document.getElementById('chart-output'))
+  }
   const lastIdx = trendData.length - 1
   chartOutput.setOption({
     tooltip: {
@@ -325,7 +343,7 @@ const renderCharts = () => {
             },
       })),
     }],
-  })
+  }, { notMerge: true })
 }
 
 // 实时性：每 60 秒自动轮询；页面从后台切回前台时立即刷新一次
@@ -361,7 +379,7 @@ const exportPPT = async () => {
     savePresentation(pptx, `AOI设备监控看板_${date}.pptx`)
   } catch (error) {
     console.error('导出PPT失败:', error)
-    alert('导出PPT失败，请重试')
+    ElMessage.error('导出PPT失败，请重试')
   } finally {
     exporting.value = false
   }
@@ -373,6 +391,8 @@ const exportPPT = async () => {
 .page {
   height: 100%;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .cockpit {
   flex: 1;
@@ -451,7 +471,8 @@ const exportPPT = async () => {
   font-size: 42px;
   font-weight: 800;
   letter-spacing: -1.5px;
-  line-height: 1.1;
+  line-height: 1.2;              /* ✅ 从 1.1 提到 1.2，42 × 1.2 = 50.4px */
+  padding: 2px 2px 0 0;          /* ✅ 上方留 2px，给"6"、"8"的顶端留空间 */
 }
 
 /* ============ 按 color 配置渐变 + 光晕色 ============ */

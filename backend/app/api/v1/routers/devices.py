@@ -12,6 +12,16 @@ from app.services import devices_service as service
 router = APIRouter(prefix="/devices", tags=["AOI&AI设备"])
 
 
+@router.get("/stats")
+def device_stats(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """获取设备三态统计：正常 / 故障 / 保养中 数量及总数。"""
+    data = service.get_device_stats(db)
+    return ApiResponse(data=data)
+
+
 @router.get("")
 def list_devices(
     page: int = Query(1, ge=1),
