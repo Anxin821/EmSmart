@@ -136,7 +136,7 @@ def update_part(
     db: Session = Depends(get_db),
     current_user: dict = Depends(require_role("admin", "engineer")),
 ):
-    return ApiResponse(data=service.update_part(db, part_id, data, request, current_user["username"]))
+    return ApiResponse(data=service.update_part(db, part_id, data, request, current_user["username"], current_user["role"]))
 
 
 @router.delete("/parts/{part_id}")

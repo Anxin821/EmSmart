@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="page-header">
-      <h1 class="page-title"><span class="emoji">📦</span> 库房管理</h1>
+      <h1 class="page-title"><span class="emoji">📦</span> 治具仓系统</h1>
 
       <div class="ph-right-group">
         <el-input v-model="borrowKeyword" placeholder="扫码搜索物品，回车添加至借领/归还列表" clearable
@@ -730,14 +730,20 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item v-if="editForm.part_type === '治具'" label="总数">
-          <el-input-number v-if="!editForm.id" v-model="editForm.total_qty" :min="0" :max="9999" controls-position="right" />
+          <template v-if="!editForm.id || userStore.isAdmin">
+            <el-input-number v-model="editForm.total_qty" :min="0" :max="9999" controls-position="right" :disabled="!userStore.isAdmin" />
+          </template>
           <span v-else class="wh-form-static">{{ editForm.total_qty }}</span>
           <span class="wh-form-hint">治具总数量</span>
+          <span v-if="!userStore.isAdmin" class="wh-form-hint" style="color:var(--el-color-warning);margin-left:4px;">仅管理员可设置</span>
         </el-form-item>
         <template v-if="editForm.part_type === '耗材'">
           <el-form-item :label="editForm.id ? '库存数量' : '初始库存'">
-            <el-input-number v-if="!editForm.id" v-model="editForm.total_qty" :min="0" :max="999999" controls-position="right" />
+            <template v-if="!editForm.id || userStore.isAdmin">
+              <el-input-number v-model="editForm.total_qty" :min="0" :max="999999" controls-position="right" :disabled="!userStore.isAdmin" />
+            </template>
             <span v-else class="wh-form-static">{{ editForm.total_qty }} {{ editForm.unit }}</span>
+            <span v-if="!userStore.isAdmin" class="wh-form-hint" style="color:var(--el-color-warning);margin-left:4px;">仅管理员可设置</span>
           </el-form-item>
           <el-form-item label="单位">
             <el-input v-model="editForm.unit" placeholder="个 / 卷 / 包 / 瓶…" maxlength="20" style="width: 160px;" />
@@ -1527,6 +1533,22 @@ const submitEdit = async () => {
   } catch {
     return
   }
+
+  // 新增物品时确认入库数量
+  if (!editForm.id) {
+    const label = editForm.part_type === '治具' ? '治具' : '耗材'
+    const { ElMessageBox } = await import('element-plus')
+    try {
+      await ElMessageBox.confirm(
+        `新增「${editForm.name}」\n入库数量：${editForm.total_qty} ${editForm.unit}`,
+        `${label}入库确认`,
+        { confirmButtonText: '确认入库', cancelButtonText: '取消', type: 'info' }
+      )
+    } catch {
+      return // 用户取消
+    }
+  }
+
   saving.value = true
   try {
     const payload = { ...editForm }
@@ -1549,7 +1571,7 @@ const submitEdit = async () => {
 }
 
 const handleDelete = async (row) => {
-  const ok = await confirmDelete('库房物品', `将删除「${row.name}」及其首页流水记录`)
+  const ok = await confirmDelete('治具仓物品', `将删除「${row.name}」及其首页流水记录`)
   if (!ok) return
   try {
     await warehouseApi.delete(row.id)

@@ -50,7 +50,7 @@
       @click="toggleGroup('aiDevice')"
     >
       <span class="bi bi-cpu-fill nav-group-icon" aria-hidden="true"></span>
-      <span class="nav-group-text">AI 设备</span>
+      <span class="nav-group-text">AI设备</span>
       <span class="bi bi-chevron-right nav-group-arrow" aria-hidden="true"></span>
     </button>
     <transition name="nav-collapse">
@@ -123,7 +123,7 @@
     </transition>
   </div>
 
-  <!-- ============ 库房与系统 ============ -->
+  <!-- ============ 治具仓与系统 ============ -->
   <div class="nav-group" :class="{ expanded: expandedGroups.system }">
     <button
       type="button"
@@ -131,13 +131,13 @@
       @click="toggleGroup('system')"
     >
       <span class="bi bi-hdd-stack-fill nav-group-icon" aria-hidden="true"></span>
-      <span class="nav-group-text">库房与系统</span>
+      <span class="nav-group-text">治具仓系统</span>
       <span class="bi bi-chevron-right nav-group-arrow" aria-hidden="true"></span>
     </button>
     <transition name="nav-collapse">
       <div v-show="expandedGroups.system" class="nav-group-body">
         <button v-if="userStore.canRead('warehouse')" type="button" class="nav-link" :class="{ active: $route.name === 'Warehouse' }" @click="go('/warehouse')">
-          <span class="bi bi-box-seam-fill" aria-hidden="true"></span>库房管理
+          <span class="bi bi-box-seam-fill" aria-hidden="true"></span>治具仓系统
         </button>
         <button v-if="userStore.canRead('users')" type="button" class="nav-link" :class="{ active: $route.name === 'Users' }" @click="go('/users')">
           <span class="bi bi-people-fill" aria-hidden="true"></span>用户管理
@@ -345,7 +345,7 @@ const NAME_MAP = {
   DevReqs:      ['业务管理', 'MES 需求管理'],
   Antivirus:    ['业务管理', '设备杀毒记录'],
   EsopParts:   ['业务管理', 'ESOP料号管理'],
-  Warehouse:   ['业务管理', '库房管理'],
+  Warehouse:   ['业务管理', '治具仓系统'],
   Exception:   ['业务管理', '异常履历管理'],
   Users:       ['业务管理', '用户管理']
 }

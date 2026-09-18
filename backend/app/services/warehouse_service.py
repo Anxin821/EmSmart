@@ -517,7 +517,7 @@ def create_part(db: Session, data: dict, request, username: str) -> dict:
     return _part_to_dict(p)
 
 
-def update_part(db: Session, part_id: int, data: dict, request, username: str) -> Optional[dict]:
+def update_part(db: Session, part_id: int, data: dict, request, username: str, role: str = "viewer") -> Optional[dict]:
     p = _get_part(db, part_id)
     if "name" in data and data["name"]:
         p.name = str(data["name"]).strip()
@@ -531,15 +531,14 @@ def update_part(db: Session, part_id: int, data: dict, request, username: str) -
         p.unit = (data.get("unit") or "").strip()
     if "warn_qty" in data and p.part_type == CONSUMABLE:
         p.warn_qty = max(0, int(data.get("warn_qty") or 0))
-    if "total_qty" in data:
+    # 只有 admin 可修改治具/耗材数量，非 admin 忽略 total_qty 字段
+    if "total_qty" in data and role == "admin":
         new_total = max(0, int(data.get("total_qty") or 0))
         if p.part_type == JIG:
-            # 治具总数调整：可用数量按差值同向调整（新增治具=可用增加）
             delta = new_total - p.total_qty
             old_total = p.total_qty
             p.available_qty = max(0, min(new_total, p.available_qty + delta))
             p.total_qty = new_total
-            # 总数变化时记录流水
             if delta != 0:
                 db.flush()
                 _add_tx(db, p, "补货" if delta > 0 else "减少", abs(delta),
