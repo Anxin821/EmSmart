@@ -7,60 +7,146 @@
         智能工厂管理平台
       </div>
 
-      <div class="nav-title">数据看板</div>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'AoiDashboard' }" @click="go('/dashboard/aoi')">
-        <span class="bi bi-bar-chart-fill" aria-hidden="true"></span>AOI&AI看板
-      </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'NetworkDashboard' }" @click="go('/dashboard/network')">
-        <span class="bi bi-hdd-network-fill" aria-hidden="true"></span>网络看板
-      </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'MesDashboard' }" @click="go('/dashboard/mes')">
-        <span class="bi bi-clipboard-data-fill" aria-hidden="true"></span>MES看板
-      </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'AntivirusDashboard' }" @click="go('/dashboard/antivirus')">
-        <span class="bi bi-shield-check" aria-hidden="true"></span>杀毒看板
-      </button>
-      <button type="button" class="nav-link" :class="{ active: $route.name === 'DutiesDashboard' }" @click="go('/dashboard/duties')">
-        <span class="bi bi-list-check" aria-hidden="true"></span>职责看板
-      </button>
+      <!-- 侧边栏导航：手风琴分组 -->
+<div class="nav-scroll">
 
-      <div class="nav-title">业务管理</div>
-      <button v-if="userStore.canRead('devices')" type="button" class="nav-link" :class="{ active: $route.name === 'Devices' }" @click="go('/devices')">
-        <span class="bi bi-cpu-fill" aria-hidden="true"></span>AOI&AI设备管理
-      </button>
-      <button v-if="userStore.canRead('weekly')" type="button" class="nav-link" :class="{ active: $route.name === 'Weekly' }" @click="go('/weekly')">
-        <span class="bi bi-graph-up-arrow" aria-hidden="true"></span>生产周报管理
-      </button>
-      <button v-if="userStore.canRead('servers')" type="button" class="nav-link" :class="{ active: $route.name === 'Servers' }" @click="go('/servers')">
-        <span class="bi bi-server" aria-hidden="true"></span>服务器管理
-      </button>
-      <button v-if="userStore.canRead('agingracks')" type="button" class="nav-link" :class="{ active: $route.name === 'AgingRacks' }" @click="go('/agingracks')">
-        <span class="bi bi-box-seam-fill" aria-hidden="true"></span>老化架管理
-      </button>
-      <button v-if="userStore.canRead('wifi')" type="button" class="nav-link" :class="{ active: $route.name === 'Wifi' }" @click="go('/wifi')">
-        <span class="bi bi-wifi" aria-hidden="true"></span>WiFi AP管理
-      </button>
-      <button v-if="userStore.canRead('bugs')" type="button" class="nav-link" :class="{ active: $route.name === 'Bugs' }" @click="go('/bugs')">
-        <span class="bi bi-bug-fill" aria-hidden="true"></span>MES BUG管理
-      </button>
-      <button v-if="userStore.canRead('devreqs')" type="button" class="nav-link" :class="{ active: $route.name === 'DevReqs' }" @click="go('/devreqs')">
-        <span class="bi bi-lightbulb-fill" aria-hidden="true"></span>MES 需求管理
-      </button>
-      <button v-if="userStore.canRead('exception')" type="button" class="nav-link" :class="{ active: $route.name === 'Exception' }" @click="go('/exception')">
-        <span class="bi bi-exclamation-triangle-fill" aria-hidden="true"></span>异常履历管理
-      </button>
-      <button v-if="userStore.canRead('esopparts')" type="button" class="nav-link" :class="{ active: $route.name === 'EsopParts' }" @click="go('/esop-parts')">
-        <span class="bi bi-file-earmark-text-fill" aria-hidden="true"></span>ESOP料号管理
-      </button>
-      <button v-if="userStore.canRead('antivirus')" type="button" class="nav-link" :class="{ active: $route.name === 'Antivirus' }" @click="go('/antivirus')">
-        <span class="bi bi-shield-shaded" aria-hidden="true"></span>设备杀毒记录
-      </button>
-      <button v-if="userStore.canRead('warehouse')" type="button" class="nav-link" :class="{ active: $route.name === 'Warehouse' }" @click="go('/warehouse')">
-        <span class="bi bi-box-seam-fill" aria-hidden="true"></span>库房管理
-      </button>
-      <button v-if="userStore.canRead('users')" type="button" class="nav-link" :class="{ active: $route.name === 'Users' }" @click="go('/users')">
-        <span class="bi bi-people-fill" aria-hidden="true"></span>用户管理
-      </button>
+  <!-- ============ 数据看板 ============ -->
+  <div class="nav-group" :class="{ expanded: expandedGroups.dashboard }">
+    <button
+      type="button"
+      class="nav-group-title"
+      @click="toggleGroup('dashboard')"
+    >
+      <span class="bi bi-grid-1x2-fill nav-group-icon" aria-hidden="true"></span>
+      <span class="nav-group-text">数据看板</span>
+      <span class="bi bi-chevron-right nav-group-arrow" aria-hidden="true"></span>
+    </button>
+    <transition name="nav-collapse">
+      <div v-show="expandedGroups.dashboard" class="nav-group-body">
+        <button type="button" class="nav-link" :class="{ active: $route.name === 'AoiDashboard' }" @click="go('/dashboard/aoi')">
+          <span class="bi bi-bar-chart-fill" aria-hidden="true"></span>AOI&AI看板
+        </button>
+        <button type="button" class="nav-link" :class="{ active: $route.name === 'NetworkDashboard' }" @click="go('/dashboard/network')">
+          <span class="bi bi-hdd-network-fill" aria-hidden="true"></span>网络看板
+        </button>
+        <button type="button" class="nav-link" :class="{ active: $route.name === 'MesDashboard' }" @click="go('/dashboard/mes')">
+          <span class="bi bi-clipboard-data-fill" aria-hidden="true"></span>MES看板
+        </button>
+        <button type="button" class="nav-link" :class="{ active: $route.name === 'AntivirusDashboard' }" @click="go('/dashboard/antivirus')">
+          <span class="bi bi-shield-check" aria-hidden="true"></span>杀毒看板
+        </button>
+        <button type="button" class="nav-link" :class="{ active: $route.name === 'DutiesDashboard' }" @click="go('/dashboard/duties')">
+          <span class="bi bi-list-check" aria-hidden="true"></span>职责看板
+        </button>
+      </div>
+    </transition>
+  </div>
+
+  <!-- ============ AI 设备 ============ -->
+  <div class="nav-group" :class="{ expanded: expandedGroups.aiDevice }">
+    <button
+      type="button"
+      class="nav-group-title"
+      @click="toggleGroup('aiDevice')"
+    >
+      <span class="bi bi-cpu-fill nav-group-icon" aria-hidden="true"></span>
+      <span class="nav-group-text">AI 设备</span>
+      <span class="bi bi-chevron-right nav-group-arrow" aria-hidden="true"></span>
+    </button>
+    <transition name="nav-collapse">
+      <div v-show="expandedGroups.aiDevice" class="nav-group-body">
+        <button v-if="userStore.canRead('devices')" type="button" class="nav-link" :class="{ active: $route.name === 'Devices' }" @click="go('/devices')">
+          <span class="bi bi-cpu-fill" aria-hidden="true"></span>AOI&AI设备管理
+        </button>
+        <button v-if="userStore.canRead('weekly')" type="button" class="nav-link" :class="{ active: $route.name === 'Weekly' }" @click="go('/weekly')">
+          <span class="bi bi-graph-up-arrow" aria-hidden="true"></span>生产周报管理
+        </button>
+      </div>
+    </transition>
+  </div>
+
+  <!-- ============ 网络 ============ -->
+  <div class="nav-group" :class="{ expanded: expandedGroups.network }">
+    <button
+      type="button"
+      class="nav-group-title"
+      @click="toggleGroup('network')"
+    >
+      <span class="bi bi-hdd-network-fill nav-group-icon" aria-hidden="true"></span>
+      <span class="nav-group-text">网络</span>
+      <span class="bi bi-chevron-right nav-group-arrow" aria-hidden="true"></span>
+    </button>
+    <transition name="nav-collapse">
+      <div v-show="expandedGroups.network" class="nav-group-body">
+        <button v-if="userStore.canRead('servers')" type="button" class="nav-link" :class="{ active: $route.name === 'Servers' }" @click="go('/servers')">
+          <span class="bi bi-server" aria-hidden="true"></span>服务器管理
+        </button>
+        <button v-if="userStore.canRead('agingracks')" type="button" class="nav-link" :class="{ active: $route.name === 'AgingRacks' }" @click="go('/agingracks')">
+          <span class="bi bi-box-seam-fill" aria-hidden="true"></span>老化架管理
+        </button>
+        <button v-if="userStore.canRead('wifi')" type="button" class="nav-link" :class="{ active: $route.name === 'Wifi' }" @click="go('/wifi')">
+          <span class="bi bi-wifi" aria-hidden="true"></span>WiFi AP管理
+        </button>
+        <button v-if="userStore.canRead('antivirus')" type="button" class="nav-link" :class="{ active: $route.name === 'Antivirus' }" @click="go('/antivirus')">
+          <span class="bi bi-shield-shaded" aria-hidden="true"></span>设备杀毒记录
+        </button>
+      </div>
+    </transition>
+  </div>
+
+  <!-- ============ MES ============ -->
+  <div class="nav-group" :class="{ expanded: expandedGroups.mes }">
+    <button
+      type="button"
+      class="nav-group-title"
+      @click="toggleGroup('mes')"
+    >
+      <span class="bi bi-clipboard-data-fill nav-group-icon" aria-hidden="true"></span>
+      <span class="nav-group-text">MES</span>
+      <span class="bi bi-chevron-right nav-group-arrow" aria-hidden="true"></span>
+    </button>
+    <transition name="nav-collapse">
+      <div v-show="expandedGroups.mes" class="nav-group-body">
+        <button v-if="userStore.canRead('bugs')" type="button" class="nav-link" :class="{ active: $route.name === 'Bugs' }" @click="go('/bugs')">
+          <span class="bi bi-bug-fill" aria-hidden="true"></span>MES BUG管理
+        </button>
+        <button v-if="userStore.canRead('devreqs')" type="button" class="nav-link" :class="{ active: $route.name === 'DevReqs' }" @click="go('/devreqs')">
+          <span class="bi bi-lightbulb-fill" aria-hidden="true"></span>MES 需求管理
+        </button>
+        <button v-if="userStore.canRead('exception')" type="button" class="nav-link" :class="{ active: $route.name === 'Exception' }" @click="go('/exception')">
+          <span class="bi bi-exclamation-triangle-fill" aria-hidden="true"></span>异常履历管理
+        </button>
+        <button v-if="userStore.canRead('esopparts')" type="button" class="nav-link" :class="{ active: $route.name === 'EsopParts' }" @click="go('/esop-parts')">
+          <span class="bi bi-file-earmark-text-fill" aria-hidden="true"></span>ESOP料号管理
+        </button>
+      </div>
+    </transition>
+  </div>
+
+  <!-- ============ 库房与系统 ============ -->
+  <div class="nav-group" :class="{ expanded: expandedGroups.system }">
+    <button
+      type="button"
+      class="nav-group-title"
+      @click="toggleGroup('system')"
+    >
+      <span class="bi bi-hdd-stack-fill nav-group-icon" aria-hidden="true"></span>
+      <span class="nav-group-text">库房与系统</span>
+      <span class="bi bi-chevron-right nav-group-arrow" aria-hidden="true"></span>
+    </button>
+    <transition name="nav-collapse">
+      <div v-show="expandedGroups.system" class="nav-group-body">
+        <button v-if="userStore.canRead('warehouse')" type="button" class="nav-link" :class="{ active: $route.name === 'Warehouse' }" @click="go('/warehouse')">
+          <span class="bi bi-box-seam-fill" aria-hidden="true"></span>库房管理
+        </button>
+        <button v-if="userStore.canRead('users')" type="button" class="nav-link" :class="{ active: $route.name === 'Users' }" @click="go('/users')">
+          <span class="bi bi-people-fill" aria-hidden="true"></span>用户管理
+        </button>
+      </div>
+    </transition>
+  </div>
+
+</div>
     </aside>
 
     <!-- 主内容区 -->
@@ -73,18 +159,18 @@
   :title="sidebarHidden ? '显示侧边栏' : '隐藏侧边栏'"
 >
   <svg
-  viewBox="0 0 24 24"
-  width="22"
-  height="22"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <rect x="3" y="4" width="18" height="16" rx="6" ry="6" />
-  <line x1="9" y1="4" x2="9" y2="20" />
-</svg>
+    viewBox="0 0 24 24"
+    width="22"
+    height="22"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <rect x="3" y="4" width="18" height="16" rx="6" ry="6" />
+    <line x1="9" y1="4" x2="9" y2="20" />
+  </svg>
 </button>
 <!-- ✅ 新增：当前模块标题 -->
   <h1 v-if="currentTitle" class="topbar-title">{{ currentTitle }}</h1>
@@ -156,7 +242,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, reactive, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
@@ -165,25 +251,76 @@ import { authApi } from '@/api'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-onMounted(() => {
-  // 恢复上次的隐藏状态
-  try {
-    sidebarHidden.value = localStorage.getItem(SIDEBAR_HIDDEN_KEY) === '1'
-  } catch { /* 忽略 */ }
-})
-// 下拉菜单显示状态
+
+// ================= 基础状态 =================
 const showMenu = ref(false)
-// 侧边栏是否隐藏（false = 显示，true = 隐藏）
 const sidebarHidden = ref(false)
 const SIDEBAR_HIDDEN_KEY = 'app_sidebar_hidden'
 
-// 切换显示/隐藏
+// ================= 手风琴分组展开状态 =================
+const expandedGroups = reactive({
+  dashboard: true,
+  aiDevice: false,
+  network: false,
+  mes: false,
+  system: false,
+})
+
+const ROUTE_GROUP_MAP = {
+  AoiDashboard: 'dashboard',
+  NetworkDashboard: 'dashboard',
+  MesDashboard: 'dashboard',
+  AntivirusDashboard: 'dashboard',
+  DutiesDashboard: 'dashboard',
+  Devices: 'aiDevice',
+  Weekly: 'aiDevice',
+  Servers: 'network',
+  AgingRacks: 'network',
+  Wifi: 'network',
+  Antivirus: 'network',
+  Bugs: 'mes',
+  DevReqs: 'mes',
+  Exception: 'mes',
+  EsopParts: 'mes',
+  Warehouse: 'system',
+  Users: 'system',
+}
+
+const toggleGroup = (key) => {
+  const willExpand = !expandedGroups[key]
+  Object.keys(expandedGroups).forEach(k => { expandedGroups[k] = false })
+  if (willExpand) expandedGroups[key] = true
+}
+
+const syncGroupFromRoute = () => {
+  const groupKey = ROUTE_GROUP_MAP[route.name]
+  if (!groupKey) return
+  Object.keys(expandedGroups).forEach(k => { expandedGroups[k] = false })
+  expandedGroups[groupKey] = true
+}
+
+// ================= 侧边栏切换 =================
 const toggleSidebar = () => {
   sidebarHidden.value = !sidebarHidden.value
   try {
     localStorage.setItem(SIDEBAR_HIDDEN_KEY, sidebarHidden.value ? '1' : '0')
   } catch { /* 隐私模式忽略 */ }
 }
+
+// ================= 生命周期 =================
+onMounted(() => {
+  try {
+    sidebarHidden.value = localStorage.getItem(SIDEBAR_HIDDEN_KEY) === '1'
+  } catch { /* 忽略 */ }
+  syncGroupFromRoute()
+})
+
+watch(
+  () => route.name,
+  () => syncGroupFromRoute()
+)
+
+// ================= 其他 state =================
 const profileDialogVisible = ref(false)
 const profileSaving = ref(false)
 const profileForm = ref({
@@ -193,15 +330,13 @@ const profileForm = ref({
   confirmPassword: ''
 })
 
-// 路由 → 分组+标题 映射（保持 NAME_MAP 常量便于后续扩展）
+// ================= 路由标题映射 =================
 const NAME_MAP = {
-  // 数据看板
   AoiDashboard:        ['数据看板', 'AOI&AI 看板'],
   NetworkDashboard:    ['数据看板', '车间网络看板'],
   MesDashboard:        ['数据看板', 'MES 看板'],
   AntivirusDashboard:  ['数据看板', '杀毒看板'],
   DutiesDashboard:     ['数据看板', '岗位职责看板'],
-  // 业务管理
   Devices:      ['业务管理', 'AOI&AI 设备管理'],
   Weekly:       ['业务管理', '生产周报管理'],
   Servers:      ['业务管理', '服务器管理'],
@@ -215,7 +350,7 @@ const NAME_MAP = {
   Exception:   ['业务管理', '异常履历管理'],
   Users:       ['业务管理', '用户管理']
 }
-// 当前模块标题（用于顶栏显示）
+
 const currentTitle = computed(() => {
   const name = route.name
   if (!name) return ''
@@ -223,17 +358,15 @@ const currentTitle = computed(() => {
   return entry ? entry[1] : ''
 })
 
-// 面包屑可点击路径：首页 = 数据看板默认页
 const HOME_PATH = '/dashboard/aoi'
 
 const roleMap = { admin: '管理员', engineer: '工程师', viewer: '只读用户' }
 const roleLabel = computed(() => roleMap[userStore.user?.role] || userStore.user?.role || '')
 const avatarText = computed(() => {
   const s = userStore.user?.full_name || userStore.user?.username || 'U'
-  return s.slice(-2)  // 中文名取末 2 字，英文首字母习惯可自行改
+  return s.slice(-2)
 })
 
-// 侧边栏点击导航：用 button 而非 <a href>，避免浏览器左下角弹出 URL 预览
 const go = (path) => router.push(path)
 
 const openProfileDialog = () => {
@@ -292,7 +425,6 @@ const handleLogout = () => {
   userStore.logout()
   router.push('/login')
 }
-
 </script>
 
 <style scoped>
@@ -367,7 +499,137 @@ const handleLogout = () => {
   text-overflow: ellipsis;
   max-width: 320px;           /* 标题很长时截断，不挤压右侧 */
 }
+/* ================================================================
+   手风琴分组
+   ================================================================ */
+.nav-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 
+.nav-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.nav-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 2px;
+}
+.nav-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, .15);
+}
+
+/* ---------- 分组容器 ---------- */
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* ---------- 分组标题 ---------- */
+.nav-group-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  color: var(--c-text-2, #475569);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  flex-shrink: 0;
+  font-family: inherit;
+  transition: background .15s, color .15s;
+}
+
+.nav-group-title:hover {
+  background: rgba(15, 23, 42, .04);
+  color: var(--c-text, #0f172a);
+}
+
+/* 分组图标（跟子项图标同样大小） */
+.nav-group-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  line-height: 1;
+  color: var(--c-text-3, #94A3B8);
+  transition: color .15s;
+}
+
+.nav-group-title:hover .nav-group-icon {
+  color: var(--primary, #2C5CE8);
+}
+
+/* 展开时：图标高亮主色 */
+.nav-group.expanded .nav-group-icon {
+  color: var(--primary, #2C5CE8);
+}
+
+.nav-group-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 展开箭头：默认指向右，展开时旋转 90° */
+.nav-group-arrow {
+  font-size: 12px;
+  color: var(--c-text-3, #94A3B8);
+  flex-shrink: 0;
+  transition: transform .24s cubic-bezier(.4, 0, .2, 1), color .15s;
+}
+
+.nav-group.expanded .nav-group-arrow {
+  transform: rotate(90deg);
+  color: var(--primary, #2C5CE8);
+}
+
+/* ---------- 分组内的子项列表 ---------- */
+.nav-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 4px 0;
+  overflow: hidden;
+}
+
+/* 子项缩进：跟分组标题的图标对齐 */
+.nav-group-body .nav-link {
+  padding-left: 34px;   /* 10px 分组 padding + 20px 图标宽 + 4px gap */
+}
+
+/* ---------- 展开/收起动画 ---------- */
+.nav-collapse-enter-active,
+.nav-collapse-leave-active {
+  transition: max-height .24s cubic-bezier(.4, 0, .2, 1), opacity .18s;
+  overflow: hidden;
+}
+
+.nav-collapse-enter-from,
+.nav-collapse-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+.nav-collapse-enter-to,
+.nav-collapse-leave-from {
+  max-height: 400px;   /* 足够大，能容纳最长组的项 */
+  opacity: 1;
+}
 /* 可选：在标题左边加一条淡竖线，跟折叠按钮做视觉分隔 */
 .topbar-title::before {
   content: '';
