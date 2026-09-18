@@ -287,9 +287,8 @@ const ROUTE_GROUP_MAP = {
 }
 
 const toggleGroup = (key) => {
-  const willExpand = !expandedGroups[key]
-  Object.keys(expandedGroups).forEach(k => { expandedGroups[k] = false })
-  if (willExpand) expandedGroups[key] = true
+  // 直接取反：展开的可以收起，收起的可以展开，互不影响
+  expandedGroups[key] = !expandedGroups[key]
 }
 
 const syncGroupFromRoute = () => {
