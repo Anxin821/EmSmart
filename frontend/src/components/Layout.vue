@@ -67,14 +67,27 @@
     <main class="main">
       <div class="topbar">
   <button
-    type="button"
-    class="sidebar-toggle"
-    @click="toggleSidebar"
-    :title="sidebarHidden ? '显示侧边栏' : '隐藏侧边栏'"
-  >
-    <span class="bi bi-list"></span>
-  </button>
-
+  type="button"
+  class="sidebar-toggle"
+  @click="toggleSidebar"
+  :title="sidebarHidden ? '显示侧边栏' : '隐藏侧边栏'"
+>
+  <svg
+  viewBox="0 0 24 24"
+  width="22"
+  height="22"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <rect x="3" y="4" width="18" height="16" rx="6" ry="6" />
+  <line x1="9" y1="4" x2="9" y2="20" />
+</svg>
+</button>
+<!-- ✅ 新增：当前模块标题 -->
+  <h1 v-if="currentTitle" class="topbar-title">{{ currentTitle }}</h1>
   <div class="topbar-actions"></div>
 
   <div class="user-right">
@@ -202,6 +215,13 @@ const NAME_MAP = {
   Exception:   ['业务管理', '异常履历管理'],
   Users:       ['业务管理', '用户管理']
 }
+// 当前模块标题（用于顶栏显示）
+const currentTitle = computed(() => {
+  const name = route.name
+  if (!name) return ''
+  const entry = NAME_MAP[name]
+  return entry ? entry[1] : ''
+})
 
 // 面包屑可点击路径：首页 = 数据看板默认页
 const HOME_PATH = '/dashboard/aoi'
@@ -314,29 +334,66 @@ const handleLogout = () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: none;
+  width: 36px;
+  height: 36px;
   background: transparent;
-  color: var(--c-text-3, #64748B);
+  border: none;
+  color: #0f172a;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 18px;
   padding: 0;
   margin-right: 8px;
   flex-shrink: 0;
   transition: background .15s, color .15s;
-  font-family: inherit;
+}
+/* ================================================================
+   顶栏当前模块标题
+   ================================================================ */
+.topbar-title {
+  /* 复位 h1 默认样式 */
+  margin: 0;
+  padding: 0;
+
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text, #0f172a);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+
+  /* 不要被压缩 */
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;           /* 标题很长时截断，不挤压右侧 */
+}
+
+/* 可选：在标题左边加一条淡竖线，跟折叠按钮做视觉分隔 */
+.topbar-title::before {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  background: var(--c-divider, #E2E8F0);
+  vertical-align: middle;
+  margin-right: 12px;
+  position: relative;
+  top: -1px;
 }
 .sidebar-toggle:hover {
   background: rgba(15, 23, 42, .06);
-  color: var(--c-text, #0f172a);
+  color: var(--primary, #2C5CE8);
 }
 .sidebar-toggle:active {
   transform: scale(.96);
 }
+.sidebar-toggle svg {
+  display: block;        /* 去掉 inline-svg 的基线空隙 */
+}
 .sidebar-toggle .bi {
+  font-size: 22px;                    /* ✅ 从 18 → 22，跟参考图尺寸感接近 */
   line-height: 1;
+  font-weight: 700;                   /* ✅ Bootstrap Icons 支持，笔画更粗 */
 }
 .profile-dialog :deep(.el-dialog) {
   border-radius: 18px;
